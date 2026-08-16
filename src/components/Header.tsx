@@ -61,14 +61,12 @@ export const Header: React.FC<{
     notifications,
     markNotificationRead,
     clearNotifications,
-    resetDemoData,
     settings,
   } = useWallet();
 
   const [isBalanceVisible, setIsBalanceVisible] = useState(true);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   // Modals state
   const [show3DotsMenu, setShow3DotsMenu] = useState(false);
@@ -129,18 +127,16 @@ export const Header: React.FC<{
 
         {/* Right Controls */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Admin / User Role Switch Pill */}
-          <button
-            onClick={toggleRoleMode}
-            className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-all shadow-md active:scale-95 ${
-              activeRole === 'ADMIN'
-                ? 'bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white shadow-rose-600/20'
-                : 'bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white shadow-indigo-600/25'
-            }`}
-          >
-            <ShieldCheck className="h-3.5 w-3.5" />
-            <span>{activeRole === 'ADMIN' ? 'Switch to User View' : 'Admin Panel'}</span>
-          </button>
+          {/* Show Exit Admin Button ONLY when currently in Admin Portal */}
+          {activeRole === 'ADMIN' && (
+            <button
+              onClick={toggleRoleMode}
+              className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-all shadow-md active:scale-95 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white shadow-rose-600/20"
+            >
+              <ShieldCheck className="h-3.5 w-3.5" />
+              <span>Exit Admin Portal</span>
+            </button>
+          )}
 
           {/* User Switcher Dropdown */}
           <div className="relative">
@@ -265,15 +261,6 @@ export const Header: React.FC<{
             </button>
           )}
 
-          {/* Reset Demo Button */}
-          <button
-            onClick={() => setShowResetConfirm(true)}
-            className="p-2 text-slate-400 hover:text-slate-200 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-full transition"
-            title="Reset Seed Data"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </button>
-
           {/* 3-LINES OPTIONS MENU BUTTON */}
           <button
             onClick={() => (onOpen3DotsMenu ? onOpen3DotsMenu() : setShow3DotsMenu(true))}
@@ -331,43 +318,6 @@ export const Header: React.FC<{
             onClose={() => setShowScanPayModal(false)}
           />
         </>
-      )}
-
-      {/* Reset Confirmation Modal */}
-      {showResetConfirm && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl">
-            <div className="flex justify-between items-start">
-              <h3 className="font-bold text-base text-white">Reset Application Data?</h3>
-              <button
-                onClick={() => setShowResetConfirm(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              This will restore all wallet balances, deposit requests, withdrawals, and system settings back to original SR GATEWAY IN defaults.
-            </p>
-            <div className="flex gap-2 justify-end pt-2">
-              <button
-                onClick={() => setShowResetConfirm(false)}
-                className="px-4 py-2 text-xs font-semibold bg-slate-800 text-slate-300 rounded-xl hover:bg-slate-700"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  resetDemoData();
-                  setShowResetConfirm(false);
-                }}
-                className="px-4 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white rounded-xl shadow-lg shadow-rose-600/20"
-              >
-                Reset Now
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </header>
   );

@@ -66,6 +66,30 @@ export const AdminPortal: React.FC = () => {
   const [modalAmount, setModalAmount] = useState<number>(1000);
   const [modalReason, setModalReason] = useState<string>('');
 
+  // Fixed Master Admin Security Password Protection (7477661867Ss)
+  const MASTER_ADMIN_PASS = '7477661867Ss';
+  const [adminPassInput, setAdminPassInput] = useState('');
+  const [isPassAuthed, setIsPassAuthed] = useState<boolean>(() => {
+    return sessionStorage.getItem('sr_admin_authed') === 'true';
+  });
+  const [passError, setPassError] = useState<string | null>(null);
+
+  const handleAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminPassInput === MASTER_ADMIN_PASS) {
+      setIsPassAuthed(true);
+      sessionStorage.setItem('sr_admin_authed', 'true');
+      setPassError(null);
+    } else {
+      setPassError('❌ Incorrect Master Admin Password. Access Denied!');
+    }
+  };
+
+  const handleAdminLock = () => {
+    setIsPassAuthed(false);
+    sessionStorage.removeItem('sr_admin_authed');
+  };
+
   // Rejection Modals
   const [rejectDepositId, setRejectDepositId] = useState<string | null>(null);
   const [depositRejectReason, setDepositRejectReason] = useState<string>('UTR mismatch / Invalid screenshot');
@@ -176,8 +200,82 @@ export const AdminPortal: React.FC = () => {
   const saveSystemSettings = (e: React.FormEvent) => {
     e.preventDefault();
     updateSettings(settingsForm);
-    showAlert('System settings updated successfully!');
+    showAlert('✅ System settings and Bank details updated successfully!');
   };
+
+  const handleAdminQrUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setSettingsForm({
+          ...settingsForm,
+          admin_qr_url: event.target.result as string,
+        });
+        showAlert('✅ QR code image loaded from device! Click Save Settings to apply.');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // If not authenticated with Master Password, render dedicated Gatekeeper Screen
+  if (!isPassAuthed) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <div className="bg-slate-900 border border-rose-500/40 rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl space-y-6 text-center text-white relative">
+          <div className="w-16 h-16 rounded-3xl bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center mx-auto shadow-lg shadow-rose-500/20">
+            <Lock className="h-8 w-8" />
+          </div>
+
+          <div className="space-y-1.5">
+            <h3 className="text-2xl font-black text-white tracking-tight">Super Admin Security Gate</h3>
+            <p className="text-xs text-slate-400">
+              Enter the authorized Master Security Password to access Admin Portal controls & ledger management.
+            </p>
+          </div>
+
+          {passError && (
+            <div className="p-3.5 bg-rose-500/20 border border-rose-500/30 rounded-2xl text-xs text-rose-300 font-bold font-mono">
+              {passError}
+            </div>
+          )}
+
+          <form onSubmit={handleAdminLogin} className="space-y-4 text-left">
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1.5 font-mono">
+                Master Security Password
+              </label>
+              <input
+                type="password"
+                placeholder="Enter admin password..."
+                value={adminPassInput}
+                onChange={(e) => {
+                  setAdminPassInput(e.target.value);
+                  setPassError(null);
+                }}
+                className="w-full bg-slate-950 border border-slate-800 focus:border-rose-500 rounded-2xl px-4 py-3 text-white font-mono text-sm focus:outline-none"
+                autoFocus
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-3.5 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition shadow-xl shadow-rose-600/30 active:scale-95 flex items-center justify-center gap-2"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              <span>Unlock Admin Portal ⚡</span>
+            </button>
+          </form>
+
+          <div className="pt-2 border-t border-slate-800/80 text-[11px] text-slate-500 font-mono">
+            Protected by SR GATEWAY Master Key Protocol
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 text-slate-100">
@@ -199,11 +297,19 @@ export const AdminPortal: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <span className="bg-rose-500/20 border border-rose-500/30 text-rose-300 px-3 py-1.5 rounded-full text-xs font-mono font-bold flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
               <span>Admin Mode Active</span>
             </span>
+            <button
+              onClick={handleAdminLock}
+              className="bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white px-3 py-1.5 rounded-full text-xs font-bold font-mono transition flex items-center gap-1.5"
+              title="Lock Admin Session"
+            >
+              <Lock className="h-3 w-3 text-rose-400" />
+              <span>Lock Admin</span>
+            </button>
           </div>
         </div>
 
@@ -882,9 +988,21 @@ export const AdminPortal: React.FC = () => {
 
               {/* Deposit QR Code Photo Editor */}
               <div className="p-4 bg-slate-900/80 rounded-2xl border border-slate-800 space-y-3">
-                <label className="block text-slate-300 font-bold text-xs font-mono">
-                  Deposit QR Code Photo (Image URL or Direct Link)
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-slate-300 font-bold text-xs font-mono">
+                    Deposit QR Code Photo (Upload from Gallery or Enter URL)
+                  </label>
+                  <label className="cursor-pointer px-3 py-1.5 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 rounded-xl text-[11px] font-bold transition flex items-center gap-1.5">
+                    <PlusCircle className="h-3.5 w-3.5" />
+                    <span>Upload QR Image from Device</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAdminQrUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
                 <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
                   <div className="w-24 h-24 bg-white p-2 rounded-2xl shrink-0 flex items-center justify-center overflow-hidden border border-slate-700 shadow-md">
                     <img
@@ -903,8 +1021,58 @@ export const AdminPortal: React.FC = () => {
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-emerald-300 font-mono text-xs focus:border-emerald-500 focus:outline-none"
                     />
                     <p className="text-[10px] text-slate-400 font-mono">
-                      Change this photo to update the official deposit QR code shown to all users on their Deposit Screen immediately.
+                      Upload any QR code screenshot from your phone/computer or paste an image URL to update the official deposit QR code immediately.
                     </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* IMPS / NEFT Bank Details Configuration */}
+              <div className="p-4 bg-slate-900/80 rounded-2xl border border-slate-800 space-y-3">
+                <label className="block text-indigo-300 font-bold text-xs font-mono flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-indigo-400" />
+                  <span>Admin Bank Account Details (Shown on User Deposit Page)</span>
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="block text-slate-400 text-[10px] font-mono uppercase mb-1">Bank Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. HDFC Bank Ltd"
+                      value={settingsForm.admin_bank_name || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, admin_bank_name: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-[10px] font-mono uppercase mb-1">Account Holder Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. SR Gateway Payments"
+                      value={settingsForm.admin_bank_account_name || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, admin_bank_account_name: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-[10px] font-mono uppercase mb-1">Bank Account Number</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 50200088192031"
+                      value={settingsForm.admin_bank_account_no || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, admin_bank_account_no: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-300 font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-[10px] font-mono uppercase mb-1">IFSC Code</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. HDFC0001092"
+                      value={settingsForm.admin_bank_ifsc || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, admin_bank_ifsc: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-amber-300 font-mono font-bold"
+                    />
                   </div>
                 </div>
               </div>

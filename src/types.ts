@@ -186,6 +186,10 @@ export interface AppSettings {
   support_url: string;
   admin_upi_id: string;
   admin_qr_url: string;
+  admin_bank_name?: string;
+  admin_bank_account_name?: string;
+  admin_bank_account_no?: string;
+  admin_bank_ifsc?: string;
 }
 
 export interface ApiKeyRecord {

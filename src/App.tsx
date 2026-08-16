@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 
 function WalletAppContent() {
-  const { activeRole, rpinModalConfig, closeRpinModal } = useWallet();
+  const { activeRole, toggleRoleMode, switchUser, rpinModalConfig, closeRpinModal } = useWallet();
 
   const [activeTab, setActiveTab] = useState<
     'home' | 'deposit' | 'withdraw' | 'transfer' | 'transactions' | 'developer' | 'support' | 'profile'
@@ -39,6 +39,27 @@ function WalletAppContent() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [activeTab]);
+
+  // Check for secret admin portal access via URL query or hash
+  useEffect(() => {
+    const checkAdminQuery = () => {
+      const params = new URLSearchParams(window.location.search);
+      const isSecretAdminRoute =
+        params.get('admin') === 'portal' ||
+        params.get('admin') === 'true' ||
+        params.get('route') === 'admin' ||
+        window.location.hash === '#admin' ||
+        window.location.hash === '#admin-portal';
+
+      if (isSecretAdminRoute && activeRole !== 'ADMIN') {
+        switchUser('admin-001');
+      }
+    };
+
+    checkAdminQuery();
+    window.addEventListener('hashchange', checkAdminQuery);
+    return () => window.removeEventListener('hashchange', checkAdminQuery);
+  }, [activeRole, switchUser]);
 
   // Modal States
   const [threeDotsOpen, setThreeDotsOpen] = useState(false);

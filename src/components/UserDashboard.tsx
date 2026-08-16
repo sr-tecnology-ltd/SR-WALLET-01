@@ -55,7 +55,7 @@ export const UserDashboard: React.FC<{
   } = useWallet();
 
   // User-specific metrics
-  const myDeposits = deposits.filter((d) => d.user_id === currentUser.id);
+  const myDeposits = deposits.filter((d) => d.user_id === currentUser.id || d.user_id === currentUser.user_custom_id);
   const totalDepositAmount = myDeposits
     .filter((d) => d.status === 'SUCCESS')
     .reduce((sum, d) => sum + d.net_amount, 0);
@@ -64,7 +64,7 @@ export const UserDashboard: React.FC<{
     .filter((d) => d.status === 'PENDING')
     .reduce((sum, d) => sum + d.amount, 0);
 
-  const myWithdrawals = withdrawals.filter((w) => w.user_id === currentUser.id);
+  const myWithdrawals = withdrawals.filter((w) => w.user_id === currentUser.id || w.user_id === currentUser.user_custom_id);
   const totalWithdrawalAmount = myWithdrawals
     .filter((w) => w.status === 'SUCCESS')
     .reduce((sum, w) => sum + w.net_payout, 0);
@@ -73,7 +73,13 @@ export const UserDashboard: React.FC<{
     .filter((w) => w.status === 'PENDING')
     .reduce((sum, w) => sum + w.amount, 0);
 
-  const myTransactions = transactions.filter((t) => t.user_id === currentUser.id);
+  const myTransactions = transactions.filter(
+    (t) =>
+      t.user_id === currentUser.id ||
+      t.user_id === currentUser.user_custom_id ||
+      t.user_custom_id === currentUser.user_custom_id ||
+      (currentUser.mobile && t.description?.includes(currentUser.mobile.replace(/[^0-9]/g, '').slice(-10)))
+  );
 
   // System Services Grid Configuration (Cleaned & Updated as requested)
   const systemServices = [

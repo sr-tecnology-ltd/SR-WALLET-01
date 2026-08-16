@@ -35,8 +35,14 @@ export const TransactionsSection: React.FC = () => {
   const [downloadMsg, setDownloadMsg] = useState<string | null>(null);
 
   const myTransactions = useMemo(() => {
-    return transactions.filter((t) => t.user_id === currentUser.id);
-  }, [transactions, currentUser.id]);
+    return transactions.filter(
+      (t) =>
+        t.user_id === currentUser.id ||
+        t.user_id === currentUser.user_custom_id ||
+        t.user_custom_id === currentUser.user_custom_id ||
+        (currentUser.mobile && t.description?.includes(currentUser.mobile.replace(/[^0-9]/g, '').slice(-10)))
+    );
+  }, [transactions, currentUser]);
 
   const handleVerifyPin = (e?: React.FormEvent) => {
     if (e) e.preventDefault();

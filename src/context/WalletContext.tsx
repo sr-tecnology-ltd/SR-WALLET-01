@@ -272,15 +272,29 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               return prev;
             });
           }
-          // Merge wallets
+          // Merge wallets across both user_id ('user-001') and custom_id ('SR-10029')
           if (data.wallets && typeof data.wallets === 'object') {
             setWallets((prev) => {
               let changed = false;
               const next = { ...prev };
               Object.entries(data.wallets).forEach(([k, w]: [string, any]) => {
-                if (next[k] && next[k].available_balance !== w.available_balance) {
-                  next[k] = { ...next[k], available_balance: w.available_balance };
-                  changed = true;
+                if (w && typeof w.available_balance === 'number') {
+                  if (!next[k] || next[k].available_balance !== w.available_balance || next[k].locked_balance !== w.locked_balance) {
+                    next[k] = { ...(next[k] || {}), ...w };
+                    changed = true;
+                  }
+                  // Also match and update profile mappings
+                  const matchedProfile = profiles.find((p) => p.id === k || p.user_custom_id === k || (p.mobile && p.mobile.replace(/[^0-9]/g, '').slice(-10) === k.replace(/[^0-9]/g, '').slice(-10)));
+                  if (matchedProfile) {
+                    if (!next[matchedProfile.id] || next[matchedProfile.id].available_balance !== w.available_balance) {
+                      next[matchedProfile.id] = { ...(next[matchedProfile.id] || {}), ...w, user_id: matchedProfile.id };
+                      changed = true;
+                    }
+                    if (!next[matchedProfile.user_custom_id] || next[matchedProfile.user_custom_id].available_balance !== w.available_balance) {
+                      next[matchedProfile.user_custom_id] = { ...(next[matchedProfile.user_custom_id] || {}), ...w, user_id: matchedProfile.user_custom_id };
+                      changed = true;
+                    }
+                  }
                 }
               });
               return changed ? next : prev;
@@ -292,14 +306,16 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
 
-    const interval = setInterval(syncFromBackend, 3000);
+    // Run immediately on mount and then every 2 seconds
+    syncFromBackend();
+    const interval = setInterval(syncFromBackend, 2000);
     return () => clearInterval(interval);
   }, []);
 
-  const currentUser = profiles.find((p) => p.id === activeUserId) || profiles[0];
+  const currentUser = profiles.find((p) => p.id === activeUserId || p.user_custom_id === activeUserId) || profiles[0];
   const activeRole = currentUser.role;
 
-  const currentWallet = wallets[currentUser.id] || {
+  const currentWallet = wallets[currentUser.id] || wallets[currentUser.user_custom_id] || {
     id: `w-${currentUser.id}`,
     user_id: currentUser.id,
     available_balance: 0,
@@ -405,7 +421,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setDeposits((prev) => [newDeposit, ...prev]);
     addNotification(currentUser.id, 'Deposit Request Submitted', `Your deposit request of ${formatINR(amount)} (UTR: ${utr}) is under review.`, 'INFO');
 
-    return { success: true, message: 'Deposit request submitted successfully! Awaiting admin approval.' };
+    return {
+      success: true,
+      message: 'Deposit request submitted successfully! Awaiting admin verification.',
+      deposit: newDeposit,
+    };
   };
 
   // Approve Deposit (Atomic Server-Side Operation)
@@ -415,18 +435,31 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (deposit.status !== 'PENDING') return { success: false, message: 'This request has already been processed.' };
 
     const targetUserId = deposit.user_id;
-    const targetUser = profiles.find((p) => p.id === targetUserId);
-    const userWallet = wallets[targetUserId] || { available_balance: 0, locked_balance: 0 };
+    const targetUser = profiles.find((p) => p.id === targetUserId || p.user_custom_id === targetUserId);
+    const resolvedId = targetUser ? targetUser.id : targetUserId;
+    const resolvedCustomId = targetUser ? targetUser.user_custom_id : targetUserId;
+    const userWallet = wallets[resolvedId] || wallets[resolvedCustomId] || { available_balance: 0, locked_balance: 0 };
 
     const prevBal = userWallet.available_balance;
     const newBal = prevBal + deposit.net_amount;
 
-    // 1. Update wallet balance
+    // 1. Update wallet balance for both ID and custom_id
     setWallets((prev) => ({
       ...prev,
-      [targetUserId]: {
-        ...prev[targetUserId],
+      [resolvedId]: {
+        ...(prev[resolvedId] || {}),
+        id: `w-${resolvedId}`,
+        user_id: resolvedId,
         available_balance: newBal,
+        locked_balance: userWallet.locked_balance,
+        updated_at: new Date().toISOString(),
+      },
+      [resolvedCustomId]: {
+        ...(prev[resolvedCustomId] || {}),
+        id: `w-${resolvedId}`,
+        user_id: resolvedId,
+        available_balance: newBal,
+        locked_balance: userWallet.locked_balance,
         updated_at: new Date().toISOString(),
       },
     }));
@@ -448,7 +481,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // 3. Create Transaction Ledger entry
     const newTx: Transaction = {
       id: `TXN-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`,
-      user_id: targetUserId,
+      user_id: resolvedId,
       user_name: deposit.user_name,
       type: 'DEPOSIT',
       amount: deposit.amount,
@@ -465,7 +498,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // 4. Create Audit Log & Notification
     addAuditLog('DEPOSIT_APPROVED', `Approved deposit request of ${formatINR(deposit.amount)} (UTR: ${deposit.utr})`, targetUser, deposit.amount, prevBal, newBal);
-    addNotification(targetUserId, 'Deposit Approved! ⚡', `Your wallet has been credited with ${formatINR(deposit.net_amount)}.`, 'SUCCESS');
+    addNotification(resolvedId, 'Deposit Approved! ⚡', `Your wallet has been credited with ${formatINR(deposit.net_amount)}.`, 'SUCCESS');
 
     // Trigger Webhook log simulation
     setWebhookLogs((prev) => [
@@ -537,12 +570,25 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const prevAvailable = currentWallet.available_balance;
     const prevLocked = currentWallet.locked_balance;
 
+    const newAvailable = Math.max(0, prevAvailable - amount);
+    const newLocked = prevLocked + amount;
+
     setWallets((prev) => ({
       ...prev,
       [currentUser.id]: {
-        ...prev[currentUser.id],
-        available_balance: prevAvailable - amount,
-        locked_balance: prevLocked + amount,
+        ...(prev[currentUser.id] || {}),
+        id: `w-${currentUser.id}`,
+        user_id: currentUser.id,
+        available_balance: newAvailable,
+        locked_balance: newLocked,
+        updated_at: new Date().toISOString(),
+      },
+      [currentUser.user_custom_id]: {
+        ...(prev[currentUser.user_custom_id] || {}),
+        id: `w-${currentUser.id}`,
+        user_id: currentUser.id,
+        available_balance: newAvailable,
+        locked_balance: newLocked,
         updated_at: new Date().toISOString(),
       },
     }));
@@ -577,14 +623,19 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       reference_id: newWithdrawal.id,
       description: `Withdrawal Request Submitted to ${paymentIdentifier}`,
       balance_before: prevAvailable,
-      balance_after: prevAvailable - amount,
+      balance_after: newAvailable,
       created_at: new Date().toISOString(),
     };
     setTransactions((prev) => [newTx, ...prev]);
 
     addNotification(currentUser.id, 'Withdrawal Requested', `Withdrawal request of ${formatINR(amount)} submitted. Net payout: ${formatINR(netPayout)}.`, 'INFO');
 
-    return { success: true, message: 'Withdrawal request submitted! Funds are locked until admin verification.' };
+    return {
+      success: true,
+      message: 'Withdrawal request submitted! Funds are locked until admin verification.',
+      withdrawal: newWithdrawal,
+      transaction: newTx,
+    };
   };
 
   // Approve Withdrawal
@@ -742,17 +793,42 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const refId = `TRF-${currentUser.mobile}-${recipient.mobile}-${Date.now()}`;
 
-    // Deduct sender & Credit receiver
+    const senderNewBal = senderPrevBal - amount;
+    const recipientNewBal = recipientPrevBal + amount;
+
+    // Deduct sender & Credit receiver across both ID and Custom ID keys
     setWallets((prev) => ({
       ...prev,
       [currentUser.id]: {
-        ...prev[currentUser.id],
-        available_balance: senderPrevBal - amount,
+        ...(prev[currentUser.id] || {}),
+        id: `w-${currentUser.id}`,
+        user_id: currentUser.id,
+        available_balance: senderNewBal,
+        locked_balance: (prev[currentUser.id]?.locked_balance) || 0,
+        updated_at: new Date().toISOString(),
+      },
+      [currentUser.user_custom_id]: {
+        ...(prev[currentUser.user_custom_id] || {}),
+        id: `w-${currentUser.id}`,
+        user_id: currentUser.id,
+        available_balance: senderNewBal,
+        locked_balance: (prev[currentUser.user_custom_id]?.locked_balance) || 0,
         updated_at: new Date().toISOString(),
       },
       [recipient.id]: {
-        ...prev[recipient.id],
-        available_balance: recipientPrevBal + amount,
+        ...(prev[recipient.id] || {}),
+        id: `w-${recipient.id}`,
+        user_id: recipient.id,
+        available_balance: recipientNewBal,
+        locked_balance: (prev[recipient.id]?.locked_balance) || 0,
+        updated_at: new Date().toISOString(),
+      },
+      [recipient.user_custom_id]: {
+        ...(prev[recipient.user_custom_id] || {}),
+        id: `w-${recipient.id}`,
+        user_id: recipient.id,
+        available_balance: recipientNewBal,
+        locked_balance: (prev[recipient.user_custom_id]?.locked_balance) || 0,
         updated_at: new Date().toISOString(),
       },
     }));
@@ -770,7 +846,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       reference_id: refId,
       description: `Internal Transfer Sent to ${recipient.full_name} (${recipient.mobile}) ${note ? `- ${note}` : ''}`,
       balance_before: senderPrevBal,
-      balance_after: senderPrevBal - amount,
+      balance_after: senderNewBal,
       created_at: new Date().toISOString(),
     };
 
@@ -787,7 +863,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       reference_id: refId,
       description: `Internal Transfer Received from ${currentUser.full_name} (${currentUser.mobile}) ${note ? `- ${note}` : ''}`,
       balance_before: recipientPrevBal,
-      balance_after: recipientPrevBal + amount,
+      balance_after: recipientNewBal,
       created_at: new Date().toISOString(),
     };
 
@@ -796,7 +872,23 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     addNotification(currentUser.id, 'Transfer Sent', `Transferred ${formatINR(amount)} to ${recipient.full_name}.`, 'INFO');
     addNotification(recipient.id, 'Funds Received! 🎁', `Received ${formatINR(amount)} from ${currentUser.full_name}.`, 'SUCCESS');
 
-    return { success: true, message: `Successfully transferred ${formatINR(amount)} to ${recipient.full_name} (${recipient.user_custom_id}).` };
+    return {
+      success: true,
+      message: `Successfully transferred ${formatINR(amount)} to ${recipient.full_name} (${recipient.user_custom_id}).`,
+      transferData: {
+        txnId: senderTx.id,
+        amount,
+        senderName: currentUser.full_name,
+        senderMobile: currentUser.mobile,
+        receiverName: recipient.full_name,
+        receiverMobile: recipient.mobile,
+        receiverCustomId: recipient.user_custom_id,
+        status: 'SUCCESS',
+        note,
+        date: new Date().toISOString(),
+        newBalance: senderNewBal,
+      },
+    };
   };
 
   // Admin Manual Add Balance

@@ -252,54 +252,31 @@ export const ThreeDotsMenuModal: React.FC<ThreeDotsMenuProps> = ({
             </div>
           </div>
 
-          {/* Section 4: System Admin & Controls */}
+          {/* Section 4: Demo Account Switcher */}
           <div className="space-y-2">
             <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-1">
-              🛡️ System Controls
+              👥 Account Switcher
             </div>
-            <div className="space-y-2">
-              <button
-                onClick={() => {
-                  toggleRoleMode();
-                  onClose();
-                }}
-                className="w-full p-3 bg-gradient-to-r from-rose-950/50 to-amber-950/50 hover:from-rose-900/60 hover:to-amber-900/60 border border-rose-500/30 rounded-2xl text-left transition flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <ShieldCheck className="h-5 w-5 text-rose-400" />
-                  <div>
-                    <div className="font-bold text-xs text-white">
-                      {activeRole === 'ADMIN' ? 'Switch to User View' : 'Super Admin Portal'}
-                    </div>
-                    <div className="text-[10px] text-rose-300">
-                      Manage deposits, payout approvals, balance edits, and user bans
-                    </div>
-                  </div>
-                </div>
-                <ChevronRight className="h-4 w-4 text-rose-400" />
-              </button>
-
-              <div className="p-3 bg-slate-950 border border-slate-800 rounded-2xl space-y-2">
-                <div className="text-[10px] text-slate-400 font-bold uppercase">Demo User Switcher</div>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {allProfiles.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => {
-                        switchUser(p.id);
-                        onClose();
-                      }}
-                      className={`p-2 rounded-xl text-left text-[11px] font-bold transition border ${
-                        p.id === currentUser.id
-                          ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
-                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <div className="truncate">{p.full_name}</div>
-                      <div className="text-[9px] font-mono opacity-70">{p.user_custom_id}</div>
-                    </button>
-                  ))}
-                </div>
+            <div className="p-3 bg-slate-950 border border-slate-800 rounded-2xl space-y-2">
+              <div className="text-[10px] text-slate-400 font-bold uppercase">Demo User Switcher</div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {allProfiles.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      switchUser(p.id);
+                      onClose();
+                    }}
+                    className={`p-2 rounded-xl text-left text-[11px] font-bold transition border ${
+                      p.id === currentUser.id
+                        ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <div className="truncate">{p.full_name}</div>
+                    <div className="text-[9px] font-mono opacity-70">{p.user_custom_id}</div>
+                  </button>
+                ))}
               </div>
             </div>
           </div>
@@ -317,17 +294,7 @@ export const ThreeDotsMenuModal: React.FC<ThreeDotsMenuProps> = ({
             <MessageSquare className="h-4 w-4 text-sky-400" />
             <span>24/7 Telegram Support</span>
           </button>
-
-          <button
-            onClick={() => {
-              resetDemoData();
-              onClose();
-            }}
-            className="text-slate-500 hover:text-rose-400 transition flex items-center gap-1 font-mono text-[11px]"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            <span>Reset Defaults</span>
-          </button>
+          <span className="text-[10px] text-slate-600 font-mono">SR GATEWAY v3.2</span>
         </div>
       </div>
     </div>

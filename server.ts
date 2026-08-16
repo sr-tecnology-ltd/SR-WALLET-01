@@ -57,11 +57,11 @@ let users: Record<string, any> = {
     user_custom_id: 'SR-10029',
     full_name: 'Rahul Sharma',
     mobile: '+91 98765 43210',
-    email: 'rahul.sharma@example.com',
+    email: 'rahul@srgateway.in',
     telegram_id: '@rahul_sr',
     role: 'USER',
     status: 'ACTIVE',
-    referral_code: 'REF-SR10029',
+    referral_code: 'RAHUL10029',
     created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
     updated_at: new Date().toISOString(),
   },
@@ -70,11 +70,11 @@ let users: Record<string, any> = {
     user_custom_id: 'SR-10034',
     full_name: 'Priya Patel',
     mobile: '+91 98123 45678',
-    email: 'priya.patel@example.com',
-    telegram_id: '@priya_pay',
+    email: 'priya@srgateway.in',
+    telegram_id: '@priya_patel',
     role: 'USER',
     status: 'ACTIVE',
-    referral_code: 'REF-SR10034',
+    referral_code: 'PRIYA10034',
     created_at: new Date(Date.now() - 86400000 * 20).toISOString(),
     updated_at: new Date().toISOString(),
   },
@@ -82,12 +82,12 @@ let users: Record<string, any> = {
     id: 'user-003',
     user_custom_id: 'SR-10088',
     full_name: 'Amit Kumar',
-    mobile: '+91 98989 12345',
-    email: 'amit.kumar@example.com',
-    telegram_id: '@amit_dev',
+    mobile: '+91 99887 76655',
+    email: 'amit@srgateway.in',
+    telegram_id: '@amit_k',
     role: 'USER',
     status: 'ACTIVE',
-    referral_code: 'REF-SR10088',
+    referral_code: 'AMIT10088',
     created_at: new Date(Date.now() - 86400000 * 15).toISOString(),
     updated_at: new Date().toISOString(),
   },
@@ -95,37 +95,71 @@ let users: Record<string, any> = {
     id: 'admin-001',
     user_custom_id: 'SR-ADMIN-01',
     full_name: 'SR Gateway System Admin',
-    mobile: '+91 99999 88888',
+    mobile: '+91 90000 00000',
     email: 'admin@srgateway.in',
-    telegram_id: '@sradmin_official',
+    telegram_id: '@srgateway_official',
     role: 'ADMIN',
     status: 'ACTIVE',
-    referral_code: 'REF-ADMIN',
+    referral_code: 'ADMIN001',
     created_at: new Date(Date.now() - 86400000 * 90).toISOString(),
     updated_at: new Date().toISOString(),
   },
 };
 
+// Aliases for internal IDs and mobile numbers
+users['user-001'] = users['SR-10029'];
+users['user-002'] = users['SR-10034'];
+users['user-003'] = users['SR-10088'];
+users['admin-001'] = users['SR-ADMIN-01'];
+users['9876543210'] = users['SR-10029'];
+users['9812345678'] = users['SR-10034'];
+users['9988776655'] = users['SR-10088'];
+users['9000000000'] = users['SR-ADMIN-01'];
+
 let wallets: Record<string, any> = {
   'SR-10029': {
-    id: 'w-user-001',
-    user_id: 'SR-10029',
+    id: 'w-001',
+    user_id: 'user-001',
+    available_balance: 142500.5,
+    locked_balance: 2500.0,
+    created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  'user-001': {
+    id: 'w-001',
+    user_id: 'user-001',
     available_balance: 142500.5,
     locked_balance: 2500.0,
     created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
     updated_at: new Date().toISOString(),
   },
   'SR-10034': {
-    id: 'w-user-002',
-    user_id: 'SR-10034',
+    id: 'w-002',
+    user_id: 'user-002',
     available_balance: 85200.0,
-    locked_balance: 0.0,
+    locked_balance: 5000.0,
+    created_at: new Date(Date.now() - 86400000 * 20).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  'user-002': {
+    id: 'w-002',
+    user_id: 'user-002',
+    available_balance: 85200.0,
+    locked_balance: 5000.0,
     created_at: new Date(Date.now() - 86400000 * 20).toISOString(),
     updated_at: new Date().toISOString(),
   },
   'SR-10088': {
-    id: 'w-user-003',
-    user_id: 'SR-10088',
+    id: 'w-003',
+    user_id: 'user-003',
+    available_balance: 12450.0,
+    locked_balance: 0.0,
+    created_at: new Date(Date.now() - 86400000 * 15).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  'user-003': {
+    id: 'w-003',
+    user_id: 'user-003',
     available_balance: 12450.0,
     locked_balance: 0.0,
     created_at: new Date(Date.now() - 86400000 * 15).toISOString(),
@@ -133,8 +167,16 @@ let wallets: Record<string, any> = {
   },
   'SR-ADMIN-01': {
     id: 'w-admin',
-    user_id: 'SR-ADMIN-01',
-    available_balance: 9500000.0,
+    user_id: 'admin-001',
+    available_balance: 2500000.0,
+    locked_balance: 0,
+    created_at: new Date(Date.now() - 86400000 * 90).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  'admin-001': {
+    id: 'w-admin',
+    user_id: 'admin-001',
+    available_balance: 2500000.0,
     locked_balance: 0,
     created_at: new Date(Date.now() - 86400000 * 90).toISOString(),
     updated_at: new Date().toISOString(),
@@ -294,17 +336,21 @@ function resolveUserAndWallet(identifier: string | number | undefined | null, fa
   });
 
   if (foundUser) {
-    if (!wallets[foundUser.user_custom_id]) {
-      wallets[foundUser.user_custom_id] = {
-        id: `w-${foundUser.user_custom_id}`,
-        user_id: foundUser.user_custom_id,
+    let userWallet = wallets[foundUser.user_custom_id] || wallets[foundUser.id] || wallets[raw];
+    if (!userWallet) {
+      userWallet = {
+        id: `w-${foundUser.user_custom_id || foundUser.id}`,
+        user_id: foundUser.user_custom_id || foundUser.id,
         available_balance: 0,
         locked_balance: 0,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
     }
-    return { user: foundUser, wallet: wallets[foundUser.user_custom_id] };
+    if (foundUser.user_custom_id) wallets[foundUser.user_custom_id] = userWallet;
+    if (foundUser.id) wallets[foundUser.id] = userWallet;
+    if (foundUser.mobile) wallets[normalizePhone(foundUser.mobile)] = userWallet;
+    return { user: foundUser, wallet: userWallet };
   }
 
   // 3. Match existing wallet key
@@ -408,38 +454,56 @@ function executeUserToUserTransfer(senderIdentifier: string | undefined, recipie
   const cleanNote = note || 'Peer-to-Peer Transfer';
 
   // 1. Transaction log for Sender (TRANSFER_OUT)
-  transactions.unshift({
+  const senderOutTxn = {
     id: txnId,
-    user_id: senderUser.user_custom_id,
+    user_id: senderUser.id || senderUser.user_custom_id,
+    user_custom_id: senderUser.user_custom_id,
     user_name: senderUser.full_name,
     type: 'TRANSFER_OUT',
     amount,
     fee: 0,
     net_amount: amount,
     status: 'SUCCESS',
-    reference_id: recipientUser.user_custom_id,
+    reference_id: recipientUser.user_custom_id || recipientUser.mobile,
     description: `Transfer to ${recipientUser.full_name} (${recipientUser.mobile || recipientUser.user_custom_id}) - ${cleanNote} [via ${source}]`,
     balance_before: senderWallet.available_balance + amount,
     balance_after: senderWallet.available_balance,
     created_at: timestamp,
-  });
+  };
+  transactions.unshift(senderOutTxn);
 
   // 2. Transaction log for Recipient (TRANSFER_IN)
-  transactions.unshift({
+  const recipientInTxn = {
     id: `TXN-IN-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
-    user_id: recipientUser.user_custom_id,
+    user_id: recipientUser.id || recipientUser.user_custom_id,
+    user_custom_id: recipientUser.user_custom_id,
     user_name: recipientUser.full_name,
     type: 'TRANSFER_IN',
     amount,
     fee: 0,
     net_amount: amount,
     status: 'SUCCESS',
-    reference_id: senderUser.user_custom_id,
+    reference_id: senderUser.user_custom_id || senderUser.mobile,
     description: `Received from ${senderUser.full_name} (${senderUser.mobile || senderUser.user_custom_id}) - ${cleanNote} [via ${source}]`,
     balance_before: recipientWallet.available_balance - amount,
     balance_after: recipientWallet.available_balance,
     created_at: timestamp,
-  });
+  };
+  transactions.unshift(recipientInTxn);
+
+  // Dual-key the updated wallets so both ID ('user-001') and Custom ID ('SR-10029') have live balance
+  if (senderUser.id) {
+    wallets[senderUser.id] = { ...senderWallet, user_id: senderUser.id };
+  }
+  if (senderUser.user_custom_id) {
+    wallets[senderUser.user_custom_id] = { ...senderWallet, user_id: senderUser.user_custom_id };
+  }
+  if (recipientUser.id) {
+    wallets[recipientUser.id] = { ...recipientWallet, user_id: recipientUser.id };
+  }
+  if (recipientUser.user_custom_id) {
+    wallets[recipientUser.user_custom_id] = { ...recipientWallet, user_id: recipientUser.user_custom_id };
+  }
 
   // 3. Telegram Notifications (if registered)
   if (senderUser.telegram_id) {
@@ -1498,12 +1562,9 @@ app.post('/api/v1/sync-state', (req: Request, res: Response) => {
     Object.entries(incomingWallets).forEach(([k, w]: [string, any]) => {
       if (!wallets[k]) {
         wallets[k] = w;
-      } else {
-        // Retain highest fresh balance if mutated
-        wallets[k] = { ...wallets[k], ...w };
       }
-      if (w.user_id && !wallets[w.user_id]) {
-        wallets[w.user_id] = wallets[k];
+      if (w && w.user_id && !wallets[w.user_id]) {
+        wallets[w.user_id] = w;
       }
     });
   }

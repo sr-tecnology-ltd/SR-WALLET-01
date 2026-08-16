@@ -41,6 +41,10 @@ export const INITIAL_SETTINGS: AppSettings = {
   support_url: 'https://t.me/SRGateway_Support_Bot',
   admin_upi_id: 'srgateway@icici',
   admin_qr_url: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&q=80',
+  admin_bank_name: 'HDFC Bank Ltd',
+  admin_bank_account_name: 'SR Gateway Payments',
+  admin_bank_account_no: '50200088192031',
+  admin_bank_ifsc: 'HDFC0001092',
 };
 
 export const INITIAL_PROFILES: UserProfile[] = [

@@ -13,6 +13,10 @@ import {
   Upload,
   Info,
   ShieldCheck,
+  Download,
+  Image as ImageIcon,
+  X,
+  FileCheck,
 } from 'lucide-react';
 
 export const DepositSection: React.FC = () => {
@@ -22,10 +26,23 @@ export const DepositSection: React.FC = () => {
   const [utr, setUtr] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'BANK_TRANSFER' | 'QR_CODE' | 'WALLET_GW'>('UPI');
   const [note, setNote] = useState<string>('');
-  const [screenshotUrl, setScreenshotUrl] = useState<string>('');
+  const [screenshotData, setScreenshotData] = useState<string>('');
+  const [screenshotFileName, setScreenshotFileName] = useState<string>('');
 
   const [copiedUpi, setCopiedUpi] = useState(false);
+  const [copiedBank, setCopiedBank] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+
+  // Deposit Confirmation Popup Modal
+  const [submittedDepositModal, setSubmittedDepositModal] = useState<{
+    id: string;
+    amount: number;
+    netAmount: number;
+    utr: string;
+    method: string;
+    status: string;
+    date: string;
+  } | null>(null);
 
   const myDeposits = deposits.filter((d) => d.user_id === currentUser.id);
 
@@ -35,16 +52,71 @@ export const DepositSection: React.FC = () => {
     setTimeout(() => setCopiedUpi(false), 2000);
   };
 
+  const copyBankDetails = () => {
+    const bankText = `Bank: ${settings.admin_bank_name || 'HDFC Bank Ltd'}\nAccount Name: ${settings.admin_bank_account_name || 'SR Gateway Payments'}\nAccount No: ${settings.admin_bank_account_no || '50200088192031'}\nIFSC: ${settings.admin_bank_ifsc || 'HDFC0001092'}`;
+    navigator.clipboard.writeText(bankText);
+    setCopiedBank(true);
+    setTimeout(() => setCopiedBank(false), 2000);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setScreenshotFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setScreenshotData(event.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDownloadQr = () => {
+    const link = document.createElement('a');
+    link.href = settings.admin_qr_url || 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=600&q=80';
+    link.download = 'SR_Gateway_Admin_Payment_QR.png';
+    link.target = '_blank';
+    link.rel = 'noreferrer';
+    link.click();
+  };
+
   const handleDepositSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setStatusMsg(null);
 
-    const res = submitDepositRequest(amount, utr, paymentMethod, screenshotUrl, note);
+    if (amount <= 0) {
+      setStatusMsg({ type: 'error', text: 'Please enter a valid deposit amount.' });
+      return;
+    }
+    if (amount < settings.minimum_deposit) {
+      setStatusMsg({ type: 'error', text: `Minimum deposit amount is ${formatINR(settings.minimum_deposit)}.` });
+      return;
+    }
+    if (!utr.trim()) {
+      setStatusMsg({ type: 'error', text: 'Please enter the 12-digit transaction UTR / Reference number.' });
+      return;
+    }
+
+    const calculatedFee = (amount * settings.deposit_charge_percent) / 100;
+    const calculatedNet = amount - calculatedFee;
+
+    const res = submitDepositRequest(amount, utr.trim(), paymentMethod, screenshotData, note);
     if (res.success) {
       setStatusMsg({ type: 'success', text: res.message });
+      setSubmittedDepositModal({
+        id: `DEP-${Date.now().toString().slice(-6)}`,
+        amount,
+        netAmount: calculatedNet,
+        utr: utr.trim(),
+        method: paymentMethod,
+        status: 'PENDING',
+        date: new Date().toLocaleString(),
+      });
       setUtr('');
       setNote('');
-      setScreenshotUrl('');
+      setScreenshotData('');
+      setScreenshotFileName('');
     } else {
       setStatusMsg({ type: 'error', text: res.message });
     }
@@ -65,7 +137,7 @@ export const DepositSection: React.FC = () => {
   }
 
   const calculatedFee = (amount * settings.deposit_charge_percent) / 100;
-  const calculatedNet = amount - calculatedFee;
+  const calculatedNet = Math.max(0, amount - calculatedFee);
 
   return (
     <div className="space-y-6 text-slate-100">
@@ -121,26 +193,49 @@ export const DepositSection: React.FC = () => {
               </div>
             </div>
 
-            {/* QR Code Preview */}
+            {/* QR Code Preview with Download Button */}
             <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-center space-y-3">
-              <div className="text-xs font-bold text-slate-300">Scan Admin QR Code</div>
-              <div className="w-40 h-40 bg-white p-2 rounded-2xl mx-auto shadow-lg flex items-center justify-center">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-300 px-1">
+                <span>Scan Admin QR Code</span>
+                <button
+                  type="button"
+                  onClick={handleDownloadQr}
+                  className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded-lg text-[10px] font-bold flex items-center gap-1 transition"
+                >
+                  <Download className="h-3 w-3" />
+                  <span>Download QR</span>
+                </button>
+              </div>
+              <div className="w-44 h-44 bg-white p-2 rounded-2xl mx-auto shadow-lg flex items-center justify-center border border-slate-700">
                 <img
-                  src={settings.admin_qr_url}
+                  src={settings.admin_qr_url || 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&q=80'}
                   alt="Admin Payment QR"
                   className="w-full h-full object-contain rounded-xl"
+                  referrerPolicy="no-referrer"
                 />
               </div>
               <p className="text-[10px] text-slate-400">Accepts GPay, PhonePe, Paytm, BHIM & All UPI Apps</p>
             </div>
 
-            {/* Bank Transfer Instructions */}
-            <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 text-xs space-y-1 font-mono text-slate-300">
-              <div className="font-bold text-indigo-300 mb-1">IMPS / NEFT Bank Details:</div>
-              <div>Bank: HDFC Bank Ltd</div>
-              <div>Account Name: SR Gateway Payments</div>
-              <div>Account No: 50200088192031</div>
-              <div>IFSC Code: HDFC0001092</div>
+            {/* Dynamic Bank Transfer Details with Copy Button */}
+            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-2 font-mono text-xs text-slate-300">
+              <div className="flex items-center justify-between font-sans">
+                <span className="font-bold text-indigo-300 text-xs">IMPS / NEFT Bank Details:</span>
+                <button
+                  type="button"
+                  onClick={copyBankDetails}
+                  className="px-2.5 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 rounded-lg text-[10px] font-bold flex items-center gap-1 transition font-sans"
+                >
+                  {copiedBank ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                  <span>{copiedBank ? 'Copied Details!' : 'Copy Bank Details'}</span>
+                </button>
+              </div>
+              <div className="space-y-1 bg-slate-900/90 p-3 rounded-xl border border-slate-800/80 text-[11px]">
+                <div><span className="text-slate-500 font-sans">Bank:</span> <strong className="text-white">{settings.admin_bank_name || 'HDFC Bank Ltd'}</strong></div>
+                <div><span className="text-slate-500 font-sans">Account Name:</span> <strong className="text-white">{settings.admin_bank_account_name || 'SR Gateway Payments'}</strong></div>
+                <div><span className="text-slate-500 font-sans">Account No:</span> <strong className="text-emerald-400 font-bold">{settings.admin_bank_account_no || '50200088192031'}</strong></div>
+                <div><span className="text-slate-500 font-sans">IFSC Code:</span> <strong className="text-amber-300">{settings.admin_bank_ifsc || 'HDFC0001092'}</strong></div>
+              </div>
             </div>
           </div>
 
@@ -244,29 +339,43 @@ export const DepositSection: React.FC = () => {
               <p className="text-[10px] text-slate-400 mt-1">12-digit bank reference code from payment confirmation</p>
             </div>
 
-            {/* Screenshot URL or Upload Simulator */}
+            {/* Upload Payment Screenshot Proof (Gallery / Device Upload) */}
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                Screenshot Image URL (Optional)
+                Upload Payment Screenshot Proof
               </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="https://..."
-                  value={screenshotUrl}
-                  onChange={(e) => setScreenshotUrl(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-white text-xs font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setScreenshotUrl('https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=400&q=80')
-                  }
-                  className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-2xl text-xs font-bold shrink-0 flex items-center gap-1"
-                >
-                  <Upload className="h-3.5 w-3.5" />
-                  <span>Sample</span>
-                </button>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <label className="flex-1 cursor-pointer bg-slate-950 hover:bg-slate-900 border border-dashed border-slate-700 hover:border-emerald-500 rounded-2xl p-4 text-center transition flex flex-col items-center justify-center gap-1.5">
+                    <Upload className="h-5 w-5 text-emerald-400" />
+                    <span className="text-xs font-bold text-slate-200">
+                      {screenshotFileName ? screenshotFileName : 'Click to Upload Screenshot from Gallery / Files'}
+                    </span>
+                    <span className="text-[10px] text-slate-500">Supports JPG, PNG, WEBP receipts</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+
+                  {screenshotData && (
+                    <div className="w-16 h-16 rounded-xl border border-slate-700 overflow-hidden bg-slate-950 shrink-0 relative group">
+                      <img src={screenshotData} alt="Preview" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setScreenshotData('');
+                          setScreenshotFileName('');
+                        }}
+                        className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs transition"
+                      >
+                        <X className="h-4 w-4 text-rose-400" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -349,6 +458,71 @@ export const DepositSection: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Deposit Submitted Confirmation Modal Popup */}
+      {submittedDepositModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative space-y-5 text-white animate-in fade-in zoom-in duration-200">
+            <button
+              onClick={() => setSubmittedDepositModal(null)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-800 transition"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto shadow-lg">
+                <FileCheck className="h-7 w-7" />
+              </div>
+              <h3 className="text-lg font-black text-white">Deposit Request Submitted!</h3>
+              <p className="text-xs text-slate-300">
+                Your deposit request has been sent for admin verification.
+              </p>
+            </div>
+
+            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-2 font-mono text-xs">
+              <div className="flex justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400 font-sans">Status:</span>
+                <span className="text-amber-400 font-bold px-2 py-0.5 rounded bg-amber-500/20">
+                  ⏳ {submittedDepositModal.status}
+                </span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400 font-sans">Amount:</span>
+                <span className="text-white font-bold text-sm">{formatINR(submittedDepositModal.amount)}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400 font-sans">Net Credit to Wallet:</span>
+                <span className="text-emerald-400 font-bold">{formatINR(submittedDepositModal.netAmount)}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400 font-sans">Bank UTR / Ref:</span>
+                <span className="text-indigo-300 font-bold">{submittedDepositModal.utr}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400 font-sans">Payment Mode:</span>
+                <span className="text-slate-200">{submittedDepositModal.method}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-slate-400 font-sans">Submitted At:</span>
+                <span className="text-slate-400">{submittedDepositModal.date}</span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-indigo-950/40 border border-indigo-500/30 rounded-xl text-[11px] text-indigo-300 text-center">
+              ⚡ Verification completes within 2–5 minutes. Your wallet balance will automatically update.
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setSubmittedDepositModal(null)}
+              className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition shadow-lg shadow-emerald-500/20"
+            >
+              Okay, Got It!
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
