@@ -247,6 +247,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       body: JSON.stringify({
         profiles,
         wallets,
+        transactions,
+        deposits,
+        withdrawals,
         apiKeys,
         settings,
       }),
@@ -272,28 +275,16 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               return prev;
             });
           }
-          // Merge wallets across both user_id ('user-001') and custom_id ('SR-10029')
+          // Merge wallets if backend has changes from bot or external PHP API
           if (data.wallets && typeof data.wallets === 'object') {
             setWallets((prev) => {
               let changed = false;
               const next = { ...prev };
               Object.entries(data.wallets).forEach(([k, w]: [string, any]) => {
                 if (w && typeof w.available_balance === 'number') {
-                  if (!next[k] || next[k].available_balance !== w.available_balance || next[k].locked_balance !== w.locked_balance) {
-                    next[k] = { ...(next[k] || {}), ...w };
+                  if (!next[k]) {
+                    next[k] = { ...w };
                     changed = true;
-                  }
-                  // Also match and update profile mappings
-                  const matchedProfile = profiles.find((p) => p.id === k || p.user_custom_id === k || (p.mobile && p.mobile.replace(/[^0-9]/g, '').slice(-10) === k.replace(/[^0-9]/g, '').slice(-10)));
-                  if (matchedProfile) {
-                    if (!next[matchedProfile.id] || next[matchedProfile.id].available_balance !== w.available_balance) {
-                      next[matchedProfile.id] = { ...(next[matchedProfile.id] || {}), ...w, user_id: matchedProfile.id };
-                      changed = true;
-                    }
-                    if (!next[matchedProfile.user_custom_id] || next[matchedProfile.user_custom_id].available_balance !== w.available_balance) {
-                      next[matchedProfile.user_custom_id] = { ...(next[matchedProfile.user_custom_id] || {}), ...w, user_id: matchedProfile.user_custom_id };
-                      changed = true;
-                    }
                   }
                 }
               });
@@ -306,9 +297,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
 
-    // Run immediately on mount and then every 2 seconds
+    // Run on mount and periodically
     syncFromBackend();
-    const interval = setInterval(syncFromBackend, 2000);
+    const interval = setInterval(syncFromBackend, 3000);
     return () => clearInterval(interval);
   }, []);
 
@@ -787,8 +778,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return { success: false, message: 'Cannot transfer to this recipient account.' };
     }
 
-    const senderPrevBal = currentWallet.available_balance;
-    const recipientWallet = wallets[recipient.id] || { available_balance: 0, locked_balance: 0 };
+    const senderWallet = wallets[currentUser.id] || wallets[currentUser.user_custom_id] || currentWallet;
+    const senderPrevBal = senderWallet.available_balance;
+    const recipientWallet = wallets[recipient.id] || wallets[recipient.user_custom_id] || { available_balance: 0, locked_balance: 0 };
     const recipientPrevBal = recipientWallet.available_balance;
 
     const refId = `TRF-${currentUser.mobile}-${recipient.mobile}-${Date.now()}`;
@@ -894,25 +886,38 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Admin Manual Add Balance
   const addBalanceByAdmin = (targetUserId: string, amount: number, reason: string) => {
     if (amount <= 0) return { success: false, message: 'Please enter a valid positive amount.' };
-    const targetUser = profiles.find((p) => p.id === targetUserId);
+    const targetUser = profiles.find((p) => p.id === targetUserId || p.user_custom_id === targetUserId);
     if (!targetUser) return { success: false, message: 'Target user not found.' };
 
-    const userWallet = wallets[targetUserId] || { available_balance: 0, locked_balance: 0 };
+    const resolvedId = targetUser.id;
+    const resolvedCustomId = targetUser.user_custom_id;
+    const userWallet = wallets[resolvedId] || wallets[resolvedCustomId] || { available_balance: 0, locked_balance: 0 };
     const prevBal = userWallet.available_balance;
     const newBal = prevBal + amount;
 
     setWallets((prev) => ({
       ...prev,
-      [targetUserId]: {
-        ...prev[targetUserId],
+      [resolvedId]: {
+        ...(prev[resolvedId] || {}),
+        id: `w-${resolvedId}`,
+        user_id: resolvedId,
         available_balance: newBal,
+        locked_balance: userWallet.locked_balance || 0,
+        updated_at: new Date().toISOString(),
+      },
+      [resolvedCustomId]: {
+        ...(prev[resolvedCustomId] || {}),
+        id: `w-${resolvedId}`,
+        user_id: resolvedId,
+        available_balance: newBal,
+        locked_balance: userWallet.locked_balance || 0,
         updated_at: new Date().toISOString(),
       },
     }));
 
     const newTx: Transaction = {
       id: `TXN-ADM-${Date.now()}`,
-      user_id: targetUserId,
+      user_id: resolvedId,
       user_name: targetUser.full_name,
       type: 'ADMIN_CREDIT',
       amount,
@@ -928,7 +933,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setTransactions((prev) => [newTx, ...prev]);
 
     addAuditLog('ADMIN_CREDIT', `Admin added ${formatINR(amount)} balance: ${reason}`, targetUser, amount, prevBal, newBal);
-    addNotification(targetUserId, 'Wallet Balance Credited', `Admin credited ${formatINR(amount)} to your wallet. Reason: ${reason}`, 'SUCCESS');
+    addNotification(resolvedId, 'Wallet Balance Credited', `Admin credited ${formatINR(amount)} to your wallet. Reason: ${reason}`, 'SUCCESS');
 
     return { success: true, message: `Successfully credited ${formatINR(amount)} to ${targetUser.full_name}.` };
   };
@@ -936,10 +941,12 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Admin Manual Cut Balance
   const cutBalanceByAdmin = (targetUserId: string, amount: number, reason: string) => {
     if (amount <= 0) return { success: false, message: 'Please enter a valid positive amount.' };
-    const targetUser = profiles.find((p) => p.id === targetUserId);
+    const targetUser = profiles.find((p) => p.id === targetUserId || p.user_custom_id === targetUserId);
     if (!targetUser) return { success: false, message: 'Target user not found.' };
 
-    const userWallet = wallets[targetUserId] || { available_balance: 0, locked_balance: 0 };
+    const resolvedId = targetUser.id;
+    const resolvedCustomId = targetUser.user_custom_id;
+    const userWallet = wallets[resolvedId] || wallets[resolvedCustomId] || { available_balance: 0, locked_balance: 0 };
     if (userWallet.available_balance < amount) {
       return { success: false, message: `Cannot cut balance. User only has ${formatINR(userWallet.available_balance)} available.` };
     }
@@ -949,16 +956,27 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     setWallets((prev) => ({
       ...prev,
-      [targetUserId]: {
-        ...prev[targetUserId],
+      [resolvedId]: {
+        ...(prev[resolvedId] || {}),
+        id: `w-${resolvedId}`,
+        user_id: resolvedId,
         available_balance: newBal,
+        locked_balance: userWallet.locked_balance || 0,
+        updated_at: new Date().toISOString(),
+      },
+      [resolvedCustomId]: {
+        ...(prev[resolvedCustomId] || {}),
+        id: `w-${resolvedId}`,
+        user_id: resolvedId,
+        available_balance: newBal,
+        locked_balance: userWallet.locked_balance || 0,
         updated_at: new Date().toISOString(),
       },
     }));
 
     const newTx: Transaction = {
       id: `TXN-ADM-${Date.now()}`,
-      user_id: targetUserId,
+      user_id: resolvedId,
       user_name: targetUser.full_name,
       type: 'ADMIN_DEBIT',
       amount,
@@ -974,7 +992,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setTransactions((prev) => [newTx, ...prev]);
 
     addAuditLog('ADMIN_DEBIT', `Admin deducted ${formatINR(amount)} balance: ${reason}`, targetUser, amount, prevBal, newBal);
-    addNotification(targetUserId, 'Wallet Balance Adjusted', `Admin deducted ${formatINR(amount)} from your wallet. Reason: ${reason}`, 'WARNING');
+    addNotification(resolvedId, 'Wallet Balance Adjusted', `Admin deducted ${formatINR(amount)} from your wallet. Reason: ${reason}`, 'WARNING');
 
     return { success: true, message: `Successfully deducted ${formatINR(amount)} from ${targetUser.full_name}.` };
   };

@@ -1542,7 +1542,15 @@ app.post('/api/v1/send', handlePhpApiRequest);
 
 // Bi-directional State Sync Between Frontend and Backend
 app.post('/api/v1/sync-state', (req: Request, res: Response) => {
-  const { profiles, wallets: incomingWallets, apiKeys: incomingKeys, settings: incomingSettings } = req.body;
+  const {
+    profiles,
+    wallets: incomingWallets,
+    transactions: incomingTransactions,
+    deposits: incomingDeposits,
+    withdrawals: incomingWithdrawals,
+    apiKeys: incomingKeys,
+    settings: incomingSettings,
+  } = req.body;
 
   if (Array.isArray(profiles)) {
     profiles.forEach((p: any) => {
@@ -1560,11 +1568,47 @@ app.post('/api/v1/sync-state', (req: Request, res: Response) => {
 
   if (incomingWallets && typeof incomingWallets === 'object') {
     Object.entries(incomingWallets).forEach(([k, w]: [string, any]) => {
-      if (!wallets[k]) {
-        wallets[k] = w;
+      if (w && typeof w === 'object') {
+        wallets[k] = {
+          ...(wallets[k] || {}),
+          ...w,
+          available_balance: typeof w.available_balance === 'number' ? w.available_balance : (wallets[k]?.available_balance ?? 0),
+          locked_balance: typeof w.locked_balance === 'number' ? w.locked_balance : (wallets[k]?.locked_balance ?? 0),
+          updated_at: new Date().toISOString(),
+        };
       }
-      if (w && w.user_id && !wallets[w.user_id]) {
-        wallets[w.user_id] = w;
+    });
+  }
+
+  if (Array.isArray(incomingTransactions)) {
+    incomingTransactions.forEach((tx: any) => {
+      const existingIdx = transactions.findIndex((t) => t.id === tx.id);
+      if (existingIdx >= 0) {
+        transactions[existingIdx] = { ...transactions[existingIdx], ...tx };
+      } else {
+        transactions.unshift(tx);
+      }
+    });
+  }
+
+  if (Array.isArray(incomingDeposits)) {
+    incomingDeposits.forEach((dep: any) => {
+      const existingIdx = depositRequests.findIndex((d) => d.id === dep.id);
+      if (existingIdx >= 0) {
+        depositRequests[existingIdx] = { ...depositRequests[existingIdx], ...dep };
+      } else {
+        depositRequests.unshift(dep);
+      }
+    });
+  }
+
+  if (Array.isArray(incomingWithdrawals)) {
+    incomingWithdrawals.forEach((wd: any) => {
+      const existingIdx = withdrawalRequests.findIndex((w) => w.id === wd.id);
+      if (existingIdx >= 0) {
+        withdrawalRequests[existingIdx] = { ...withdrawalRequests[existingIdx], ...wd };
+      } else {
+        withdrawalRequests.unshift(wd);
       }
     });
   }
