@@ -30,7 +30,7 @@ export const UserDashboard: React.FC<{
   onOpenDeveloper?: () => void;
   onOpenSupport?: () => void;
   onOpenTelegramOtp?: () => void;
-  onOpenMerchantGateway?: () => void;
+  onOpenUpiApiGateway?: () => void;
   onOpenProfile?: () => void;
 }> = ({
   onOpenDeposit,
@@ -40,7 +40,7 @@ export const UserDashboard: React.FC<{
   onOpenDeveloper,
   onOpenSupport,
   onOpenTelegramOtp,
-  onOpenMerchantGateway,
+  onOpenUpiApiGateway,
   onOpenProfile,
 }) => {
   const {
@@ -112,12 +112,12 @@ export const UserDashboard: React.FC<{
     },
     {
       id: 4,
-      title: 'Merchant Gateway',
-      subtitle: 'API Checkout',
-      icon: Code,
-      badge: 'REST V1',
-      color: 'from-purple-500/20 to-purple-600/10 border-purple-500/30 text-purple-400',
-      action: onOpenMerchantGateway || onOpenDeveloper,
+      title: 'UPI API Gateway',
+      subtitle: 'Coming Soon • Telegram Info',
+      icon: Zap,
+      badge: 'SOON',
+      color: 'from-indigo-500/20 to-purple-600/10 border-indigo-500/30 text-indigo-400',
+      action: onOpenUpiApiGateway || onOpenDeveloper,
     },
     {
       id: 5,
@@ -229,7 +229,7 @@ export const UserDashboard: React.FC<{
 
             {/* UPI API Gateway Bar Sub-Card */}
             <button
-              onClick={onOpenDeveloper}
+              onClick={onOpenUpiApiGateway || onOpenDeveloper}
               className="w-full p-3.5 rounded-2xl bg-slate-950/80 border border-emerald-500/25 hover:border-emerald-400 transition flex items-center justify-between group cursor-pointer"
             >
               <div className="flex items-center gap-3">
@@ -237,10 +237,13 @@ export const UserDashboard: React.FC<{
                   <Zap className="h-4 w-4" />
                 </div>
                 <div className="text-left">
-                  <div className="text-xs font-black text-white group-hover:text-emerald-300 transition-colors">
-                    UPI API Gateway
+                  <div className="text-xs font-black text-white group-hover:text-emerald-300 transition-colors flex items-center gap-2">
+                    <span>UPI API Gateway</span>
+                    <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      COMING SOON
+                    </span>
                   </div>
-                  <div className="text-[10px] text-slate-400 font-mono">Real-time REST V1 Webhook Receiver</div>
+                  <div className="text-[10px] text-slate-400 font-mono">Announcement in our official Telegram channel</div>
                 </div>
               </div>
               <span className="text-emerald-400 font-bold text-sm group-hover:translate-x-1 transition-transform">

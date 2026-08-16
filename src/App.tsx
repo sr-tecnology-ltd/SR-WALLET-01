@@ -10,12 +10,9 @@ import { TransactionsSection } from './components/TransactionsSection';
 import { DeveloperApiSection } from './components/DeveloperApiSection';
 import { SupportSection } from './components/SupportSection';
 import { AdminPortal } from './components/AdminPortal';
-import { AuthModal } from './components/AuthModal';
 import { TelegramOtpModal } from './components/TelegramOtpModal';
-import { MerchantGatewaySimulatorModal } from './components/MerchantGatewaySimulatorModal';
-import { RewardsModal } from './components/RewardsModal';
-import { ScanPayModal } from './components/ScanPayModal';
 import { ThreeDotsMenuModal } from './components/ThreeDotsMenuModal';
+import { UpiApiGatewayModal } from './components/UpiApiGatewayModal';
 import { UserProfileSection } from './components/UserProfileSection';
 import { RpinModal } from './components/RpinModal';
 import {
@@ -63,12 +60,8 @@ function WalletAppContent() {
 
   // Modal States
   const [threeDotsOpen, setThreeDotsOpen] = useState(false);
-  const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<'LOGIN' | 'REGISTER' | 'TELEGRAM_OTP'>('LOGIN');
   const [telegramOtpOpen, setTelegramOtpOpen] = useState(false);
-  const [apiSimulatorOpen, setApiSimulatorOpen] = useState(false);
-  const [rewardsOpen, setRewardsOpen] = useState(false);
-  const [scanPayOpen, setScanPayOpen] = useState(false);
+  const [upiApiGatewayOpen, setUpiApiGatewayOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500 selection:text-white flex flex-col justify-between">
@@ -77,14 +70,6 @@ function WalletAppContent() {
         <Header
           onOpenTelegram={() => setActiveTab('support')}
           onOpen3DotsMenu={() => setThreeDotsOpen(true)}
-          onOpenAuthModal={(mode) => {
-            setAuthMode(mode);
-            setAuthModalOpen(true);
-          }}
-          onOpenTelegramOtp={() => setTelegramOtpOpen(true)}
-          onOpenApiSimulator={() => setApiSimulatorOpen(true)}
-          onOpenRewards={() => setRewardsOpen(true)}
-          onOpenScanPay={() => setScanPayOpen(true)}
           onOpenProfile={() => setActiveTab('profile')}
         />
 
@@ -117,7 +102,7 @@ function WalletAppContent() {
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id as any)}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition whitespace-nowrap active:scale-95 ${
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition whitespace-nowrap active:scale-95 cursor-pointer ${
                         isActive
                           ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-600/30'
                           : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800'
@@ -145,7 +130,7 @@ function WalletAppContent() {
                   onOpenDeveloper={() => setActiveTab('developer')}
                   onOpenSupport={() => setActiveTab('support')}
                   onOpenTelegramOtp={() => setTelegramOtpOpen(true)}
-                  onOpenMerchantGateway={() => setApiSimulatorOpen(true)}
+                  onOpenUpiApiGateway={() => setUpiApiGatewayOpen(true)}
                   onOpenProfile={() => setActiveTab('profile')}
                 />
               )}
@@ -158,10 +143,6 @@ function WalletAppContent() {
               {activeTab === 'profile' && (
                 <UserProfileSection
                   onOpenDeveloper={() => setActiveTab('developer')}
-                  onLogout={() => {
-                    setAuthMode('LOGIN');
-                    setAuthModalOpen(true);
-                  }}
                 />
               )}
               {activeTab === 'support' && <SupportSection />}
@@ -171,44 +152,22 @@ function WalletAppContent() {
       </div>
 
       {/* MODALS RENDERED GLOBAL */}
-      <AuthModal
-        isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        mode={authMode}
-      />
-
       <TelegramOtpModal
         isOpen={telegramOtpOpen}
         onClose={() => setTelegramOtpOpen(false)}
       />
 
-      <MerchantGatewaySimulatorModal
-        isOpen={apiSimulatorOpen}
-        onClose={() => setApiSimulatorOpen(false)}
-      />
-
-      <RewardsModal
-        isOpen={rewardsOpen}
-        onClose={() => setRewardsOpen(false)}
-      />
-
-      <ScanPayModal
-        isOpen={scanPayOpen}
-        onClose={() => setScanPayOpen(false)}
+      <UpiApiGatewayModal
+        isOpen={upiApiGatewayOpen}
+        onClose={() => setUpiApiGatewayOpen(false)}
       />
 
       <ThreeDotsMenuModal
         isOpen={threeDotsOpen}
         onClose={() => setThreeDotsOpen(false)}
-        onOpenAuth={(mode) => {
-          setAuthMode(mode);
-          setAuthModalOpen(true);
-        }}
         onOpenTelegramOtp={() => setTelegramOtpOpen(true)}
-        onOpenApiSimulator={() => setApiSimulatorOpen(true)}
+        onOpenUpiApiGateway={() => setUpiApiGatewayOpen(true)}
         onOpenDeveloper={() => setActiveTab('developer')}
-        onOpenRewards={() => setRewardsOpen(true)}
-        onOpenScanPay={() => setScanPayOpen(true)}
         onOpenSupport={() => setActiveTab('support')}
       />
 
@@ -244,7 +203,7 @@ function WalletAppContent() {
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id as any)}
-                  className={`flex flex-col items-center gap-1 transition ${
+                  className={`flex flex-col items-center gap-1 transition cursor-pointer ${
                     isActive ? 'text-indigo-400 font-extrabold' : 'text-slate-400'
                   }`}
                 >

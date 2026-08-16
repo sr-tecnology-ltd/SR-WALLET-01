@@ -6,76 +6,32 @@ import {
   Bell,
   Eye,
   EyeOff,
-  UserCheck,
-  Send,
-  RotateCcw,
-  Sparkles,
-  ChevronDown,
-  X,
-  MessageSquare,
-  CheckCircle2,
-  AlertCircle,
   Menu,
   User,
-  LogIn,
-  UserPlus,
-  Bot,
-  Code,
-  Gift,
-  QrCode,
 } from 'lucide-react';
-import { AuthModal } from './AuthModal';
-import { TelegramOtpModal } from './TelegramOtpModal';
-import { MerchantGatewaySimulatorModal } from './MerchantGatewaySimulatorModal';
-import { RewardsModal } from './RewardsModal';
-import { ScanPayModal } from './ScanPayModal';
-import { ThreeDotsMenuModal } from './ThreeDotsMenuModal';
 
 export const Header: React.FC<{
   onOpenTelegram: () => void;
   onOpen3DotsMenu?: () => void;
-  onOpenAuthModal?: (mode: 'LOGIN' | 'REGISTER' | 'TELEGRAM_OTP') => void;
-  onOpenTelegramOtp?: () => void;
-  onOpenApiSimulator?: () => void;
-  onOpenRewards?: () => void;
-  onOpenScanPay?: () => void;
   onOpenProfile?: () => void;
 }> = ({
   onOpenTelegram,
   onOpen3DotsMenu,
-  onOpenAuthModal,
-  onOpenTelegramOtp,
-  onOpenApiSimulator,
-  onOpenRewards,
-  onOpenScanPay,
   onOpenProfile,
 }) => {
   const {
     currentUser,
     activeRole,
-    switchUser,
     toggleRoleMode,
-    allProfiles,
     currentWallet,
     formatINR,
     notifications,
     markNotificationRead,
     clearNotifications,
-    settings,
   } = useWallet();
 
   const [isBalanceVisible, setIsBalanceVisible] = useState(true);
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
-
-  // Modals state
-  const [show3DotsMenu, setShow3DotsMenu] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authMode, setAuthMode] = useState<'LOGIN' | 'REGISTER' | 'TELEGRAM_OTP'>('LOGIN');
-  const [showTelegramModal, setShowTelegramModal] = useState(false);
-  const [showApiSimulatorModal, setShowApiSimulatorModal] = useState(false);
-  const [showRewardsModal, setShowRewardsModal] = useState(false);
-  const [showScanPayModal, setShowScanPayModal] = useState(false);
 
   const unreadNotifs = notifications.filter((n) => n.user_id === currentUser.id && !n.read);
 
@@ -88,15 +44,18 @@ export const Header: React.FC<{
             SR
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="font-black text-lg tracking-tight text-white">
-                SR GATEWAY <span className="text-emerald-400 font-mono">IN</span>
+            <div className="flex items-center space-x-2">
+              <span className="font-extrabold text-base tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">
+                SR GATEWAY
+              </span>
+              <span className="text-[10px] font-black font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                IN
               </span>
               <span
-                className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${
                   activeRole === 'ADMIN'
-                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                    : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                    ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse'
+                    : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
                 }`}
               >
                 {activeRole === 'ADMIN' ? '🛡️ Super Admin' : 'VPA Gateway'}
@@ -118,7 +77,7 @@ export const Header: React.FC<{
           </div>
           <button
             onClick={() => setIsBalanceVisible(!isBalanceVisible)}
-            className="p-1 text-slate-400 hover:text-white transition-colors rounded-full hover:bg-slate-800"
+            className="p-1 text-slate-400 hover:text-white transition-colors rounded-full hover:bg-slate-800 cursor-pointer"
             title={isBalanceVisible ? 'Hide Balance' : 'Show Balance'}
           >
             {isBalanceVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
@@ -131,67 +90,30 @@ export const Header: React.FC<{
           {activeRole === 'ADMIN' && (
             <button
               onClick={toggleRoleMode}
-              className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-all shadow-md active:scale-95 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white shadow-rose-600/20"
+              className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-all shadow-md active:scale-95 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white shadow-rose-600/20 cursor-pointer"
             >
               <ShieldCheck className="h-3.5 w-3.5" />
               <span>Exit Admin Portal</span>
             </button>
           )}
 
-          {/* User Switcher Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setShowUserDropdown(!showUserDropdown)}
-              className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold px-2.5 py-1.5 rounded-full transition text-slate-200"
-            >
-              <div className="w-5 h-5 rounded-full bg-indigo-500/30 text-indigo-300 flex items-center justify-center font-mono text-[10px] font-bold">
-                {currentUser.full_name.charAt(0)}
-              </div>
-              <span className="hidden lg:inline max-w-[90px] truncate">{currentUser.full_name}</span>
-              <ChevronDown className="h-3 w-3 text-slate-400" />
-            </button>
-
-            {showUserDropdown && (
-              <div className="absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-2 z-50 text-xs space-y-1">
-                <div className="px-3 py-2 border-b border-slate-800">
-                  <div className="text-slate-400 text-[10px]">Active Demo Account</div>
-                  <div className="font-bold text-white text-xs">{currentUser.full_name}</div>
-                  <div className="text-[10px] text-emerald-400 font-mono">{currentUser.user_custom_id} • {currentUser.role}</div>
-                </div>
-
-                <div className="text-[10px] text-slate-500 font-bold px-3 py-1 uppercase tracking-wider">
-                  Switch Account
-                </div>
-
-                {allProfiles.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => {
-                      switchUser(p.id);
-                      setShowUserDropdown(false);
-                    }}
-                    className={`w-full text-left px-3 py-2 rounded-xl flex items-center justify-between transition ${
-                      p.id === currentUser.id
-                        ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 font-bold'
-                        : 'hover:bg-slate-800 text-slate-300'
-                    }`}
-                  >
-                    <div>
-                      <div className="font-semibold text-white">{p.full_name}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">{p.user_custom_id} ({p.role})</div>
-                    </div>
-                    {p.id === currentUser.id && <UserCheck className="h-4 w-4 text-emerald-400" />}
-                  </button>
-                ))}
-              </div>
-            )}
+          {/* User Identifier Tag (Simple, clean, no switcher) */}
+          <div
+            onClick={onOpenProfile}
+            className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold px-2.5 py-1.5 rounded-full transition text-slate-200 cursor-pointer"
+            title="User Profile"
+          >
+            <div className="w-5 h-5 rounded-full bg-indigo-500/30 text-indigo-300 flex items-center justify-center font-mono text-[10px] font-bold">
+              {currentUser.full_name.charAt(0)}
+            </div>
+            <span className="hidden lg:inline max-w-[90px] truncate">{currentUser.full_name}</span>
           </div>
 
           {/* Notifications Center */}
           <div className="relative">
             <button
               onClick={() => setShowNotifDropdown(!showNotifDropdown)}
-              className="p-2 text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-full transition relative"
+              className="p-2 text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-full transition relative cursor-pointer"
               title="Notifications"
             >
               <Bell className="h-4 w-4" />
@@ -212,7 +134,7 @@ export const Header: React.FC<{
                   {notifications.length > 0 && (
                     <button
                       onClick={clearNotifications}
-                      className="text-[10px] text-slate-400 hover:text-rose-400 transition"
+                      className="text-[10px] text-slate-400 hover:text-rose-400 transition cursor-pointer"
                     >
                       Clear All
                     </button>
@@ -263,62 +185,14 @@ export const Header: React.FC<{
 
           {/* 3-LINES OPTIONS MENU BUTTON */}
           <button
-            onClick={() => (onOpen3DotsMenu ? onOpen3DotsMenu() : setShow3DotsMenu(true))}
-            className="p-2 text-white bg-indigo-600 hover:bg-indigo-500 rounded-full shadow-lg shadow-indigo-600/30 transition active:scale-95 border border-indigo-400/30"
+            onClick={() => onOpen3DotsMenu && onOpen3DotsMenu()}
+            className="p-2 text-white bg-indigo-600 hover:bg-indigo-500 rounded-full shadow-lg shadow-indigo-600/30 transition active:scale-95 border border-indigo-400/30 cursor-pointer"
             title="Navigation Menu"
           >
             <Menu className="h-4 w-4" />
           </button>
         </div>
       </div>
-
-      {/* Fallback Modals (Only rendered if onOpen3DotsMenu is not provided) */}
-      {!onOpen3DotsMenu && (
-        <>
-          <ThreeDotsMenuModal
-            isOpen={show3DotsMenu}
-            onClose={() => setShow3DotsMenu(false)}
-            onOpenAuth={(mode) => {
-              if (onOpenAuthModal) onOpenAuthModal(mode);
-              else {
-                setAuthMode(mode);
-                setShowAuthModal(true);
-              }
-            }}
-            onOpenTelegramOtp={() => (onOpenTelegramOtp ? onOpenTelegramOtp() : setShowTelegramModal(true))}
-            onOpenApiSimulator={() => (onOpenApiSimulator ? onOpenApiSimulator() : setShowApiSimulatorModal(true))}
-            onOpenRewards={() => (onOpenRewards ? onOpenRewards() : setShowRewardsModal(true))}
-            onOpenScanPay={() => (onOpenScanPay ? onOpenScanPay() : setShowScanPayModal(true))}
-            onOpenSupport={onOpenTelegram}
-          />
-
-          <AuthModal
-            isOpen={showAuthModal}
-            onClose={() => setShowAuthModal(false)}
-            initialMode={authMode}
-          />
-
-          <TelegramOtpModal
-            isOpen={showTelegramModal}
-            onClose={() => setShowTelegramModal(false)}
-          />
-
-          <MerchantGatewaySimulatorModal
-            isOpen={showApiSimulatorModal}
-            onClose={() => setShowApiSimulatorModal(false)}
-          />
-
-          <RewardsModal
-            isOpen={showRewardsModal}
-            onClose={() => setShowRewardsModal(false)}
-          />
-
-          <ScanPayModal
-            isOpen={showScanPayModal}
-            onClose={() => setShowScanPayModal(false)}
-          />
-        </>
-      )}
     </header>
   );
 };

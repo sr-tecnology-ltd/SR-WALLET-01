@@ -357,16 +357,14 @@ export const UserProfileSection: React.FC<{
 
         <button
           onClick={() => {
+            setMsg('Session securely authenticated & refreshed.');
+            setTimeout(() => setMsg(null), 3000);
             if (onLogout) onLogout();
-            else {
-              setMsg('Session Terminated. Logging out...');
-              setTimeout(() => setMsg(null), 2000);
-            }
           }}
-          className="w-full py-3.5 bg-slate-950 hover:bg-rose-950/40 border border-rose-500/40 hover:border-rose-500 text-rose-400 rounded-2xl font-bold text-xs uppercase tracking-wider transition active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+          className="w-full py-3.5 bg-slate-950 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 rounded-2xl font-bold text-xs uppercase tracking-wider transition active:scale-98 cursor-pointer flex items-center justify-center gap-2"
         >
-          <LogOut className="h-4 w-4" />
-          <span>TERMINATE SESSION (LOGOUT)</span>
+          <LogOut className="h-4 w-4 text-slate-400" />
+          <span>REFRESH SESSION</span>
         </button>
       </div>
     </div>
