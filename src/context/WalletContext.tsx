@@ -659,15 +659,29 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     const targetUserId = wd.user_id;
-    const targetUser = profiles.find((p) => p.id === targetUserId);
-    const userWallet = wallets[targetUserId] || { available_balance: 0, locked_balance: 0 };
+    const targetUser = profiles.find((p) => p.id === targetUserId || p.user_custom_id === targetUserId);
+    const resolvedId = targetUser ? targetUser.id : targetUserId;
+    const resolvedCustomId = targetUser ? targetUser.user_custom_id : targetUserId;
+    const userWallet = wallets[resolvedId] || wallets[resolvedCustomId] || { available_balance: 0, locked_balance: 0 };
 
     // 1. Release locked balance
+    const newLocked = Math.max(0, (userWallet.locked_balance || 0) - wd.amount);
     setWallets((prev) => ({
       ...prev,
-      [targetUserId]: {
-        ...prev[targetUserId],
-        locked_balance: Math.max(0, userWallet.locked_balance - wd.amount),
+      [resolvedId]: {
+        ...(prev[resolvedId] || {}),
+        id: `w-${resolvedId}`,
+        user_id: resolvedId,
+        available_balance: userWallet.available_balance,
+        locked_balance: newLocked,
+        updated_at: new Date().toISOString(),
+      },
+      [resolvedCustomId]: {
+        ...(prev[resolvedCustomId] || {}),
+        id: `w-${resolvedId}`,
+        user_id: resolvedId,
+        available_balance: userWallet.available_balance,
+        locked_balance: newLocked,
         updated_at: new Date().toISOString(),
       },
     }));
@@ -715,16 +729,31 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     const targetUserId = wd.user_id;
-    const targetUser = profiles.find((p) => p.id === targetUserId);
-    const userWallet = wallets[targetUserId] || { available_balance: 0, locked_balance: 0 };
+    const targetUser = profiles.find((p) => p.id === targetUserId || p.user_custom_id === targetUserId);
+    const resolvedId = targetUser ? targetUser.id : targetUserId;
+    const resolvedCustomId = targetUser ? targetUser.user_custom_id : targetUserId;
+    const userWallet = wallets[resolvedId] || wallets[resolvedCustomId] || { available_balance: 0, locked_balance: 0 };
 
     // Return locked funds back to available balance
+    const restoredAvailable = userWallet.available_balance + wd.amount;
+    const restoredLocked = Math.max(0, (userWallet.locked_balance || 0) - wd.amount);
+
     setWallets((prev) => ({
       ...prev,
-      [targetUserId]: {
-        ...prev[targetUserId],
-        available_balance: userWallet.available_balance + wd.amount,
-        locked_balance: Math.max(0, userWallet.locked_balance - wd.amount),
+      [resolvedId]: {
+        ...(prev[resolvedId] || {}),
+        id: `w-${resolvedId}`,
+        user_id: resolvedId,
+        available_balance: restoredAvailable,
+        locked_balance: restoredLocked,
+        updated_at: new Date().toISOString(),
+      },
+      [resolvedCustomId]: {
+        ...(prev[resolvedCustomId] || {}),
+        id: `w-${resolvedId}`,
+        user_id: resolvedId,
+        available_balance: restoredAvailable,
+        locked_balance: restoredLocked,
         updated_at: new Date().toISOString(),
       },
     }));
@@ -749,9 +778,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     );
 
     addAuditLog('WITHDRAWAL_REJECTED', `Rejected withdrawal ${wd.id}: ${reason}`, targetUser, wd.amount);
-    addNotification(targetUserId, 'Withdrawal Rejected', `Your withdrawal of ${formatINR(wd.amount)} was rejected. ${formatINR(wd.amount)} returned to your available balance.`, 'ALERT');
+    addNotification(resolvedId, 'Withdrawal Rejected (Refunded)', `Your withdrawal of ${formatINR(wd.amount)} was rejected. ${formatINR(wd.amount)} has been immediately restored to your available wallet balance. Reason: ${reason}`, 'ALERT');
 
-    return { success: true, message: `Withdrawal rejected. ${formatINR(wd.amount)} restored to user's wallet.` };
+    return { success: true, message: `Withdrawal rejected. ${formatINR(wd.amount)} refunded & restored to user's wallet.` };
   };
 
   // Internal User-to-User Transfer
