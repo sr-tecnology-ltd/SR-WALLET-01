@@ -795,11 +795,32 @@ app.post('/api/v1/auth/register', (req: Request, res: Response) => {
   });
 });
 
-app.post('/api/v1/auth/login', (req: Request, res: Response) => {
-  const { identifier } = req.body; // mobile, custom_id, or email
+app.post('/api/v1/auth/login', async (req: Request, res: Response) => {
+  const { identifier, device_name, ip_address, location } = req.body; // mobile, custom_id, or email
   const user = Object.values(users).find(
     (u) => u.user_custom_id === identifier || u.mobile === identifier || u.email === identifier
   ) || users['SR-10029'];
+
+  const clientIp = ip_address || (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '103.212.144.20';
+  const clientDevice = device_name || req.headers['user-agent'] || 'Web Browser (Chrome)';
+  const clientLocation = location || 'Mumbai, Maharashtra, India';
+  const loginTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+  // Dispatch Telegram Login Alert if user has connected Telegram
+  const tgTarget = user.telegram_id || user.telegram_chat_id;
+  if (tgTarget) {
+    sendTelegramNotification(
+      tgTarget,
+      `🚨 <b>SR GATEWAY • NEW LOGIN ALERT</b>\n\n` +
+      `An account login was detected on your SR GATEWAY ID.\n\n` +
+      `👤 <b>Account:</b> ${user.full_name} (<code>${user.user_custom_id}</code>)\n` +
+      `📱 <b>Device:</b> ${clientDevice}\n` +
+      `🌐 <b>IP Address:</b> <code>${clientIp}</code>\n` +
+      `📍 <b>Location:</b> ${clientLocation}\n` +
+      `⏰ <b>Time:</b> ${loginTime} IST\n\n` +
+      `🛡️ <i>If this was you, no action needed. If you did NOT log in, change your RPIN immediately or contact 24/7 Support!</i>`
+    );
+  }
 
   res.json({
     status: 'success',
@@ -808,6 +829,50 @@ app.post('/api/v1/auth/login', (req: Request, res: Response) => {
     token: `sr_jwt_mock_${Date.now()}_${user.user_custom_id}`,
     user,
     wallet: wallets[user.user_custom_id] || wallets['SR-10029'],
+    login_alert_sent: !!tgTarget,
+  });
+});
+
+app.post('/api/v1/auth/login-alert', async (req: Request, res: Response) => {
+  const { user_id, chat_id, telegram_id, device_name, ip_address, location, user_name } = req.body;
+  const targetUser = Object.values(users).find(
+    (u) => u.user_custom_id === user_id || u.id === user_id || u.mobile === user_id
+  ) || users['SR-10029'];
+
+  const targetTg = chat_id || telegram_id || targetUser.telegram_chat_id || targetUser.telegram_id;
+  const clientIp = ip_address || (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '103.212.144.20';
+  const clientDevice = device_name || 'Standard Web Device (Chrome)';
+  const clientLocation = location || 'Mumbai, Maharashtra, India';
+  const displayName = user_name || targetUser.full_name || 'Valued User';
+  const customId = user_id || targetUser.user_custom_id || 'SR-10029';
+  const loginTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+  if (targetTg) {
+    await sendTelegramNotification(
+      targetTg,
+      `🚨 <b>SR GATEWAY • NEW LOGIN ALERT</b>\n\n` +
+      `An account login was detected on your SR GATEWAY ID.\n\n` +
+      `👤 <b>Account:</b> ${displayName} (<code>${customId}</code>)\n` +
+      `📱 <b>Device:</b> ${clientDevice}\n` +
+      `🌐 <b>IP Address:</b> <code>${clientIp}</code>\n` +
+      `📍 <b>Location:</b> ${clientLocation}\n` +
+      `⏰ <b>Time:</b> ${loginTime} IST\n\n` +
+      `🛡️ <i>If this was you, no action needed. If you did NOT log in, change your RPIN immediately or contact 24/7 Support!</i>`
+    );
+  }
+
+  res.json({
+    status: 'success',
+    code: 200,
+    message: targetTg ? 'Telegram login security alert dispatched' : 'No Telegram Chat ID linked to this account',
+    alert_sent: !!targetTg,
+    target: targetTg || null,
+    details: {
+      device: clientDevice,
+      ip: clientIp,
+      location: clientLocation,
+      time: loginTime,
+    },
   });
 });
 

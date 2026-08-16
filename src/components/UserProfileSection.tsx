@@ -24,7 +24,7 @@ export const UserProfileSection: React.FC<{
   onOpenDeveloper?: () => void;
   onLogout?: () => void;
 }> = ({ onOpenDeveloper, onLogout }) => {
-  const { currentUser, currentWallet, transactions, formatINR, switchUser, allProfiles, openRpinModal } = useWallet();
+  const { currentUser, currentWallet, transactions, formatINR, switchUser, allProfiles, openRpinModal, logoutUser } = useWallet();
 
   const [showFullPhone, setShowFullPhone] = useState(false);
   const [is2FAEnabled, setIs2FAEnabled] = useState(true);
@@ -357,14 +357,16 @@ export const UserProfileSection: React.FC<{
 
         <button
           onClick={() => {
-            setMsg('Session securely authenticated & refreshed.');
-            setTimeout(() => setMsg(null), 3000);
-            if (onLogout) onLogout();
+            logoutUser();
+            setMsg('Account Logged Out Successfully! 🔒');
+            setTimeout(() => {
+              if (onLogout) onLogout();
+            }, 500);
           }}
-          className="w-full py-3.5 bg-slate-950 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 rounded-2xl font-bold text-xs uppercase tracking-wider transition active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+          className="w-full py-4 bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-500 hover:to-red-500 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition shadow-lg shadow-rose-600/30 active:scale-98 cursor-pointer flex items-center justify-center gap-2 border border-rose-400/30"
         >
-          <LogOut className="h-4 w-4 text-slate-400" />
-          <span>REFRESH SESSION</span>
+          <LogOut className="h-4 w-4 text-white" />
+          <span>LOG OUT (EXIT SESSION)</span>
         </button>
       </div>
     </div>

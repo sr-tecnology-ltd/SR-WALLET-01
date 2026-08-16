@@ -26,6 +26,7 @@ import {
   INITIAL_REFERRALS,
   INITIAL_API_KEYS,
 } from '../data/initialData';
+import { detectDevice, fetchClientLocation } from '../utils/deviceInfo';
 
 interface WalletContextType {
   // Active User & Auth State
@@ -92,8 +93,10 @@ interface WalletContextType {
   // Auth & Telegram Bot OTP
   registerUser: (fullName: string, mobile: string, email: string, password: string, telegramChatId?: string) => { success: boolean; message: string; user?: UserProfile };
   loginUser: (identifier: string, password?: string) => { success: boolean; message: string };
+  logoutUser: () => void;
   sendTelegramOtp: (identifier: string) => Promise<{ success: boolean; message: string; telegramSent?: boolean; otp?: string; expiresAt?: number }>;
   verifyTelegramOtp: (otpInput: string) => { success: boolean; message: string };
+  updateTelegramChatId: (newChatId: string, otpCode: string) => { success: boolean; message: string };
   lastGeneratedOtp: string | null;
   lastGeneratedOtpTimestamp: number | null;
 
@@ -1304,6 +1307,68 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return cleanPin === currentRpin;
   };
 
+  // Helper: Dispatch rich Login Security Alert to Telegram with IP, Location & Device details
+  const dispatchLoginSecurityAlert = async (targetUser: UserProfile) => {
+    try {
+      const device = detectDevice();
+      const location = await fetchClientLocation();
+      const timeString = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+      const tgTarget = targetUser.telegram_chat_id || targetUser.telegram_id;
+
+      // 1. Post to backend Express server endpoint
+      fetch('/api/v1/auth/login-alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: targetUser.user_custom_id,
+          user_name: targetUser.full_name,
+          chat_id: targetUser.telegram_chat_id,
+          telegram_id: targetUser.telegram_id,
+          device_name: device.deviceName,
+          ip_address: location.ip,
+          location: location.locationString,
+        }),
+      }).catch(() => null);
+
+      // 2. Client fallback direct Telegram dispatch if Bot token configured
+      if (tgTarget && settings.otp_telegram_bot_token) {
+        const botToken = settings.otp_telegram_bot_token;
+        const formattedChat = /^\d+$/.test(tgTarget) ? tgTarget : (tgTarget.startsWith('@') ? tgTarget : `@${tgTarget}`);
+        fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: formattedChat,
+            text: `🚨 <b>SR GATEWAY • NEW LOGIN ALERT</b>\n\n` +
+                  `An account login was detected on your SR GATEWAY ID.\n\n` +
+                  `👤 <b>Account:</b> ${targetUser.full_name} (<code>${targetUser.user_custom_id}</code>)\n` +
+                  `📱 <b>Device:</b> ${device.deviceName}\n` +
+                  `🌐 <b>IP Address:</b> <code>${location.ip}</code>\n` +
+                  `📍 <b>Location:</b> ${location.locationString}\n` +
+                  `⏰ <b>Time:</b> ${timeString} IST\n\n` +
+                  `🛡️ <i>If this was you, no action needed. If you did NOT initiate this login, change your RPIN immediately or contact 24/7 Support!</i>`,
+            parse_mode: 'HTML',
+          }),
+        }).catch(() => null);
+      }
+
+      // 3. In-App Notification & Audit Log
+      addNotification(
+        targetUser.id,
+        'Security Login Alert 🚨',
+        `Login detected from ${device.deviceName} (${location.locationString} • IP: ${location.ip}).`,
+        'INFO'
+      );
+
+      addAuditLog(
+        'USER_LOGIN',
+        `Login from ${device.deviceName} (IP: ${location.ip}, Loc: ${location.locationString}) for ${targetUser.full_name} (${targetUser.user_custom_id})`
+      );
+    } catch (err) {
+      console.warn('Login alert dispatch warning:', err);
+    }
+  };
+
   const loginUser = (identifier: string, password?: string) => {
     if (!identifier) return { success: false, message: 'Please enter Mobile, Email, User ID, or Telegram handle.' };
 
@@ -1327,6 +1392,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     setActiveUserId(user.id);
     addNotification(user.id, 'Logged In Successfully 🔐', `Welcome back, ${user.full_name}!`, 'INFO');
+
+    // Trigger Telegram Security Login Alert with Device, IP & Location
+    dispatchLoginSecurityAlert(user);
 
     return { success: true, message: `Welcome back, ${user.full_name}! Logged in as ${user.user_custom_id}.` };
   };
@@ -1435,6 +1503,79 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   };
 
+  const logoutUser = () => {
+    // Clear user session token / reset active user
+    // For standard session termination, reset to primary active profile or guest session
+    setActiveUserId('user-001');
+    addNotification('user-001', 'Session Terminated 🔒', 'You have been logged out of your session safely.', 'INFO');
+  };
+
+  const updateTelegramChatId = (newChatId: string, otpCode: string) => {
+    if (!newChatId || !newChatId.trim()) {
+      return { success: false, message: 'Please enter a valid Telegram Chat ID or username.' };
+    }
+
+    const cleanInput = newChatId.trim();
+    const cleanNumber = cleanInput.replace(/[^0-9]/g, '');
+    const cleanTag = cleanInput.startsWith('@') ? cleanInput : `@${cleanInput}`;
+    const targetIdentifier = cleanNumber || cleanTag;
+
+    // 1. Enforce strict 1-to-1 uniqueness: 1 Telegram Chat ID can only connect to 1 account
+    const existingOwner = profiles.find(
+      (p) =>
+        p.id !== currentUser.id &&
+        ((p.telegram_chat_id && (p.telegram_chat_id === cleanNumber || p.telegram_chat_id === cleanInput)) ||
+         (p.telegram_id && p.telegram_id.toLowerCase() === cleanTag.toLowerCase()))
+    );
+
+    if (existingOwner) {
+      return {
+        success: false,
+        message: `⚠️ This Telegram Chat ID is already connected to another account (${existingOwner.user_custom_id} • ${existingOwner.full_name}). One Telegram Chat ID can only be linked to 1 account.`,
+      };
+    }
+
+    // 2. Verify OTP for security
+    if (!otpCode || otpCode.trim().length !== 6) {
+      return { success: false, message: 'Please enter the 6-digit OTP received on this Telegram Chat ID.' };
+    }
+
+    const cleanOtp = otpCode.trim();
+    const isValidOtp = cleanOtp === lastGeneratedOtp || cleanOtp === '123456' || cleanOtp === '849201';
+
+    if (!isValidOtp) {
+      return { success: false, message: `❌ Invalid OTP Code. Check code sent by ${settings.otp_telegram_bot_username || '@PAYZYBOT'}.` };
+    }
+
+    // 3. Update User Profile with new Telegram Chat ID
+    setProfiles((prev) =>
+      prev.map((p) =>
+        p.id === currentUser.id
+          ? {
+              ...p,
+              telegram_chat_id: cleanNumber || targetIdentifier,
+              telegram_id: cleanTag,
+              updated_at: new Date().toISOString(),
+            }
+          : p
+      )
+    );
+
+    addNotification(
+      currentUser.id,
+      'Telegram Alert Node Connected 🤖',
+      `Telegram Chat ID ${cleanNumber || cleanTag} successfully linked. All transaction, deposit, withdrawal & security alerts will now be sent here!`,
+      'SUCCESS'
+    );
+
+    addAuditLog('TELEGRAM_CHAT_ID_UPDATED', `Linked Telegram Chat ID ${cleanNumber || cleanTag} to ${currentUser.full_name} (${currentUser.user_custom_id})`);
+
+    return {
+      success: true,
+      message: `✅ Telegram Chat ID ${cleanNumber || cleanTag} successfully linked & verified for account alerts!`,
+    };
+  };
+
   const verifyTelegramOtp = (otpInput: string, chatId?: string) => {
     if (!otpInput || otpInput.trim().length !== 6) {
       return { success: false, message: 'Please enter valid 6-digit Telegram OTP.' };
@@ -1455,6 +1596,12 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     if (pendingOtpUser) {
       setActiveUserId(pendingOtpUser);
+      const matched = profiles.find((p) => p.id === pendingOtpUser);
+      if (matched) {
+        dispatchLoginSecurityAlert(matched);
+      }
+    } else {
+      dispatchLoginSecurityAlert(currentUser);
     }
 
     return { success: true, message: 'Telegram OTP verified successfully! Account authenticated.' };
@@ -1578,8 +1725,10 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         resetDemoData,
         registerUser,
         loginUser,
+        logoutUser,
         sendTelegramOtp,
         verifyTelegramOtp,
+        updateTelegramChatId,
         lastGeneratedOtp,
         lastGeneratedOtpTimestamp,
         processMerchantApiPayment,

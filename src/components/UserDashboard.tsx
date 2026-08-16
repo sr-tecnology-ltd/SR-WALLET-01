@@ -142,24 +142,6 @@ export const UserDashboard: React.FC<{
     },
     {
       id: 7,
-      title: 'User Profile',
-      subtitle: 'Security & RPIN Settings',
-      icon: User,
-      badge: 'PROFILE',
-      color: 'from-teal-500/20 to-teal-600/10 border-teal-500/30 text-teal-300',
-      action: onOpenProfile,
-    },
-    {
-      id: 8,
-      title: 'Super Admin Portal',
-      subtitle: 'Approvals & Edits',
-      icon: ShieldCheck,
-      badge: 'ADMIN',
-      color: 'from-rose-500/20 to-amber-600/10 border-rose-500/30 text-rose-300',
-      action: toggleRoleMode,
-    },
-    {
-      id: 9,
       title: 'Official Channel',
       subtitle: settings.telegram_channel_name,
       icon: MessageSquare,
@@ -168,7 +150,7 @@ export const UserDashboard: React.FC<{
       action: () => window.open(settings.telegram_channel_url, '_blank'),
     },
     {
-      id: 10,
+      id: 8,
       title: '24/7 Support Bot',
       subtitle: 'Instant Help Desk',
       icon: MessageSquare,

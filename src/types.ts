@@ -139,7 +139,9 @@ export type AuditActionType =
   | 'USER_UNBANNED'
   | 'SETTINGS_UPDATED'
   | 'API_KEY_CREATED'
-  | 'API_KEY_REVOKED';
+  | 'API_KEY_REVOKED'
+  | 'TELEGRAM_CHAT_ID_UPDATED'
+  | 'USER_LOGIN';
 
 export interface AuditLog {
   id: string;

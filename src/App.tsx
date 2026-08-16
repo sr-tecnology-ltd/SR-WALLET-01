@@ -143,6 +143,7 @@ function WalletAppContent() {
               {activeTab === 'profile' && (
                 <UserProfileSection
                   onOpenDeveloper={() => setActiveTab('developer')}
+                  onLogout={() => setActiveTab('home')}
                 />
               )}
               {activeTab === 'support' && <SupportSection />}
