@@ -1,0 +1,6 @@
+{
+  "name": "SR GATEWAY IN",
+  "description": "Internal Wallet & Ledger Platform with Deposit/Withdrawal Verification, Admin Control, Referral & Daily Bonus, and Developer API.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
