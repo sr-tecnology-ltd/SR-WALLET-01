@@ -268,30 +268,20 @@ export const DepositSection: React.FC = () => {
           <form onSubmit={handleDepositSubmit} className="space-y-4">
             {/* Payment Method Selector */}
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-2">Payment Method Used</label>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { id: 'UPI', label: 'UPI / VPA', icon: QrCode },
-                  { id: 'BANK_TRANSFER', label: 'Bank IMPS', icon: CreditCard },
-                  { id: 'QR_CODE', label: 'QR Scan', icon: PlusCircle },
-                ].map((m) => {
-                  const Icon = m.icon;
-                  return (
-                    <button
-                      type="button"
-                      key={m.id}
-                      onClick={() => setPaymentMethod(m.id as any)}
-                      className={`p-3 rounded-2xl border text-xs font-bold flex flex-col items-center gap-1.5 transition ${
-                        paymentMethod === m.id
-                          ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-lg shadow-emerald-500/10'
-                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" />
-                      <span>{m.label}</span>
-                    </button>
-                  );
-                })}
+              <label className="block text-xs font-bold text-slate-300 mb-2">Payment Method</label>
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/40 rounded-2xl flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                    <QrCode className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-black text-emerald-300">UPI / BANK</div>
+                    <div className="text-[10px] text-slate-400">Direct VPA, UPI App or IMPS/NEFT Transfer</div>
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono font-bold">
+                  ACTIVE
+                </span>
               </div>
             </div>
 

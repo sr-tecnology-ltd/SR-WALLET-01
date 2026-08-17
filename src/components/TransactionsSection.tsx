@@ -414,6 +414,8 @@ export const TransactionsSection: React.FC = () => {
                   tx.type === 'DAILY_BONUS' ||
                   tx.type === 'REFERRAL_BONUS';
 
+                const txnId = tx.id.startsWith('SR-') ? tx.id : `SR-${tx.id.toUpperCase()}`;
+
                 return (
                   <tr key={tx.id} className="hover:bg-slate-850/50 transition">
                     <td className="py-3.5 px-3 text-slate-400 whitespace-nowrap">
@@ -425,10 +427,16 @@ export const TransactionsSection: React.FC = () => {
                         minute: '2-digit',
                       })}
                     </td>
-                    <td className="py-3.5 px-3 font-bold text-slate-300 whitespace-nowrap">{tx.id}</td>
+                    <td className="py-3.5 px-3 font-bold text-sky-300 whitespace-nowrap font-mono">{txnId}</td>
                     <td className="py-3.5 px-3">
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-slate-950 border border-slate-800 text-indigo-300">
-                        {tx.type}
+                      <span
+                        className={`px-2 py-0.5 rounded font-black text-[9px] uppercase tracking-wider ${
+                          isCredit
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                        }`}
+                      >
+                        {isCredit ? 'RECEIVED' : 'DEBIT'}
                       </span>
                     </td>
                     <td className="py-3.5 px-3 font-sans font-medium text-white max-w-xs truncate">
@@ -436,7 +444,7 @@ export const TransactionsSection: React.FC = () => {
                     </td>
                     <td
                       className={`py-3.5 px-3 text-right font-black ${
-                        isCredit ? 'text-emerald-400' : 'text-slate-200'
+                        isCredit ? 'text-emerald-400' : 'text-rose-400'
                       }`}
                     >
                       {isCredit ? '+' : '-'}{formatINR(tx.net_amount)}

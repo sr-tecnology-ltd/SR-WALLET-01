@@ -33,6 +33,7 @@ export const ThreeDotsMenuModal: React.FC<ThreeDotsMenuProps> = ({
     formatINR,
     currentWallet,
     settings,
+    logoutUser,
   } = useWallet();
 
   if (!isOpen) return null;
@@ -176,7 +177,7 @@ export const ThreeDotsMenuModal: React.FC<ThreeDotsMenuProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
+        <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs gap-2">
           <button
             onClick={() => {
               onClose();
@@ -185,9 +186,18 @@ export const ThreeDotsMenuModal: React.FC<ThreeDotsMenuProps> = ({
             className="text-slate-400 hover:text-sky-400 transition flex items-center gap-1.5 font-bold cursor-pointer"
           >
             <MessageSquare className="h-4 w-4 text-sky-400" />
-            <span>24/7 Telegram Support</span>
+            <span>24/7 Support</span>
           </button>
-          <span className="text-[10px] text-slate-600 font-mono">SR GATEWAY IN</span>
+
+          <button
+            onClick={() => {
+              onClose();
+              logoutUser();
+            }}
+            className="text-rose-400 hover:text-rose-300 transition flex items-center gap-1.5 font-bold cursor-pointer px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/20"
+          >
+            <span>Log Out</span>
+          </button>
         </div>
       </div>
     </div>

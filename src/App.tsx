@@ -15,6 +15,8 @@ import { ThreeDotsMenuModal } from './components/ThreeDotsMenuModal';
 import { UpiApiGatewayModal } from './components/UpiApiGatewayModal';
 import { UserProfileSection } from './components/UserProfileSection';
 import { RpinModal } from './components/RpinModal';
+import { AuthPortal } from './components/AuthPortal';
+import { AppLockModal } from './components/AppLockModal';
 import {
   Wallet,
   PlusCircle,
@@ -27,7 +29,7 @@ import {
 } from 'lucide-react';
 
 function WalletAppContent() {
-  const { activeRole, toggleRoleMode, switchUser, rpinModalConfig, closeRpinModal } = useWallet();
+  const { isAuthenticated, activeRole, toggleRoleMode, switchUser, rpinModalConfig, closeRpinModal } = useWallet();
 
   const [activeTab, setActiveTab] = useState<
     'home' | 'deposit' | 'withdraw' | 'transfer' | 'transactions' | 'developer' | 'support' | 'profile'
@@ -62,6 +64,62 @@ function WalletAppContent() {
   const [threeDotsOpen, setThreeDotsOpen] = useState(false);
   const [telegramOtpOpen, setTelegramOtpOpen] = useState(false);
   const [upiApiGatewayOpen, setUpiApiGatewayOpen] = useState(false);
+
+  // App Open RPIN Security Lock state
+  const [isAppUnlocked, setIsAppUnlocked] = useState<boolean>(() => {
+    return sessionStorage.getItem('sr_app_unlocked') === 'true';
+  });
+
+  const handleAppUnlock = () => {
+    sessionStorage.setItem('sr_app_unlocked', 'true');
+    setIsAppUnlocked(true);
+  };
+
+  // If user is not authenticated (logged out), render AuthPortal (Login, Register & Telegram OTP)
+  if (!isAuthenticated) {
+    return (
+      <>
+        <AuthPortal />
+        <RpinModal
+          isOpen={rpinModalConfig.isOpen}
+          mode={rpinModalConfig.mode}
+          title={rpinModalConfig.title}
+          description={rpinModalConfig.description}
+          amount={rpinModalConfig.amount}
+          recipientName={rpinModalConfig.recipientName}
+          onClose={closeRpinModal}
+          onSuccess={() => {
+            if (rpinModalConfig.onSuccessCallback) {
+              rpinModalConfig.onSuccessCallback();
+            }
+          }}
+        />
+      </>
+    );
+  }
+
+  // If user is authenticated but app is locked, render AppLockModal
+  if (!isAppUnlocked && activeRole === 'USER') {
+    return (
+      <>
+        <AppLockModal onUnlock={handleAppUnlock} />
+        <RpinModal
+          isOpen={rpinModalConfig.isOpen}
+          mode={rpinModalConfig.mode}
+          title={rpinModalConfig.title}
+          description={rpinModalConfig.description}
+          amount={rpinModalConfig.amount}
+          recipientName={rpinModalConfig.recipientName}
+          onClose={closeRpinModal}
+          onSuccess={() => {
+            if (rpinModalConfig.onSuccessCallback) {
+              rpinModalConfig.onSuccessCallback();
+            }
+          }}
+        />
+      </>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500 selection:text-white flex flex-col justify-between">

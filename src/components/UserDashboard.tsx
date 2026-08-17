@@ -384,7 +384,9 @@ export const UserDashboard: React.FC<{
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-base font-extrabold text-white">Recent Transaction Ledger</h3>
-            <p className="text-xs text-slate-400">All real-time deposits, withdrawals, and user to user transfers</p>
+            <p className="text-xs text-slate-400">
+              Live ledger for Deposits, Withdrawals, P2P Transfers & Wallet Payments
+            </p>
           </div>
           <button
             onClick={onOpenTransactions}
@@ -397,9 +399,9 @@ export const UserDashboard: React.FC<{
 
         <div className="divide-y divide-slate-800/80">
           {myTransactions.length === 0 ? (
-            <p className="text-center text-slate-500 py-8 text-xs">No transaction history found.</p>
+            <p className="text-center text-slate-500 py-8 text-xs font-mono">No transaction history found.</p>
           ) : (
-            myTransactions.slice(0, 5).map((tx) => {
+            myTransactions.slice(0, 7).map((tx) => {
               const isCredit =
                 tx.type === 'DEPOSIT' ||
                 tx.type === 'TRANSFER_IN' ||
@@ -407,43 +409,67 @@ export const UserDashboard: React.FC<{
                 tx.type === 'DAILY_BONUS' ||
                 tx.type === 'REFERRAL_BONUS';
 
+              const txnId = tx.id.startsWith('SR-') ? tx.id : `SR-${tx.id.toUpperCase()}`;
+
               return (
                 <div key={tx.id} className="py-3.5 flex items-center justify-between gap-3 text-xs">
                   <div className="flex items-center gap-3">
                     <div
-                      className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-sm ${
-                        isCredit ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                      className={`w-10 h-10 rounded-2xl flex flex-col items-center justify-center font-black text-xs shrink-0 ${
+                        isCredit
+                          ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400'
+                          : 'bg-rose-500/15 border border-rose-500/30 text-rose-400'
                       }`}
                     >
-                      {isCredit ? '↓' : '↑'}
+                      <span className="text-sm font-black leading-none">{isCredit ? '↓' : '↑'}</span>
+                      <span className="text-[8px] font-mono uppercase tracking-tighter mt-0.5">
+                        {isCredit ? 'CR' : 'DR'}
+                      </span>
                     </div>
-                    <div>
-                      <div className="font-extrabold text-white text-xs sm:text-sm">{tx.description}</div>
-                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                        Ref: {tx.reference_id} • {new Date(tx.created_at).toLocaleString()}
+
+                    <div className="space-y-0.5">
+                      <div className="font-extrabold text-white text-xs sm:text-sm flex items-center gap-2">
+                        <span>{tx.description}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <span className="text-sky-300 font-bold">TXN ID: {txnId}</span>
+                        <span>•</span>
+                        <span>{new Date(tx.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="text-right">
+                  <div className="text-right shrink-0 space-y-1">
                     <div
-                      className={`font-mono font-black text-sm ${
-                        isCredit ? 'text-emerald-400' : 'text-slate-200'
+                      className={`font-mono font-black text-sm flex items-center justify-end gap-1 ${
+                        isCredit ? 'text-emerald-400' : 'text-rose-400'
                       }`}
                     >
-                      {isCredit ? '+' : '-'}{formatINR(tx.net_amount)}
+                      <span>{isCredit ? '+' : '-'}{formatINR(tx.net_amount)}</span>
+                      <span
+                        className={`text-[9px] px-1.5 py-0.5 rounded font-black tracking-wider ${
+                          isCredit
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                        }`}
+                      >
+                        {isCredit ? 'RECEIVED' : 'DEBIT'}
+                      </span>
                     </div>
-                    <span
-                      className={`text-[9px] font-mono font-extrabold uppercase px-2 py-0.5 rounded-full ${
-                        tx.status === 'SUCCESS'
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : tx.status === 'PENDING'
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                          : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                      }`}
-                    >
-                      {tx.status}
-                    </span>
+
+                    <div className="flex items-center justify-end gap-1.5">
+                      <span
+                        className={`text-[9px] font-mono font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                          tx.status === 'SUCCESS'
+                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                            : tx.status === 'PENDING'
+                            ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                            : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                        }`}
+                      >
+                        {tx.status}
+                      </span>
+                    </div>
                   </div>
                 </div>
               );

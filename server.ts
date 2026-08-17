@@ -449,7 +449,17 @@ function executeUserToUserTransfer(senderIdentifier: string | undefined, recipie
   recipientWallet.available_balance += amount;
   recipientWallet.updated_at = new Date().toISOString();
 
-  const txnId = `TXN-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+  const generateSRId = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let str = '';
+    for (let i = 0; i < 13; i++) {
+      str += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `SR-${str}`;
+  };
+
+  const txnId = generateSRId();
+  const recipientTxnId = generateSRId();
   const timestamp = new Date().toISOString();
   const cleanNote = note || 'Peer-to-Peer Transfer';
 
@@ -474,7 +484,7 @@ function executeUserToUserTransfer(senderIdentifier: string | undefined, recipie
 
   // 2. Transaction log for Recipient (TRANSFER_IN)
   const recipientInTxn = {
-    id: `TXN-IN-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+    id: recipientTxnId,
     user_id: recipientUser.id || recipientUser.user_custom_id,
     user_custom_id: recipientUser.user_custom_id,
     user_name: recipientUser.full_name,
