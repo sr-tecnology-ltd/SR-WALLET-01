@@ -1362,7 +1362,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return { success: true, message: 'Security RPIN reset successfully! You can now use your new 4-digit PIN.' };
   };
 
-  // Helper: Dispatch rich Login Security Alert to Telegram with IP, Location & Device details
+  // Helper: Dispatch rich Login Security Alert to Telegram & Gmail with IP, Location & Device details
   const dispatchLoginSecurityAlert = async (targetUser: UserProfile) => {
     try {
       const device = detectDevice();
@@ -1370,13 +1370,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const timeString = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
       const tgTarget = targetUser.telegram_chat_id || targetUser.telegram_id;
 
-      // 1. Post to backend Express server endpoint
+      // 1. Post to backend Express server endpoint (Dispatches both Telegram and Automated Gmail alerts)
       fetch('/api/v1/auth/login-alert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: targetUser.user_custom_id,
           user_name: targetUser.full_name,
+          email: targetUser.email,
           chat_id: targetUser.telegram_chat_id,
           telegram_id: targetUser.telegram_id,
           device_name: device.deviceName,
@@ -1411,7 +1412,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       addNotification(
         targetUser.id,
         'Security Login Alert 🚨',
-        `Login detected from ${device.deviceName} (${location.locationString} • IP: ${location.ip}).`,
+        `Login detected from ${device.deviceName} (${location.locationString} • IP: ${location.ip}). Email & Bot alert dispatched.`,
         'INFO'
       );
 

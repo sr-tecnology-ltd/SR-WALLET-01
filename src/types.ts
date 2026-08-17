@@ -192,6 +192,30 @@ export interface AppSettings {
   admin_bank_account_name?: string;
   admin_bank_account_no?: string;
   admin_bank_ifsc?: string;
+  // Automated Email Notification System
+  email_alerts_enabled?: boolean;
+  email_login_alert_enabled?: boolean;
+  email_deposit_alert_enabled?: boolean;
+  email_withdraw_alert_enabled?: boolean;
+  smtp_host?: string;
+  smtp_port?: number;
+  smtp_user?: string;
+  smtp_pass?: string;
+  smtp_from_name?: string;
+  smtp_from_email?: string;
+}
+
+export interface EmailLog {
+  id: string;
+  recipient_email: string;
+  user_id?: string;
+  user_name?: string;
+  subject: string;
+  type: 'LOGIN_ALERT' | 'DEPOSIT_ALERT' | 'WITHDRAWAL_ALERT' | 'SYSTEM_ALERT';
+  status: 'SENT' | 'FAILED';
+  preview?: string;
+  error?: string;
+  created_at: string;
 }
 
 export interface ApiKeyRecord {

@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 
 export const DeveloperApiSection: React.FC = () => {
-  const { currentUser, apiKeys, createApiKey, revokeApiKey, currentWallet, formatINR, settings } = useWallet();
+  const { currentUser, apiKeys, createApiKey, revokeApiKey, currentWallet, formatINR, settings, refreshFromBackend } = useWallet();
 
   const [newKeyName, setNewKeyName] = useState('Telegram Bot & Merchant Key');
   const [createdSecret, setCreatedSecret] = useState<string | null>(null);
@@ -170,6 +170,9 @@ export const DeveloperApiSection: React.FC = () => {
           txn: data.result,
         },
       ]);
+      
+      // Auto-refresh balances and transactions on frontend
+      await refreshFromBackend();
     } catch (err: any) {
       setBotSimLogs((prev) => [
         ...prev,
@@ -204,6 +207,12 @@ export const DeveloperApiSection: React.FC = () => {
           comment: customComment || 'API_Payment_Test',
           sender_id: currentUser.user_custom_id,
         });
+      } else if (activeEndpoint.includes('Receiver User Check') || activeEndpoint.includes('check_user')) {
+        endpoint = `/Api/api.php?token=${encodeURIComponent(customApiKey)}&action=check_user&number=${encodeURIComponent(customNumber)}`;
+        method = 'GET';
+      } else if (activeEndpoint.includes('REST Receiver Verify')) {
+        endpoint = `/api/v1/user/verify?number=${encodeURIComponent(customNumber)}`;
+        method = 'GET';
       } else if (activeEndpoint.includes('POST /api.php (JSON Balance)')) {
         endpoint = '/Api/api.php';
         method = 'POST';
@@ -239,6 +248,9 @@ export const DeveloperApiSection: React.FC = () => {
 
       const data = await res.json();
       setApiResponse(JSON.stringify(data, null, 2));
+      
+      // Auto-refresh balances and transactions on frontend
+      await refreshFromBackend();
     } catch (err: any) {
       setApiResponse(JSON.stringify({ error: 'Failed to connect to API endpoint', details: err.message }, null, 2));
     } finally {
@@ -647,10 +659,12 @@ export const DeveloperApiSection: React.FC = () => {
                     onChange={(e) => setActiveEndpoint(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:outline-none focus:border-indigo-500"
                   >
-                    <option value="GET /Api/api.php (Token + Paytm Query URL)">GET /Api/api.php (Token + Paytm Query URL)</option>
-                    <option value="POST /api.php (JSON Transfer)">POST /Api/api.php (JSON Transfer)</option>
-                    <option value="GET /api.php (Balance)">GET /Api/api.php (Balance Check)</option>
-                    <option value="POST /api.php (JSON Balance)">POST /Api/api.php (JSON Balance)</option>
+                    <option value="GET /Api/api.php (Token + Paytm Query URL)">GET /Api/api.php (Token + Paytm URL - Live Debit & Credit)</option>
+                    <option value="POST /api.php (JSON Transfer)">POST /Api/api.php (JSON Body - Live Debit & Credit)</option>
+                    <option value="GET /Api/api.php (Receiver User Check / Registration Verification)">GET /Api/api.php (Receiver Check & Identify - ?action=check_user)</option>
+                    <option value="GET /api/v1/user/verify (REST Receiver Verify)">GET /api/v1/user/verify (REST Receiver Identity Check)</option>
+                    <option value="GET /api.php (Balance)">GET /Api/api.php (Live Balance Check)</option>
+                    <option value="POST /api.php (JSON Balance)">POST /Api/api.php (JSON Balance Check)</option>
                   </select>
                 </div>
 

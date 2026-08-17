@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useWallet } from '../context/WalletContext';
 import {
   ShieldCheck,
@@ -29,6 +29,10 @@ import {
   RefreshCw,
   Gift,
   Sparkles,
+  Mail,
+  Send,
+  Inbox,
+  Trash2,
 } from 'lucide-react';
 import { UserProfile, DepositRequest, WithdrawalRequest, Wallet } from '../types';
 
@@ -102,6 +106,88 @@ export const AdminPortal: React.FC = () => {
 
   // Admin Settings Form State
   const [settingsForm, setSettingsForm] = useState(settings);
+
+  // Email Test & Logs State
+  const [testEmailRecipient, setTestEmailRecipient] = useState<string>('sk190rihan@gmail.com');
+  const [testEmailType, setTestEmailType] = useState<'LOGIN_ALERT' | 'DEPOSIT_ALERT' | 'WITHDRAW_ALERT'>('LOGIN_ALERT');
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState<boolean>(false);
+  const [testEmailResult, setTestEmailResult] = useState<{
+    success: boolean;
+    message: string;
+    log_id?: string;
+    mode?: string;
+  } | null>(null);
+  const [emailLogsList, setEmailLogsList] = useState<any[]>([]);
+  const [isLoadingEmailLogs, setIsLoadingEmailLogs] = useState<boolean>(false);
+
+  const fetchEmailLogs = async () => {
+    setIsLoadingEmailLogs(true);
+    try {
+      const res = await fetch('/api/v1/admin/email-logs');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === 'success' && Array.isArray(data.logs)) {
+          setEmailLogsList(data.logs);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch email logs:', e);
+    } finally {
+      setIsLoadingEmailLogs(false);
+    }
+  };
+
+  const handleClearEmailLogs = async () => {
+    try {
+      const res = await fetch('/api/v1/admin/email-logs', { method: 'DELETE' });
+      if (res.ok) {
+        setEmailLogsList([]);
+        showAlert('Email dispatch logs cleared successfully!');
+      }
+    } catch (e) {
+      console.error('Failed to clear logs:', e);
+    }
+  };
+
+  const handleSendTestEmail = async () => {
+    if (!testEmailRecipient || !testEmailRecipient.includes('@')) {
+      showAlert('Please enter a valid Gmail / recipient email address.');
+      return;
+    }
+    setIsSendingTestEmail(true);
+    setTestEmailResult(null);
+    try {
+      const res = await fetch('/api/v1/admin/test-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: testEmailRecipient,
+          test_type: testEmailType,
+        }),
+      });
+      const data = await res.json();
+      setTestEmailResult({
+        success: data.status === 'success',
+        message: data.message || (data.status === 'success' ? 'Email test passed!' : 'Email test failed'),
+        log_id: data.log_id,
+        mode: data.mode,
+      });
+      fetchEmailLogs();
+    } catch (err: any) {
+      setTestEmailResult({
+        success: false,
+        message: err.message || 'Failed to dispatch test email request.',
+      });
+    } finally {
+      setIsSendingTestEmail(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeAdminTab === 'SETTINGS') {
+      fetchEmailLogs();
+    }
+  }, [activeAdminTab]);
 
   // Status message
   const [adminAlertMsg, setAdminAlertMsg] = useState<string | null>(null);
@@ -1263,6 +1349,273 @@ export const AdminPortal: React.FC = () => {
                     User panel redirect destination URL
                   </p>
                 </div>
+              </div>
+            </div>
+
+            {/* Automated Gmail / Email Alert System (Login, Deposit, Withdrawal Alerts) */}
+            <div className="bg-slate-950 border border-emerald-500/30 rounded-2xl p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">
+                    <Mail className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-white text-xs flex items-center gap-2">
+                      <span>Automated Gmail & Email Notification Engine</span>
+                      {settingsForm.email_alerts_enabled ? (
+                        <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+                          ACTIVE ENGINE
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-bold">
+                          DISABLED
+                        </span>
+                      )}
+                    </h4>
+                    <p className="text-[10px] text-slate-400 font-mono">
+                      Automatically send real-time HTML security and transaction alerts to user registered Gmail IDs (Login, Deposit & Withdrawal with full details)
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={settingsForm.email_alerts_enabled}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, email_alerts_enabled: e.target.checked })}
+                  className="w-5 h-5 accent-emerald-500 cursor-pointer"
+                />
+              </div>
+
+              {/* Individual Alert Triggers */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-white text-xs">🔐 Login Alerts</div>
+                    <div className="text-[10px] text-slate-400 font-mono">IP, Device & Location email</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={settingsForm.email_login_alert_enabled}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, email_login_alert_enabled: e.target.checked })}
+                    className="w-4 h-4 accent-indigo-500 cursor-pointer"
+                  />
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-white text-xs">💰 Deposit Alerts</div>
+                    <div className="text-[10px] text-slate-400 font-mono">UTR submission & credit update</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={settingsForm.email_deposit_alert_enabled}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, email_deposit_alert_enabled: e.target.checked })}
+                    className="w-4 h-4 accent-emerald-500 cursor-pointer"
+                  />
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-white text-xs">💸 Withdrawal Alerts</div>
+                    <div className="text-[10px] text-slate-400 font-mono">Payout requested & dispatched</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={settingsForm.email_withdraw_alert_enabled}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, email_withdraw_alert_enabled: e.target.checked })}
+                    className="w-4 h-4 accent-purple-500 cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* SMTP Connection Configuration */}
+              <div className="p-4 bg-slate-900/80 rounded-2xl border border-slate-800 space-y-3">
+                <div className="font-bold text-white text-xs font-mono flex items-center gap-2 text-slate-200">
+                  <KeyRound className="h-3.5 w-3.5 text-emerald-400" />
+                  <span>SMTP Mail Server Parameters (Gmail SMTP / Custom Server)</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
+                  <div>
+                    <label className="block text-slate-400 text-[10px] uppercase mb-1">SMTP Host</label>
+                    <input
+                      type="text"
+                      placeholder="smtp.gmail.com"
+                      value={settingsForm.smtp_host || 'smtp.gmail.com'}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, smtp_host: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-[10px] uppercase mb-1">SMTP Port</label>
+                    <input
+                      type="number"
+                      placeholder="587"
+                      value={settingsForm.smtp_port || 587}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, smtp_port: Number(e.target.value) })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-[10px] uppercase mb-1">SMTP Username / Gmail ID</label>
+                    <input
+                      type="text"
+                      placeholder="support@srgateway.in or gmail"
+                      value={settingsForm.smtp_user || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, smtp_user: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-300 font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-[10px] uppercase mb-1">App Password / Secret</label>
+                    <input
+                      type="password"
+                      placeholder="Google App Password (16-char)"
+                      value={settingsForm.smtp_pass || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, smtp_pass: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-amber-300 font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
+                  <div>
+                    <label className="block text-slate-400 text-[10px] uppercase mb-1">Sender Brand Display Name</label>
+                    <input
+                      type="text"
+                      placeholder="SR GATEWAY Security & Alerts"
+                      value={settingsForm.smtp_from_name || 'SR GATEWAY Alerts'}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, smtp_from_name: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-[10px] uppercase mb-1">Sender From Email Address</label>
+                    <input
+                      type="text"
+                      placeholder="alerts@srgateway.in"
+                      value={settingsForm.smtp_from_email || 'alerts@srgateway.in'}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, smtp_from_email: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Live SMTP Dispatch & Testing Console */}
+              <div className="p-4 bg-emerald-950/20 border border-emerald-500/20 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-emerald-300 text-xs font-mono flex items-center gap-2">
+                    <Send className="h-3.5 w-3.5 text-emerald-400" />
+                    <span>Live Test Email Notification Sender</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={fetchEmailLogs}
+                    className="text-[10px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-mono"
+                  >
+                    <RefreshCw className={`h-3 w-3 ${isLoadingEmailLogs ? 'animate-spin' : ''}`} />
+                    <span>Refresh Logs</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="sm:col-span-2">
+                    <label className="block text-slate-400 text-[10px] font-mono uppercase mb-1">Test Recipient Gmail ID</label>
+                    <input
+                      type="email"
+                      placeholder="sk190rihan@gmail.com"
+                      value={testEmailRecipient}
+                      onChange={(e) => setTestEmailRecipient(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-300 font-mono font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 text-[10px] font-mono uppercase mb-1">Test Event Type</label>
+                    <select
+                      value={testEmailType}
+                      onChange={(e: any) => setTestEmailType(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
+                    >
+                      <option value="LOGIN_ALERT">🔐 Login Alert Email</option>
+                      <option value="DEPOSIT_ALERT">💰 Deposit Credited Email</option>
+                      <option value="WITHDRAW_ALERT">💸 Withdrawal Payout Email</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1">
+                  <button
+                    type="button"
+                    disabled={isSendingTestEmail}
+                    onClick={handleSendTestEmail}
+                    className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl flex items-center gap-2 transition shadow-lg shadow-emerald-500/20 active:scale-95 disabled:opacity-50"
+                  >
+                    <Send className={`h-3.5 w-3.5 ${isSendingTestEmail ? 'animate-pulse' : ''}`} />
+                    <span>{isSendingTestEmail ? 'Dispatching Live Email...' : 'Send Live Test Email 🚀'}</span>
+                  </button>
+
+                  {testEmailResult && (
+                    <div
+                      className={`text-[11px] font-mono px-3 py-1.5 rounded-xl border flex items-center gap-2 ${
+                        testEmailResult.success
+                          ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                          : 'bg-rose-500/10 text-rose-300 border-rose-500/30'
+                      }`}
+                    >
+                      {testEmailResult.success ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                      <span>{testEmailResult.message}</span>
+                      {testEmailResult.mode && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+                          {testEmailResult.mode}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Email Dispatch Audit Log Preview */}
+                {emailLogsList.length > 0 && (
+                  <div className="mt-4 pt-3 border-t border-slate-800/80 space-y-2">
+                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                      <span className="flex items-center gap-1.5">
+                        <Inbox className="h-3 w-3 text-emerald-400" />
+                        <span>Recent Email Dispatch Ledger ({emailLogsList.length})</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleClearEmailLogs}
+                        className="text-rose-400 hover:text-rose-300 flex items-center gap-1 text-[10px]"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        <span>Clear History</span>
+                      </button>
+                    </div>
+
+                    <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1 font-mono text-[10px]">
+                      {emailLogsList.slice(0, 8).map((log: any) => (
+                        <div
+                          key={log.id}
+                          className="p-2 bg-slate-950/80 rounded-lg border border-slate-800/70 flex items-center justify-between gap-2"
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <span
+                              className={`px-1.5 py-0.5 rounded font-bold ${
+                                log.status === 'SENT' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
+                              }`}
+                            >
+                              {log.type}
+                            </span>
+                            <span className="text-slate-200 truncate">{log.to}</span>
+                            <span className="text-slate-500 truncate hidden sm:inline">{log.subject}</span>
+                          </div>
+                          <div className="text-slate-400 shrink-0">
+                            {new Date(log.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
