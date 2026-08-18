@@ -290,8 +290,20 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
                 <span className="text-slate-400">Wallet Mobile A/C:</span>
                 <span className="text-white font-bold">+91 {registeredUserPopup.user.mobile}</span>
               </div>
+              {registeredUserPopup.user.email && (
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                  <span className="text-slate-400 flex items-center gap-1">
+                    <Mail className="h-3.5 w-3.5 text-indigo-400" /> Email Alert Sent:
+                  </span>
+                  <span className="text-indigo-300 font-bold truncate max-w-[180px]">
+                    {registeredUserPopup.user.email}
+                  </span>
+                </div>
+              )}
               <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                <span className="text-slate-400">Telegram Alert Node:</span>
+                <span className="text-slate-400 flex items-center gap-1">
+                  <Bot className="h-3.5 w-3.5 text-sky-400" /> Telegram Alert:
+                </span>
                 <span className="text-sky-300 font-bold">
                   {registeredUserPopup.user.telegram_chat_id || registeredUserPopup.user.telegram_id}
                 </span>
@@ -566,11 +578,11 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
 
                 <div>
                   <label className="block text-[11px] font-mono text-slate-400 mb-1 font-bold">
-                    EMAIL ADDRESS (OPTIONAL)
+                    EMAIL ADDRESS (FOR REAL-TIME GMAIL ALERTS)
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <Mail className="h-4 w-4" />
+                      <Mail className="h-4 w-4 text-indigo-400" />
                     </div>
                     <input
                       type="email"
@@ -580,6 +592,9 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
                       className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-2xl text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 transition"
                     />
                   </div>
+                  <p className="text-[10px] text-slate-500 font-mono mt-1">
+                    ⚡ Registration, Login & Transaction alerts will be delivered to this Gmail.
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

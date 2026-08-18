@@ -71,10 +71,7 @@ export const DeveloperApiSection: React.FC = () => {
   };
 
   // Smart non-self recipient defaults
-  const defaultRecipientNumber =
-    currentUser.user_custom_id === 'SR-10034' || currentUser.mobile?.includes('98123')
-      ? '9876543210'
-      : '9812345678';
+  const defaultRecipientNumber = '9876543210';
 
   // API Tester state
   const [activeEndpoint, setActiveEndpoint] = useState<string>('GET /Api/api.php (Token + Paytm Query URL)');
@@ -99,7 +96,7 @@ export const DeveloperApiSection: React.FC = () => {
 
   // Telegram Bot Simulator State
   const [botCommandInput, setBotCommandInput] = useState(`/pay ${defaultRecipientNumber} 100 Coffee_Payout`);
-  const [botSimUsername, setBotSimUsername] = useState(currentUser.telegram_id || '@rahul_sr');
+  const [botSimUsername, setBotSimUsername] = useState(currentUser.telegram_id || '@user_gateway');
   const [botSimChatId, setBotSimChatId] = useState('638291048');
   const [botSimLogs, setBotSimLogs] = useState<Array<{ sender: 'user' | 'bot'; text: string; time: string; txn?: any }>>([
     {
@@ -110,7 +107,10 @@ export const DeveloperApiSection: React.FC = () => {
   ]);
   const [isBotRunning, setIsBotRunning] = useState(false);
 
-  const currentOrigin = 'https://srgateway.onrender.com';
+  // Dynamically resolve Gateway URL based on the real browser window origin or custom domain
+  const currentOrigin = typeof window !== 'undefined' && window.location.origin
+    ? window.location.origin
+    : 'https://srgateway.in';
 
   const requestedApiUrl = `${currentOrigin}/Api/api.php?token=${activeApiKey}&paytm=${defaultRecipientNumber}&amount=100&comment=Payment_Transfer`;
   const requestedApiTemplate = `${currentOrigin}/Api/api.php?token=${activeApiKey}&paytm={wallet}&amount={amount}&comment={comment}`;

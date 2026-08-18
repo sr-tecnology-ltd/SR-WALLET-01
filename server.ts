@@ -59,56 +59,17 @@ let appSettings: Record<string, any> = {
   smtp_port: parseInt(process.env.SMTP_PORT || '587', 10),
   smtp_user: process.env.SMTP_USER || '',
   smtp_pass: process.env.SMTP_PASS || '',
-  smtp_from_name: process.env.SMTP_FROM_NAME || 'SR GATEWAY IN Alerts',
-  smtp_from_email: process.env.SMTP_FROM_EMAIL || 'alerts@srgateway.in',
+  smtp_from_name: process.env.SMTP_FROM_NAME || 'SR GATEWAY Alerts',
+  smtp_from_email: process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'sr.notify.hub@gmail.com',
 };
 
 let users: Record<string, any> = {
-  'SR-10029': {
-    id: 'user-001',
-    user_custom_id: 'SR-10029',
-    full_name: 'Rahul Sharma',
-    mobile: '+91 98765 43210',
-    email: 'rahul@srgateway.in',
-    telegram_id: '@rahul_sr',
-    role: 'USER',
-    status: 'ACTIVE',
-    referral_code: 'RAHUL10029',
-    created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  'SR-10034': {
-    id: 'user-002',
-    user_custom_id: 'SR-10034',
-    full_name: 'Priya Patel',
-    mobile: '+91 98123 45678',
-    email: 'priya@srgateway.in',
-    telegram_id: '@priya_patel',
-    role: 'USER',
-    status: 'ACTIVE',
-    referral_code: 'PRIYA10034',
-    created_at: new Date(Date.now() - 86400000 * 20).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  'SR-10088': {
-    id: 'user-003',
-    user_custom_id: 'SR-10088',
-    full_name: 'Amit Kumar',
-    mobile: '+91 99887 76655',
-    email: 'amit@srgateway.in',
-    telegram_id: '@amit_k',
-    role: 'USER',
-    status: 'ACTIVE',
-    referral_code: 'AMIT10088',
-    created_at: new Date(Date.now() - 86400000 * 15).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
   'SR-ADMIN-01': {
     id: 'admin-001',
     user_custom_id: 'SR-ADMIN-01',
     full_name: 'SR Gateway System Admin',
     mobile: '+91 90000 00000',
-    email: 'admin@srgateway.in',
+    email: 'sr.notify.hub@gmail.com',
     telegram_id: '@srgateway_official',
     role: 'ADMIN',
     status: 'ACTIVE',
@@ -118,65 +79,11 @@ let users: Record<string, any> = {
   },
 };
 
-// Aliases for internal IDs and mobile numbers
-users['user-001'] = users['SR-10029'];
-users['user-002'] = users['SR-10034'];
-users['user-003'] = users['SR-10088'];
+// Aliases for admin
 users['admin-001'] = users['SR-ADMIN-01'];
-users['9876543210'] = users['SR-10029'];
-users['9812345678'] = users['SR-10034'];
-users['9988776655'] = users['SR-10088'];
 users['9000000000'] = users['SR-ADMIN-01'];
 
 let wallets: Record<string, any> = {
-  'SR-10029': {
-    id: 'w-001',
-    user_id: 'user-001',
-    available_balance: 142500.5,
-    locked_balance: 2500.0,
-    created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  'user-001': {
-    id: 'w-001',
-    user_id: 'user-001',
-    available_balance: 142500.5,
-    locked_balance: 2500.0,
-    created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  'SR-10034': {
-    id: 'w-002',
-    user_id: 'user-002',
-    available_balance: 85200.0,
-    locked_balance: 5000.0,
-    created_at: new Date(Date.now() - 86400000 * 20).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  'user-002': {
-    id: 'w-002',
-    user_id: 'user-002',
-    available_balance: 85200.0,
-    locked_balance: 5000.0,
-    created_at: new Date(Date.now() - 86400000 * 20).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  'SR-10088': {
-    id: 'w-003',
-    user_id: 'user-003',
-    available_balance: 12450.0,
-    locked_balance: 0.0,
-    created_at: new Date(Date.now() - 86400000 * 15).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  'user-003': {
-    id: 'w-003',
-    user_id: 'user-003',
-    available_balance: 12450.0,
-    locked_balance: 0.0,
-    created_at: new Date(Date.now() - 86400000 * 15).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
   'SR-ADMIN-01': {
     id: 'w-admin',
     user_id: 'admin-001',
@@ -195,75 +102,11 @@ let wallets: Record<string, any> = {
   },
 };
 
-let transactions: any[] = [
-  {
-    id: 'TXN-9081',
-    user_id: 'SR-10029',
-    user_name: 'Rahul Sharma',
-    type: 'DEPOSIT',
-    amount: 50000,
-    fee: 0,
-    net_amount: 50000,
-    status: 'SUCCESS',
-    reference_id: 'UTR202608129081',
-    description: 'UPI Deposit approved by Admin',
-    balance_before: 92500.5,
-    balance_after: 142500.5,
-    created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-  },
-  {
-    id: 'TXN-8812',
-    user_id: 'SR-10029',
-    user_name: 'Rahul Sharma',
-    type: 'TRANSFER_IN',
-    amount: 15000,
-    fee: 0,
-    net_amount: 15000,
-    status: 'SUCCESS',
-    reference_id: 'TRF-10034',
-    description: 'Received internal payout from Priya Patel (SR-10034)',
-    balance_before: 77500.5,
-    balance_after: 92500.5,
-    created_at: new Date(Date.now() - 3600000 * 12).toISOString(),
-  },
-];
+let transactions: any[] = [];
 
 let depositRequests: any[] = [];
 let withdrawalRequests: any[] = [];
 let apiKeys: any[] = [
-  {
-    id: 'KEY-001',
-    user_id: 'SR-10029',
-    key_name: 'Rahul Sharma Bot & Merchant Key',
-    api_key_prefix: 'sr_live_rahul_981a',
-    secret_key_masked: 'sr_sec_rahul_••••••••••••4f29',
-    permissions: ['balance.read', 'transfer.write', 'deposit.request', 'withdraw.request'],
-    is_active: true,
-    created_at: new Date(Date.now() - 86400000 * 5).toISOString(),
-    last_used_at: new Date().toISOString(),
-  },
-  {
-    id: 'KEY-002',
-    user_id: 'SR-10034',
-    key_name: 'Priya Patel Telegram Gateway Key',
-    api_key_prefix: 'sr_live_priya_4b12',
-    secret_key_masked: 'sr_sec_priya_••••••••••••3c88',
-    permissions: ['balance.read', 'transfer.write', 'deposit.request', 'withdraw.request'],
-    is_active: true,
-    created_at: new Date(Date.now() - 86400000 * 4).toISOString(),
-    last_used_at: new Date().toISOString(),
-  },
-  {
-    id: 'KEY-003',
-    user_id: 'SR-10088',
-    key_name: 'Amit Kumar Merchant Payout Key',
-    api_key_prefix: 'sr_live_amit_7c99',
-    secret_key_masked: 'sr_sec_amit_••••••••••••4d11',
-    permissions: ['balance.read', 'transfer.write', 'deposit.request', 'withdraw.request'],
-    is_active: true,
-    created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
-    last_used_at: new Date().toISOString(),
-  },
   {
     id: 'KEY-ADMIN',
     user_id: 'SR-ADMIN-01',
@@ -321,7 +164,7 @@ let emailLogs: Array<{
   user_id?: string;
   user_name?: string;
   subject: string;
-  type: 'LOGIN_ALERT' | 'DEPOSIT_ALERT' | 'WITHDRAW_ALERT' | 'TRANSACTION_ALERT' | 'SYSTEM_ALERT';
+  type: 'LOGIN_ALERT' | 'DEPOSIT_ALERT' | 'WITHDRAW_ALERT' | 'TRANSACTION_ALERT' | 'SYSTEM_ALERT' | 'REGISTER_ALERT';
   status: 'SENT' | 'FAILED' | 'SIMULATED';
   error_message?: string;
   preview: string;
@@ -510,7 +353,7 @@ async function sendEmailNotification(params: {
   subject: string;
   html?: string;
   text?: string;
-  type: 'LOGIN_ALERT' | 'DEPOSIT_ALERT' | 'WITHDRAW_ALERT' | 'TRANSACTION_ALERT' | 'SYSTEM_ALERT';
+  type: 'LOGIN_ALERT' | 'DEPOSIT_ALERT' | 'WITHDRAW_ALERT' | 'TRANSACTION_ALERT' | 'SYSTEM_ALERT' | 'REGISTER_ALERT';
   user_id?: string;
   user_name?: string;
   metadata?: Record<string, any>;
@@ -537,25 +380,44 @@ async function sendEmailNotification(params: {
     return { success: false, message: 'Invalid recipient email', log_id: logId, mode: 'SIMULATED' };
   }
 
-  const smtpUser = appSettings.smtp_user || process.env.SMTP_USER || '';
-  const smtpPass = appSettings.smtp_pass || process.env.SMTP_PASS || '';
-  const smtpHost = appSettings.smtp_host || process.env.SMTP_HOST || 'smtp.gmail.com';
+  const smtpUser = (appSettings.smtp_user || process.env.SMTP_USER || '').trim();
+  const rawPass = (appSettings.smtp_pass || process.env.SMTP_PASS || '').trim();
+  // Strip whitespace from Google App Passwords
+  const smtpPass = rawPass.replace(/\s+/g, '');
+  const smtpHost = (appSettings.smtp_host || process.env.SMTP_HOST || 'smtp.gmail.com').trim();
   const smtpPort = Number(appSettings.smtp_port || process.env.SMTP_PORT || 587);
-  const fromName = appSettings.smtp_from_name || 'SR GATEWAY IN Alerts';
-  const fromEmail = appSettings.smtp_from_email || smtpUser || 'alerts@srgateway.in';
+  const fromName = appSettings.smtp_from_name || process.env.SMTP_FROM_NAME || 'SR GATEWAY Alerts';
+  
+  // Ensure fromEmail is never empty and does not use fake srgateway.in domain
+  let fromEmail = (appSettings.smtp_from_email || process.env.SMTP_FROM_EMAIL || '').trim();
+  if (!fromEmail || fromEmail.includes('@srgateway.in')) {
+    fromEmail = smtpUser || 'sr.notify.hub@gmail.com';
+  }
 
   // If real SMTP credentials are provided, attempt real nodemailer dispatch
   if (smtpUser && smtpPass) {
     try {
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: smtpPort,
-        secure: smtpPort === 465,
-        auth: {
-          user: smtpUser,
-          pass: smtpPass,
-        },
-      });
+      const isGmail = smtpHost.includes('gmail.com');
+      const transporter = isGmail
+        ? nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+              user: smtpUser,
+              pass: smtpPass,
+            },
+          })
+        : nodemailer.createTransport({
+            host: smtpHost,
+            port: smtpPort,
+            secure: smtpPort === 465,
+            auth: {
+              user: smtpUser,
+              pass: smtpPass,
+            },
+            tls: {
+              rejectUnauthorized: false,
+            },
+          });
 
       const info = await transporter.sendMail({
         from: `"${fromName}" <${fromEmail}>`,
@@ -718,11 +580,11 @@ function findRegisteredUser(identifier: string | number | undefined | null): {
 }
 
 // Helper: Resolve User & Wallet (with fallback to default user for senders if omitted)
-function resolveUserAndWallet(identifier: string | number | undefined | null, fallbackCustomId = 'SR-10029'): { user: any; wallet: any } {
+function resolveUserAndWallet(identifier: string | number | undefined | null): { user: any; wallet: any } {
   if (!identifier) {
-    const defaultUser = users[fallbackCustomId] || users['SR-10029'];
-    const defaultWallet = wallets[fallbackCustomId] || wallets['SR-10029'];
-    return { user: defaultUser, wallet: defaultWallet };
+    const adminUser = users['SR-ADMIN-01'];
+    const adminWallet = wallets['SR-ADMIN-01'];
+    return { user: adminUser, wallet: adminWallet };
   }
 
   const lookup = findRegisteredUser(identifier);
@@ -730,9 +592,9 @@ function resolveUserAndWallet(identifier: string | number | undefined | null, fa
     return { user: lookup.user, wallet: lookup.wallet };
   }
 
-  const defaultUser = users[fallbackCustomId] || users['SR-10029'];
-  const defaultWallet = wallets[fallbackCustomId] || wallets['SR-10029'];
-  return { user: defaultUser, wallet: defaultWallet };
+  const adminUser = users['SR-ADMIN-01'];
+  const adminWallet = wallets['SR-ADMIN-01'];
+  return { user: adminUser, wallet: adminWallet };
 }
 
 // Helper: Execute User-to-User Transfer Core Logic with strict receiver registration check & live balance updates
@@ -1162,40 +1024,178 @@ app.get('/api/docs', (req: Request, res: Response) => {
 });
 
 // 3. Auth Endpoints
-app.post('/api/v1/auth/register', (req: Request, res: Response) => {
-  const { full_name, mobile, email, telegram_id, referral_code } = req.body;
-  const customId = `SR-${Math.floor(10000 + Math.random() * 90000)}`;
+app.post('/api/v1/auth/register', async (req: Request, res: Response) => {
+  const { full_name, mobile, email, telegram_id, telegram_chat_id, user_custom_id, referral_code } = req.body;
+  const customId = user_custom_id || `SR-${Math.floor(10000 + Math.random() * 90000)}`;
+  const cleanMobile = mobile ? mobile.trim() : '+91 90000 00000';
+  const cleanEmail = email ? email.trim() : '';
+  const cleanName = full_name ? full_name.trim() : 'New User';
+  const regTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
 
   const newUser = {
     id: `u-${Date.now()}`,
     user_custom_id: customId,
-    full_name: full_name || 'New User',
-    mobile: mobile || '+91 90000 00000',
-    email: email || `${customId.toLowerCase()}@srgateway.in`,
-    telegram_id: telegram_id || '',
+    full_name: cleanName,
+    mobile: cleanMobile,
+    email: cleanEmail,
+    telegram_id: telegram_id || (telegram_chat_id ? (telegram_chat_id.startsWith('@') ? telegram_chat_id : `@chat_${telegram_chat_id}`) : ''),
+    telegram_chat_id: telegram_chat_id || undefined,
     role: 'USER',
     status: 'ACTIVE',
-    referral_code: `REF-${customId}`,
+    referral_code: referral_code || `REF-${customId}`,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
 
   users[customId] = newUser;
+  if (newUser.id) users[newUser.id] = newUser;
+  const normPhone = normalizePhone(cleanMobile);
+  if (normPhone) users[normPhone] = newUser;
+  if (cleanEmail) users[cleanEmail] = newUser;
+
+  const welcomeBonus = appSettings.signup_bonus_enabled ? Number(appSettings.signup_bonus_amount || 50) : 50;
+
   wallets[customId] = {
     id: `w-${Date.now()}`,
     user_id: customId,
-    available_balance: 50.0, // Welcome bonus
+    available_balance: welcomeBonus, // Welcome bonus
     locked_balance: 0.0,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
+  if (newUser.id) wallets[newUser.id] = wallets[customId];
+  if (normPhone) wallets[normPhone] = wallets[customId];
+
+  // 1. Dispatch Automated Registration Email Alert to User's provided email
+  let emailDispatched = false;
+  if (cleanEmail && cleanEmail.includes('@') && !cleanEmail.includes('@srgateway.in') && appSettings.email_alerts_enabled) {
+    const regEmailHtml = buildAlertEmailHtml({
+      title: '🎉 Welcome to SR GATEWAY • Registration Successful',
+      badgeText: 'ACCOUNT ACTIVATED',
+      badgeBgColor: '#10b981',
+      recipientName: cleanName,
+      recipientId: customId,
+      summaryText: 'Congratulations! Your SR GATEWAY account and wallet have been created successfully. You are now ready to make instant deposits, transfers, and accept API payments.',
+      details: [
+        { label: 'Account Holder', value: cleanName, isBold: true },
+        { label: 'Gateway User ID', value: customId, isBold: true, isHighlight: true },
+        { label: 'Registered Mobile', value: cleanMobile },
+        { label: 'Registered Email', value: cleanEmail },
+        { label: 'Opening Balance', value: `₹${welcomeBonus.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true, isHighlight: true },
+        { label: 'Referral Code', value: newUser.referral_code },
+        { label: 'Registration Time', value: `${regTime} IST` },
+      ],
+      instructions: 'Please set your 4-digit Security RPIN inside the app to protect your transfers and withdrawals. Never share your RPIN or OTP with anyone.',
+    });
+
+    sendEmailNotification({
+      to: cleanEmail,
+      subject: `🎉 Welcome to SR GATEWAY: Account Created Successfully (${customId})`,
+      html: regEmailHtml,
+      text: `Welcome to SR GATEWAY, ${cleanName}! Your account ${customId} is activated with ₹${welcomeBonus} balance.`,
+      type: 'REGISTER_ALERT',
+      user_id: customId,
+      user_name: cleanName,
+      metadata: { mobile: cleanMobile, email: cleanEmail, bonus: welcomeBonus },
+    }).then((res) => {
+      emailDispatched = res.success;
+    }).catch((e) => console.error('Registration email alert dispatch error:', e));
+  }
+
+  // 2. Dispatch Automated Telegram Alert to User's Telegram Bot / Chat ID
+  const tgTarget = telegram_chat_id || telegram_id || newUser.telegram_chat_id || newUser.telegram_id;
+  if (tgTarget) {
+    sendTelegramNotification(
+      tgTarget,
+      `🎉 <b>WELCOME TO SR GATEWAY!</b>\n\n` +
+      `Your account has been created & activated successfully!\n\n` +
+      `👤 <b>Name:</b> ${cleanName}\n` +
+      `🆔 <b>User ID:</b> <code>${customId}</code>\n` +
+      `📱 <b>Mobile:</b> ${cleanMobile}\n` +
+      `📧 <b>Email:</b> ${cleanEmail || 'Registered'}\n` +
+      `💰 <b>Opening Balance:</b> ₹${welcomeBonus.toFixed(2)}\n` +
+      `⏰ <b>Registered:</b> ${regTime} IST\n\n` +
+      `⚡ <i>You can now execute instant peer-to-peer transfers using <code>/pay</code> and check balance with <code>/balance</code>.</i>`
+    );
+  }
 
   res.status(201).json({
     status: 'success',
     code: 201,
-    message: 'User registered successfully with ₹50 sign-up bonus',
+    message: `User registered successfully with ₹${welcomeBonus} sign-up bonus`,
     user: newUser,
     wallet: wallets[customId],
+    email_alert_dispatched: Boolean(cleanEmail),
+    telegram_alert_dispatched: Boolean(tgTarget),
+  });
+});
+
+// Dedicated Register Alert Webhook Endpoint for Frontend Events
+app.post('/api/v1/auth/register-alert', async (req: Request, res: Response) => {
+  const { user_custom_id, full_name, mobile, email, telegram_id, telegram_chat_id, opening_balance = 50 } = req.body;
+  const customId = user_custom_id || `SR-${Math.floor(10000 + Math.random() * 90000)}`;
+  const cleanEmail = (email || '').trim();
+  const cleanName = (full_name || 'Valued User').trim();
+  const cleanMobile = (mobile || '').trim();
+  const regTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+  // 1. Dispatch Email Alert
+  let emailDispatched = false;
+  if (cleanEmail && cleanEmail.includes('@') && !cleanEmail.includes('@srgateway.in') && appSettings.email_alerts_enabled) {
+    const regEmailHtml = buildAlertEmailHtml({
+      title: '🎉 Welcome to SR GATEWAY • Registration Successful',
+      badgeText: 'ACCOUNT ACTIVATED',
+      badgeBgColor: '#10b981',
+      recipientName: cleanName,
+      recipientId: customId,
+      summaryText: 'Congratulations! Your SR GATEWAY account and wallet have been created successfully. You are now ready to make instant deposits, transfers, and accept API payments.',
+      details: [
+        { label: 'Account Holder', value: cleanName, isBold: true },
+        { label: 'Gateway User ID', value: customId, isBold: true, isHighlight: true },
+        { label: 'Registered Mobile', value: cleanMobile },
+        { label: 'Registered Email', value: cleanEmail },
+        { label: 'Opening Balance', value: `₹${Number(opening_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true, isHighlight: true },
+        { label: 'Registration Time', value: `${regTime} IST` },
+      ],
+      instructions: 'Please set your 4-digit Security RPIN inside the app to protect your transfers and withdrawals. Never share your RPIN or OTP with anyone.',
+    });
+
+    const emailRes = await sendEmailNotification({
+      to: cleanEmail,
+      subject: `🎉 Welcome to SR GATEWAY: Account Created Successfully (${customId})`,
+      html: regEmailHtml,
+      text: `Welcome to SR GATEWAY, ${cleanName}! Your account ${customId} is activated with ₹${opening_balance} balance.`,
+      type: 'REGISTER_ALERT',
+      user_id: customId,
+      user_name: cleanName,
+      metadata: { mobile: cleanMobile, email: cleanEmail, opening_balance },
+    });
+    emailDispatched = emailRes.success;
+  }
+
+  // 2. Dispatch Telegram Alert
+  const tgTarget = telegram_chat_id || telegram_id;
+  if (tgTarget) {
+    await sendTelegramNotification(
+      tgTarget,
+      `🎉 <b>WELCOME TO SR GATEWAY!</b>\n\n` +
+      `Your account has been created & activated successfully!\n\n` +
+      `👤 <b>Name:</b> ${cleanName}\n` +
+      `🆔 <b>User ID:</b> <code>${customId}</code>\n` +
+      `📱 <b>Mobile:</b> ${cleanMobile}\n` +
+      `📧 <b>Email:</b> ${cleanEmail || 'Registered'}\n` +
+      `💰 <b>Opening Balance:</b> ₹${Number(opening_balance).toFixed(2)}\n` +
+      `⏰ <b>Registered:</b> ${regTime} IST\n\n` +
+      `⚡ <i>You can now execute instant peer-to-peer transfers using <code>/pay</code> and check balance with <code>/balance</code>.</i>`
+    );
+  }
+
+  res.json({
+    status: 'success',
+    code: 200,
+    message: 'Registration alerts processed successfully',
+    email_dispatched: emailDispatched,
+    telegram_dispatched: Boolean(tgTarget),
   });
 });
 
@@ -1227,9 +1227,9 @@ app.post('/api/v1/auth/login', async (req: Request, res: Response) => {
   }
 
   // 2. Dispatch Automated Email Login Alert to user's registered Gmail ID
-  const recipientEmail = email || user.email || (user.user_custom_id ? `${user.user_custom_id.toLowerCase()}@srgateway.in` : 'user@srgateway.in');
+  const recipientEmail = email || user.email;
   let emailAlertSent = false;
-  if (appSettings.email_alerts_enabled && appSettings.email_login_alert_enabled && recipientEmail && recipientEmail.includes('@')) {
+  if (appSettings.email_alerts_enabled && appSettings.email_login_alert_enabled && recipientEmail && recipientEmail.includes('@') && !recipientEmail.includes('@srgateway.in')) {
     const emailHtml = buildAlertEmailHtml({
       title: '🔐 New Account Login Alert',
       badgeText: 'SECURITY NOTICE',
@@ -1304,9 +1304,9 @@ app.post('/api/v1/auth/login-alert', async (req: Request, res: Response) => {
   }
 
   // 2. Email Dispatch
-  const targetEmail = email || targetUser.email || (customId ? `${customId.toLowerCase()}@srgateway.in` : 'user@srgateway.in');
+  const targetEmail = email || targetUser.email;
   let emailDispatched = false;
-  if (appSettings.email_alerts_enabled && appSettings.email_login_alert_enabled && targetEmail && targetEmail.includes('@')) {
+  if (appSettings.email_alerts_enabled && appSettings.email_login_alert_enabled && targetEmail && targetEmail.includes('@') && !targetEmail.includes('@srgateway.in')) {
     const emailHtml = buildAlertEmailHtml({
       title: '🔐 New Account Login Alert',
       badgeText: 'SECURITY NOTICE',
@@ -1447,12 +1447,13 @@ app.post('/api/v1/auth/telegram-otp/verify', (req: Request, res: Response) => {
   }
 
   if (record && (record.otp === cleanOtp || cleanOtp === '123456' || cleanOtp === '849201')) {
+    const userLookup = findRegisteredUser(rawId) || findRegisteredUser(cleanId);
     return res.json({
       status: 'success',
       code: 200,
       verified: true,
       message: 'Telegram OTP verified successfully! Identity confirmed.',
-      linked_user: users['SR-10029'],
+      linked_user: userLookup?.user || null,
     });
   }
 
@@ -1479,19 +1480,19 @@ app.get('/api/v1/verify', async (req: Request, res: Response) => {
   });
 
   // Test 2: PHP Direct Balance API
-  const senderWallet = wallets['SR-10029'];
+  const adminWallet = wallets['SR-ADMIN-01'];
   results.push({
     test_name: 'PHP Gateway Balance Query',
-    endpoint: '/api.php?api_key=sr_live_bot_8a92&action=balance',
+    endpoint: '/api.php?api_key=sr_live_admin_0001&action=balance',
     status: 'PASSED',
     http_code: 200,
-    details: `Successfully fetched wallet balance (₹${senderWallet.available_balance}).`,
+    details: `Successfully fetched wallet balance (₹${adminWallet?.available_balance || 0}).`,
   });
 
   // Test 3: PHP Direct Transfer API
   results.push({
     test_name: 'PHP Gateway Transfer Method',
-    endpoint: '/api.php?api_key=sr_live_bot_8a92&number=9876543210&amount=100',
+    endpoint: '/api.php?api_key=sr_live_admin_0001&number=9000000000&amount=100',
     status: 'PASSED',
     http_code: 200,
     details: 'Ready to process instant peer-to-peer balance debit & credits.',
@@ -1509,7 +1510,7 @@ app.get('/api/v1/verify', async (req: Request, res: Response) => {
   // Test 5: REST Balance Endpoint
   results.push({
     test_name: 'REST v1 Balance API',
-    endpoint: '/api/v1/balance?user_id=SR-10029',
+    endpoint: '/api/v1/balance?user_id=SR-ADMIN-01',
     status: 'PASSED',
     http_code: 200,
     details: 'JSON payload format matches OpenAPI 3.0 specification.',
@@ -1541,9 +1542,17 @@ app.get('/api/v1/verify', async (req: Request, res: Response) => {
 
 // 4. Wallet Balance API
 app.get('/api/v1/balance', validateApiKey, (req: Request, res: Response) => {
-  const customId = (req.query.user_id as string) || 'SR-10029';
-  const wallet = wallets[customId] || wallets['SR-10029'];
-  const user = users[customId] || users['SR-10029'];
+  const customId = req.query.user_id as string;
+  if (!customId) {
+    return res.status(400).json({ status: 'error', code: 400, message: 'User ID or Registered Mobile number is required' });
+  }
+  const lookup = findRegisteredUser(customId);
+  if (!lookup.found || !lookup.user || !lookup.wallet) {
+    return res.status(404).json({ status: 'error', code: 404, message: `Account '${customId}' not found.` });
+  }
+
+  const wallet = lookup.wallet;
+  const user = lookup.user;
 
   res.json({
     status: 'success',
@@ -1565,9 +1574,13 @@ app.get('/api/v1/balance', validateApiKey, (req: Request, res: Response) => {
 app.post('/api/v1/transfer', validateApiKey, (req: Request, res: Response) => {
   const { sender_id, from, recipient_id, number, to, phone, amount, note, comment } = req.body;
   const numAmt = parseFloat(amount);
-  const sender = sender_id || from || 'SR-10029';
+  const sender = sender_id || from;
   const recipient = recipient_id || number || to || phone;
   const noteMsg = note || comment || 'Peer Transfer';
+
+  if (!sender) {
+    return res.status(400).json({ status: 'error', code: 400, message: 'Sender ID is required' });
+  }
 
   const result = executeUserToUserTransfer(sender, recipient, numAmt, noteMsg, 'REST API');
 
@@ -1599,7 +1612,7 @@ app.post('/api/v1/transfer', validateApiKey, (req: Request, res: Response) => {
 
 // 6. Deposit Request API
 app.post('/api/v1/deposit/request', validateApiKey, async (req: Request, res: Response) => {
-  const { user_id = 'SR-10029', amount, utr, payment_method = 'UPI', email } = req.body;
+  const { user_id, amount, utr, payment_method = 'UPI', email } = req.body;
   const numAmt = parseFloat(amount);
 
   if (isNaN(numAmt) || numAmt < appSettings.minimum_deposit) {
@@ -1614,12 +1627,21 @@ app.post('/api/v1/deposit/request', validateApiKey, async (req: Request, res: Re
     return res.status(400).json({ status: 'error', code: 400, message: 'Valid UTR/Ref number is required' });
   }
 
+  if (!user_id) {
+    return res.status(400).json({ status: 'error', code: 400, message: 'User ID is required' });
+  }
+
+  const lookup = findRegisteredUser(user_id);
+  if (!lookup.found || !lookup.user) {
+    return res.status(404).json({ status: 'error', code: 404, message: `User '${user_id}' not found` });
+  }
+  const user = lookup.user;
+
   const depositId = `DEP-${Math.floor(100000 + Math.random() * 900000)}`;
-  const user = users[user_id] || users['SR-10029'];
 
   const depObj = {
     id: depositId,
-    user_id,
+    user_id: user.user_custom_id,
     user_name: user.full_name,
     user_custom_id: user.user_custom_id,
     amount: numAmt,
@@ -1634,7 +1656,7 @@ app.post('/api/v1/deposit/request', validateApiKey, async (req: Request, res: Re
   depositRequests.unshift(depObj);
 
   // Dispatch Automated Deposit Alert Email to User's registered Gmail
-  const userEmail = email || user.email || (user.user_custom_id ? `${user.user_custom_id.toLowerCase()}@srgateway.in` : 'user@srgateway.in');
+  const userEmail = email || user.email;
   if (appSettings.email_alerts_enabled && appSettings.email_deposit_alert_enabled && userEmail && userEmail.includes('@')) {
     const depositEmailHtml = buildAlertEmailHtml({
       title: '💰 Deposit Request Submitted',
@@ -1809,8 +1831,8 @@ app.post('/api/v1/withdraw/request', validateApiKey, async (req: Request, res: R
   withdrawalRequests.unshift(wdrObj);
 
   // Dispatch Automated Withdrawal Alert Email to User's registered Gmail with full payout details
-  const userEmail = email || user.email || (user.user_custom_id ? `${user.user_custom_id.toLowerCase()}@srgateway.in` : 'user@srgateway.in');
-  if (appSettings.email_alerts_enabled && appSettings.email_withdraw_alert_enabled && userEmail && userEmail.includes('@')) {
+  const userEmail = email || user.email;
+  if (appSettings.email_alerts_enabled && appSettings.email_withdraw_alert_enabled && userEmail && userEmail.includes('@') && !userEmail.includes('@srgateway.in')) {
     const withdrawEmailHtml = buildAlertEmailHtml({
       title: '💸 Withdrawal Request Initiated',
       badgeText: 'PROCESSING PAYOUT',
@@ -2004,6 +2026,17 @@ app.delete('/api/v1/keys/revoke/:keyId', (req: Request, res: Response) => {
 // 11. Admin Endpoints
 app.get('/api/v1/admin/settings', (req: Request, res: Response) => {
   res.json({ status: 'success', code: 200, settings: appSettings });
+});
+
+app.post('/api/v1/admin/settings', (req: Request, res: Response) => {
+  const incoming = req.body || {};
+  appSettings = { ...appSettings, ...incoming };
+  res.json({
+    status: 'success',
+    code: 200,
+    message: 'Admin system settings updated successfully',
+    settings: appSettings,
+  });
 });
 
 // ==========================================
@@ -2658,8 +2691,27 @@ app.put('/api/v1/admin/settings', (req: Request, res: Response) => {
 
 // Admin Email Alert Testing Endpoint
 app.post('/api/v1/admin/test-email', async (req: Request, res: Response) => {
-  const { to = 'sk190rihan@gmail.com', test_type = 'LOGIN_ALERT' } = req.body;
+  const {
+    to = 'sk190rihan@gmail.com',
+    test_type = 'LOGIN_ALERT',
+    smtp_host,
+    smtp_port,
+    smtp_user,
+    smtp_pass,
+    smtp_from_name,
+    smtp_from_email,
+  } = req.body;
   const targetEmail = to.trim();
+
+  // If new SMTP settings are submitted in test payload, update appSettings
+  if (smtp_user !== undefined && smtp_pass !== undefined) {
+    if (smtp_host) appSettings.smtp_host = smtp_host;
+    if (smtp_port) appSettings.smtp_port = Number(smtp_port);
+    if (smtp_user) appSettings.smtp_user = smtp_user;
+    if (smtp_pass) appSettings.smtp_pass = smtp_pass;
+    if (smtp_from_name) appSettings.smtp_from_name = smtp_from_name;
+    if (smtp_from_email) appSettings.smtp_from_email = smtp_from_email;
+  }
 
   let subject = '⚡ SR GATEWAY • Live SMTP Email Test';
   let title = 'Live Email Notification Test';
@@ -2676,6 +2728,11 @@ app.post('/api/v1/admin/test-email', async (req: Request, res: Response) => {
     title = 'Withdrawal Payout Alert';
     badgeText = 'DISPATCHED';
     badgeBg = '#6366f1';
+  } else if (test_type === 'TRANSFER_ALERT') {
+    subject = '⚡ Transfer Alert: ₹500.00 Sent to SR-10034 (Live Test)';
+    title = 'Peer-to-Peer Transfer Alert';
+    badgeText = 'TRANSFERRED';
+    badgeBg = '#ec4899';
   }
 
   const testHtml = buildAlertEmailHtml({

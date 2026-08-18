@@ -163,6 +163,12 @@ export const AdminPortal: React.FC = () => {
         body: JSON.stringify({
           to: testEmailRecipient,
           test_type: testEmailType,
+          smtp_host: settingsForm.smtp_host,
+          smtp_port: settingsForm.smtp_port,
+          smtp_user: settingsForm.smtp_user,
+          smtp_pass: settingsForm.smtp_pass,
+          smtp_from_name: settingsForm.smtp_from_name,
+          smtp_from_email: settingsForm.smtp_from_email,
         }),
       });
       const data = await res.json();
@@ -1488,11 +1494,11 @@ export const AdminPortal: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 text-[10px] uppercase mb-1">Sender From Email Address</label>
+                    <label className="block text-slate-400 text-[10px] uppercase mb-1">Sender From Email Address (Gmail / Verified Email)</label>
                     <input
                       type="text"
-                      placeholder="alerts@srgateway.in"
-                      value={settingsForm.smtp_from_email || 'alerts@srgateway.in'}
+                      placeholder="sr.notify.hub@gmail.com"
+                      value={settingsForm.smtp_from_email || settingsForm.smtp_user || 'sr.notify.hub@gmail.com'}
                       onChange={(e) => setSettingsForm({ ...settingsForm, smtp_from_email: e.target.value })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
                     />
@@ -1522,7 +1528,7 @@ export const AdminPortal: React.FC = () => {
                     <label className="block text-slate-400 text-[10px] font-mono uppercase mb-1">Test Recipient Gmail ID</label>
                     <input
                       type="email"
-                      placeholder="sk190rihan@gmail.com"
+                      placeholder="sr.notify.hub@gmail.com"
                       value={testEmailRecipient}
                       onChange={(e) => setTestEmailRecipient(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-300 font-mono font-bold"

@@ -355,8 +355,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const toggleRoleMode = () => {
     if (activeRole === 'ADMIN') {
-      setActiveUserId('user-001'); // Switch to standard User Rahul
-      localStorage.setItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`, 'user-001');
+      const firstNonAdmin = profiles.find((p) => p.role !== 'ADMIN');
+      if (firstNonAdmin) {
+        setActiveUserId(firstNonAdmin.id);
+        localStorage.setItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`, firstNonAdmin.id);
+      }
     } else {
       setActiveUserId('admin-001'); // Switch to Admin
       localStorage.setItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`, 'admin-001');
@@ -372,7 +375,16 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const updateSettings = (newSettings: Partial<AppSettings>) => {
-    setSettings((prev) => ({ ...prev, ...newSettings }));
+    setSettings((prev) => {
+      const merged = { ...prev, ...newSettings };
+      // Push to backend settings API immediately
+      fetch('/api/v1/admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(merged),
+      }).catch(() => null);
+      return merged;
+    });
     addAuditLog('SETTINGS_UPDATED', `Updated system configuration settings.`);
   };
 
@@ -1268,6 +1280,32 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setActiveUserId(newUserId);
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`, newUserId);
 
+    // Trigger Automated Registration Email & Telegram Alert from Server
+    fetch('/api/v1/auth/register-alert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_custom_id: userCustomId,
+        full_name: fullName.trim(),
+        mobile: cleanMobile,
+        email: cleanEmail,
+        telegram_id: newProfile.telegram_id,
+        telegram_chat_id: cleanChatId || undefined,
+        opening_balance: welcomeBonus,
+      }),
+    }).catch((err) => console.error('Failed to trigger register alert:', err));
+
+    // Also sync state to backend
+    fetch('/api/v1/sync-state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profiles: [...profiles, newProfile],
+        wallets: { ...wallets, [newUserId]: newWallet, [userCustomId]: newWallet },
+        apiKeys: [newApiKeyRecord, ...apiKeys],
+      }),
+    }).catch(() => null);
+
     if (welcomeBonus > 0) {
       // Initial bonus transaction
       const bonusTx: Transaction = {
@@ -1738,7 +1776,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setNotifications(INITIAL_NOTIFICATIONS);
     setReferrals(INITIAL_REFERRALS);
     setApiKeys(INITIAL_API_KEYS);
-    setActiveUserId('user-001');
+    setActiveUserId('admin-001');
   };
 
   return (
