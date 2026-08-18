@@ -15,6 +15,11 @@ export interface UserProfile {
   referred_by?: string;
   rpin?: string; // 4-digit security RPIN
   theme?: 'DARK' | 'LIGHT';
+  welcome_bonus_status?: 'PENDING' | 'CLAIMED' | 'EXPIRED' | 'NONE';
+  welcome_bonus_amount?: number;
+  welcome_bonus_expires_at?: string; // ISO timestamp 24h from registration
+  welcome_bonus_claimed_at?: string;
+  has_made_first_transaction?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -167,7 +172,9 @@ export interface AppSettings {
   deposit_charge_percent: number;
   withdraw_charge_percent: number;
   signup_bonus_enabled: boolean;
-  signup_bonus_amount: number; // e.g. ₹0 (disabled) or custom amount set by admin
+  signup_bonus_amount: number; // e.g. ₹50 or custom amount set by admin
+  welcome_bonus_min_txn?: number; // Minimum ₹1 transaction required
+  welcome_bonus_expiry_hours?: number; // 24 hours window
   referral_enabled: boolean;
   referral_bonus_type: 'FIXED' | 'PERCENTAGE';
   referral_bonus_amount: number; // e.g. ₹50 or 5%

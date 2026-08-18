@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useWallet } from '../context/WalletContext';
 import {
   Wallet,
@@ -20,6 +20,10 @@ import {
   User,
   Power,
   Zap,
+  Sparkles,
+  Gift,
+  Timer,
+  AlertCircle,
 } from 'lucide-react';
 
 export const UserDashboard: React.FC<{
@@ -160,8 +164,96 @@ export const UserDashboard: React.FC<{
     },
   ];
 
+  // Dynamic Welcome Bonus calculation & countdown
+  const bonusAmount = currentUser.welcome_bonus_amount || settings.signup_bonus_amount || 50;
+  const isBonusPending =
+    currentUser.welcome_bonus_status === 'PENDING' ||
+    (currentUser.welcome_bonus_status === undefined &&
+      settings.signup_bonus_enabled &&
+      bonusAmount > 0 &&
+      !currentUser.has_made_first_transaction);
+
+  const [timeLeftStr, setTimeLeftStr] = useState<string>('');
+  const [isBonusExpiredState, setIsBonusExpiredState] = useState(false);
+
+  useEffect(() => {
+    if (!isBonusPending) return;
+
+    const calculateRemaining = () => {
+      const expiry = currentUser.welcome_bonus_expires_at
+        ? new Date(currentUser.welcome_bonus_expires_at).getTime()
+        : new Date(currentUser.created_at || Date.now()).getTime() + (settings.welcome_bonus_expiry_hours || 24) * 60 * 60 * 1000;
+
+      const diff = expiry - Date.now();
+      if (diff <= 0) {
+        setTimeLeftStr('Expired');
+        setIsBonusExpiredState(true);
+      } else {
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const secs = Math.floor((diff % (1000 * 60)) / 1000);
+        setTimeLeftStr(`${hours.toString().padStart(2, '0')}h ${mins.toString().padStart(2, '0')}m ${secs.toString().padStart(2, '0')}s`);
+        setIsBonusExpiredState(false);
+      }
+    };
+
+    calculateRemaining();
+    const interval = setInterval(calculateRemaining, 1000);
+    return () => clearInterval(interval);
+  }, [currentUser, settings, isBonusPending]);
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* 🎁 DYNAMIC WELCOME BONUS BANNER (Pending 1st Transaction) */}
+      {isBonusPending && !isBonusExpiredState && (
+        <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-amber-500/20 via-purple-500/20 to-emerald-500/20 border border-amber-500/40 shadow-xl relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="p-3 rounded-2xl bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
+              <Gift className="h-6 w-6 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <span className="text-sm font-black text-amber-300 tracking-wide">
+                  🎁 ₹{bonusAmount} Welcome Bonus Auto-Unlock Offer
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/30 text-amber-200 border border-amber-500/50 font-bold flex items-center gap-1">
+                  <Timer className="h-3 w-3" />
+                  <span>Expires in: {timeLeftStr || '24h'}</span>
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed font-mono">
+                ⚡ <strong>Condition:</strong> Make your 1st transaction (Min. <strong>₹1</strong> Send/Transfer) within <strong>24 Hours</strong> to claim and instantly credit ₹{bonusAmount} to your wallet!
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onOpenTransfer}
+            className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 text-slate-950 font-black text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 shrink-0 shadow-lg shadow-amber-500/20 transition-all hover:scale-105 active:scale-95"
+          >
+            <span>Send ₹1 & Claim ₹{bonusAmount}</span>
+            <ArrowUpRight className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Claimed Welcome Bonus Confirmation Tag */}
+      {currentUser.welcome_bonus_status === 'CLAIMED' && (
+        <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 rounded-xl bg-emerald-500/20 text-emerald-400">
+              <CheckCircle2 className="h-4 w-4" />
+            </div>
+            <div>
+              <span className="font-bold text-emerald-300">Welcome Bonus Claimed: </span>
+              <span className="text-slate-300 font-mono">₹{bonusAmount} was successfully credited to your wallet upon your 1st transaction.</span>
+            </div>
+          </div>
+          <span className="text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full shrink-0">
+            CLAIMED ⚡
+          </span>
+        </div>
+      )}
+
       {/* High Quality Wallet Card Section (Screenshots #17 & #20 match) */}
       <div className="grid grid-cols-12 gap-5">
         {/* Main Wallet Hero Card */}

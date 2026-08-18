@@ -46,8 +46,8 @@ let appSettings: Record<string, any> = {
   telegram_channel_name: '@SRGatewayOfficial',
   telegram_channel_url: 'https://t.me/SRGatewayOfficial',
   support_url: 'https://t.me/SRGatewaySupportBot',
-  otp_telegram_bot_username: process.env.TELEGRAM_BOT_USERNAME || '@PAYZYBOT',
-  otp_telegram_bot_token: process.env.TELEGRAM_BOT_TOKEN || '7829103847:AAHx_example_bot_token_key',
+  otp_telegram_bot_username: process.env.TELEGRAM_BOT_USERNAME || '@SRGatewayBot',
+  otp_telegram_bot_token: process.env.TELEGRAM_BOT_TOKEN || '',
   admin_upi_id: 'srgateway.admin@upi',
   admin_qr_url: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=srgateway.admin@upi%26pn=SR%20GATEWAY%20ADMIN',
   // Automated Email Alert Settings
@@ -132,29 +132,6 @@ function normalizePhone(num: string | number | undefined | null): string {
     return digits.slice(-10);
   }
   return digits;
-}
-
-// Helper: Send Telegram HTML message safely
-async function sendTelegramNotification(chatId: string | number | undefined, message: string) {
-  if (!chatId) return;
-  const token = appSettings.otp_telegram_bot_token || '7829103847:AAHx_example_bot_token_key';
-  const target = chatId.toString().trim();
-  const formattedChat = /^\d+$/.test(target) ? target : (target.startsWith('@') ? target : `@${target}`);
-
-  try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: formattedChat,
-        text: message,
-        parse_mode: 'HTML',
-      }),
-    });
-  } catch (err) {
-    // Non-blocking telegram dispatch
-    console.error('Telegram notification error:', err);
-  }
 }
 
 // In-Memory Email Dispatch Logs for Tracking & Admin Audit
@@ -500,6 +477,79 @@ async function sendEmailNotification(params: {
     log_id: logId,
     mode: 'SIMULATED',
   };
+}
+
+// Helper: Check if token is a valid Telegram bot token format and not a placeholder
+function isRealTelegramToken(tok?: string | null): boolean {
+  if (!tok) return false;
+  const str = tok.trim();
+  if (str.length < 15 || !str.includes(':')) return false;
+  if (
+    str.toLowerCase().includes('example') ||
+    str.includes('AAHx_example') ||
+    str.startsWith('7829103847:AAHx') ||
+    str.toLowerCase().includes('placeholder')
+  ) {
+    return false;
+  }
+  return true;
+}
+
+// Helper: Resolve active Telegram bot token prioritizing non-empty, non-example credentials
+function getTelegramBotToken(customToken?: string | null): string {
+  if (isRealTelegramToken(customToken)) return customToken!.trim();
+  if (isRealTelegramToken(process.env.TELEGRAM_BOT_TOKEN)) return process.env.TELEGRAM_BOT_TOKEN!.trim();
+  if (isRealTelegramToken(appSettings.otp_telegram_bot_token)) return appSettings.otp_telegram_bot_token.trim();
+  return (customToken || process.env.TELEGRAM_BOT_TOKEN || appSettings.otp_telegram_bot_token || '').trim();
+}
+
+// Helper: Send Real-Time Telegram HTML Notification with automatic token & chat ID sanitization
+async function sendTelegramNotification(
+  targetChat: string | number,
+  messageHtml: string,
+  customToken?: string
+): Promise<{ ok: boolean; status?: string; message_id?: number; description?: string; error?: string }> {
+  if (!targetChat) {
+    return { ok: false, error: 'MISSING_CHAT_ID', description: 'Target Telegram chat_id or username is empty.' };
+  }
+
+  const raw = targetChat.toString().trim();
+  const formattedChat = /^-?\d+$/.test(raw) ? raw : (raw.startsWith('@') ? raw : `@${raw}`);
+  const botToken = getTelegramBotToken(customToken);
+
+  if (!isRealTelegramToken(botToken)) {
+    console.warn(`[TELEGRAM NOTIFICATION (LOCAL)] Bot token not configured or using placeholder. Target: ${formattedChat}`);
+    return {
+      ok: false,
+      error: 'UNCONFIGURED_BOT_TOKEN',
+      description: 'Telegram Bot Token is not configured. Please set TELEGRAM_BOT_TOKEN in Render environment or Admin Portal > Settings.',
+    };
+  }
+
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: formattedChat,
+        text: messageHtml,
+        parse_mode: 'HTML',
+      }),
+    });
+
+    const data: any = await response.json();
+    if (data && data.ok) {
+      console.log(`[TELEGRAM NOTIFICATION SENT] To: ${formattedChat} | MessageID: ${data.result?.message_id}`);
+      return { ok: true, status: 'sent', message_id: data.result?.message_id };
+    } else {
+      const desc = data?.description || 'Telegram API rejected request';
+      console.warn(`[TELEGRAM NOTIFICATION REJECTED] To: ${formattedChat} | Error: ${desc}`);
+      return { ok: false, error: data?.error_code?.toString() || 'TELEGRAM_REJECTED', description: desc };
+    }
+  } catch (err: any) {
+    console.error(`[TELEGRAM NOTIFICATION ERROR] To: ${formattedChat} | ${err.message}`);
+    return { ok: false, error: 'NETWORK_ERROR', description: err.message };
+  }
 }
 
 
@@ -1353,14 +1403,358 @@ app.post('/api/v1/auth/login-alert', async (req: Request, res: Response) => {
   });
 });
 
+// Deposit Alert Endpoint (Automated Telegram & Email for Deposit Creation / Approval / Rejection)
+app.post('/api/v1/alerts/deposit-alert', async (req: Request, res: Response) => {
+  const { user_id, user_name, email, chat_id, telegram_id, amount, net_amount, utr, status, new_balance, reason } = req.body;
+  const targetTg = chat_id || telegram_id;
+  const time = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+  const displayAmt = Number(net_amount || amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  const displayName = user_name || 'Valued User';
+  const customId = user_id || 'SR-10029';
+
+  // 1. Telegram Dispatch
+  if (targetTg) {
+    let tgText = '';
+    if (status === 'SUCCESS' || status === 'APPROVED') {
+      tgText =
+        `🟢 <b>SR GATEWAY • DEPOSIT APPROVED & CREDITED</b>\n\n` +
+        `Your wallet deposit has been verified and credited successfully!\n\n` +
+        `💰 <b>Amount Credited:</b> ₹${displayAmt}\n` +
+        `🆔 <b>UTR / Ref:</b> <code>${utr || 'DIRECT_QR'}</code>\n` +
+        `👤 <b>User:</b> ${displayName} (<code>${customId}</code>)\n` +
+        `💵 <b>New Balance:</b> ₹${Number(new_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
+        `⏰ <b>Time:</b> ${time} IST\n\n` +
+        `⚡ <i>Instant settlement completed on SR Gateway Ledger.</i>`;
+    } else if (status === 'REJECTED') {
+      tgText =
+        `❌ <b>SR GATEWAY • DEPOSIT REQUEST REJECTED</b>\n\n` +
+        `Your deposit request could not be verified by Admin.\n\n` +
+        `💰 <b>Amount:</b> ₹${displayAmt}\n` +
+        `🆔 <b>UTR:</b> <code>${utr || 'N/A'}</code>\n` +
+        `⚠️ <b>Rejection Reason:</b> ${reason || 'Invalid UTR or unverified screenshot'}\n` +
+        `⏰ <b>Time:</b> ${time} IST\n\n` +
+        `💬 <i>Please contact 24/7 Support if you have queries.</i>`;
+    } else {
+      tgText =
+        `⏳ <b>SR GATEWAY • DEPOSIT UNDER VERIFICATION</b>\n\n` +
+        `Your deposit request has been submitted to Admin.\n\n` +
+        `💰 <b>Amount:</b> ₹${displayAmt}\n` +
+        `🆔 <b>Submitted UTR:</b> <code>${utr || 'PENDING'}</code>\n` +
+        `👤 <b>User:</b> ${displayName} (<code>${customId}</code>)\n` +
+        `⏱️ <b>Status:</b> Admin verification in progress (1-5 minutes).\n` +
+        `⏰ <b>Time:</b> ${time} IST`;
+    }
+    await sendTelegramNotification(targetTg, tgText);
+  }
+
+  // 2. Email Dispatch
+  if (appSettings.email_alerts_enabled && appSettings.email_deposit_alert_enabled && email && email.includes('@') && !email.includes('@srgateway.in')) {
+    const isSuccess = status === 'SUCCESS' || status === 'APPROVED';
+    const emailHtml = buildAlertEmailHtml({
+      title: isSuccess ? '⚡ Deposit Approved & Credited' : status === 'REJECTED' ? '❌ Deposit Request Rejected' : '⏳ Deposit Request Submitted',
+      badgeText: isSuccess ? 'DEPOSIT SUCCESS' : status === 'REJECTED' ? 'REJECTED' : 'PENDING APPROVAL',
+      badgeBgColor: isSuccess ? '#10b981' : status === 'REJECTED' ? '#ef4444' : '#f59e0b',
+      recipientName: displayName,
+      recipientId: customId,
+      summaryText: isSuccess
+        ? `Your deposit of ₹${displayAmt} has been verified and credited to your SR Gateway wallet.`
+        : status === 'REJECTED'
+        ? `Your deposit request for ₹${displayAmt} was rejected. Reason: ${reason || 'Invalid UTR'}`
+        : `Your deposit request of ₹${displayAmt} (UTR: ${utr}) is queued for manual verification.`,
+      details: [
+        { label: 'Amount', value: `₹${displayAmt}`, isBold: true },
+        { label: 'Transaction UTR', value: utr || 'N/A' },
+        { label: 'Account Status', value: isSuccess ? 'Active & Funded' : status },
+        { label: 'Timestamp', value: `${time} IST` },
+      ],
+      instructions: isSuccess
+        ? 'You can now use your wallet balance for P2P transfers, payouts, or API services.'
+        : 'If you have any questions, reach out to 24/7 Support with your UTR number.',
+    });
+
+    await sendEmailNotification({
+      to: email,
+      subject: isSuccess
+        ? `🟢 Deposit Credited: ₹${displayAmt} added to your SR GATEWAY Wallet (${customId})`
+        : status === 'REJECTED'
+        ? `❌ Deposit Update: Request of ₹${displayAmt} Rejected (${customId})`
+        : `⏳ Deposit Submitted: ₹${displayAmt} under verification (${customId})`,
+      html: emailHtml,
+      text: `Deposit update for SR GATEWAY account ${customId}: ₹${displayAmt} - Status: ${status}`,
+      type: 'DEPOSIT_ALERT',
+      user_id: customId,
+      user_name: displayName,
+    });
+  }
+
+  res.json({ status: 'success', message: 'Deposit alert dispatched' });
+});
+
+// Withdrawal Alert Endpoint (Automated Telegram & Email for Withdrawal Requested / Approved / Paid / Rejected)
+app.post('/api/v1/alerts/withdrawal-alert', async (req: Request, res: Response) => {
+  const { user_id, user_name, email, chat_id, telegram_id, amount, net_payout, payment_identifier, status, utr, reason, remaining_balance } = req.body;
+  const targetTg = chat_id || telegram_id;
+  const time = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+  const displayAmt = Number(net_payout || amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  const displayName = user_name || 'Valued User';
+  const customId = user_id || 'SR-10029';
+
+  // 1. Telegram Dispatch
+  if (targetTg) {
+    let tgText = '';
+    if (status === 'SUCCESS' || status === 'PAID') {
+      tgText =
+        `💸 <b>SR GATEWAY • WITHDRAWAL PAID & SETTLED</b>\n\n` +
+        `Your payout has been transferred to your designated account!\n\n` +
+        `💰 <b>Amount Transferred:</b> ₹${displayAmt}\n` +
+        `👤 <b>Destination:</b> <code>${payment_identifier}</code>\n` +
+        `🆔 <b>Bank UTR:</b> <code>${utr || 'SETTLED'}</code>\n` +
+        `👤 <b>User:</b> ${displayName} (<code>${customId}</code>)\n` +
+        `⏰ <b>Time:</b> ${time} IST\n\n` +
+        `⚡ <i>Funds have been dispatched from SR Gateway Treasury.</i>`;
+    } else if (status === 'REJECTED') {
+      tgText =
+        `❌ <b>SR GATEWAY • WITHDRAWAL REJECTED (REFUNDED)</b>\n\n` +
+        `Your withdrawal request could not be completed. The full amount has been refunded to your wallet.\n\n` +
+        `💰 <b>Refunded Amount:</b> ₹${displayAmt}\n` +
+        `⚠️ <b>Reason:</b> ${reason || 'Incorrect UPI ID / Security review'}\n` +
+        `💵 <b>Available Balance:</b> ₹${Number(remaining_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
+        `⏰ <b>Time:</b> ${time} IST`;
+    } else {
+      tgText =
+        `🔒 <b>SR GATEWAY • WITHDRAWAL REQUEST IN PROCESS</b>\n\n` +
+        `Withdrawal request registered. Funds are locked safely in escrow.\n\n` +
+        `💰 <b>Payout Amount:</b> ₹${displayAmt}\n` +
+        `👤 <b>Payout Destination:</b> <code>${payment_identifier}</code>\n` +
+        `👤 <b>User:</b> ${displayName} (<code>${customId}</code>)\n` +
+        `⏱️ <b>Status:</b> Payout processing by Admin Treasury.\n` +
+        `⏰ <b>Time:</b> ${time} IST`;
+    }
+    await sendTelegramNotification(targetTg, tgText);
+  }
+
+  // 2. Email Dispatch
+  if (appSettings.email_alerts_enabled && appSettings.email_withdraw_alert_enabled && email && email.includes('@') && !email.includes('@srgateway.in')) {
+    const isPaid = status === 'SUCCESS' || status === 'PAID';
+    const emailHtml = buildAlertEmailHtml({
+      title: isPaid ? '💸 Withdrawal Paid & Settled' : status === 'REJECTED' ? '❌ Withdrawal Request Rejected (Refunded)' : '🔒 Withdrawal Request Received',
+      badgeText: isPaid ? 'PAYOUT SUCCESS' : status === 'REJECTED' ? 'REFUNDED' : 'IN ESCROW',
+      badgeBgColor: isPaid ? '#10b981' : status === 'REJECTED' ? '#ef4444' : '#6366f1',
+      recipientName: displayName,
+      recipientId: customId,
+      summaryText: isPaid
+        ? `Your payout of ₹${displayAmt} has been processed to ${payment_identifier}.`
+        : status === 'REJECTED'
+        ? `Your withdrawal request for ₹${displayAmt} was rejected and funds restored to your wallet. Reason: ${reason || 'Security check'}`
+        : `Your withdrawal request of ₹${displayAmt} to ${payment_identifier} is currently being processed.`,
+      details: [
+        { label: 'Amount', value: `₹${displayAmt}`, isBold: true },
+        { label: 'Destination', value: payment_identifier },
+        { label: 'Bank UTR / Ref', value: utr || (isPaid ? 'DIRECT_SETTLEMENT' : 'PENDING') },
+        { label: 'Timestamp', value: `${time} IST` },
+      ],
+      instructions: isPaid
+        ? 'Please check your bank account or UPI app for credit confirmation.'
+        : 'If you need support or wish to update payment details, contact 24/7 Support.',
+    });
+
+    await sendEmailNotification({
+      to: email,
+      subject: isPaid
+        ? `💸 Payout Sent: ₹${displayAmt} transferred to ${payment_identifier} (${customId})`
+        : status === 'REJECTED'
+        ? `❌ Withdrawal Rejected: ₹${displayAmt} refunded to wallet (${customId})`
+        : `🔒 Withdrawal Received: ₹${displayAmt} in process (${customId})`,
+      html: emailHtml,
+      text: `Withdrawal update for SR GATEWAY account ${customId}: ₹${displayAmt} - Status: ${status}`,
+      type: 'WITHDRAW_ALERT',
+      user_id: customId,
+      user_name: displayName,
+    });
+  }
+
+  res.json({ status: 'success', message: 'Withdrawal alert dispatched' });
+});
+
+// P2P User-to-User Transfer Alert Endpoint (Dispatches Telegram & Email to BOTH Sender & Receiver)
+app.post('/api/v1/alerts/transfer-alert', async (req: Request, res: Response) => {
+  const {
+    sender_id,
+    sender_name,
+    sender_email,
+    sender_chat_id,
+    sender_mobile,
+    sender_balance,
+    receiver_id,
+    receiver_name,
+    receiver_email,
+    receiver_chat_id,
+    receiver_mobile,
+    receiver_balance,
+    amount,
+    txn_id,
+    note,
+  } = req.body;
+
+  const time = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+  const displayAmt = Number(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+  // 1. SENDER NOTIFICATIONS (Debit Alert)
+  if (sender_chat_id) {
+    const senderTg =
+      `🔴 <b>SR GATEWAY • MONEY DEBITED (P2P TRANSFER)</b>\n\n` +
+      `You transferred funds to another SR Gateway user.\n\n` +
+      `💸 <b>Amount Debited:</b> ₹${displayAmt}\n` +
+      `👤 <b>Transferred To:</b> ${receiver_name} (${receiver_mobile || receiver_id})\n` +
+      `🆔 <b>Txn ID:</b> <code>${txn_id}</code>\n` +
+      `💰 <b>Remaining Balance:</b> ₹${Number(sender_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
+      `📝 <b>Note:</b> ${note || 'P2P Wallet Transfer'}\n` +
+      `⏰ <b>Time:</b> ${time} IST\n\n` +
+      `⚡ <i>Settled instantly on SR Gateway network.</i>`;
+    await sendTelegramNotification(sender_chat_id, senderTg);
+  }
+
+  if (sender_email && sender_email.includes('@') && !sender_email.includes('@srgateway.in')) {
+    const senderHtml = buildAlertEmailHtml({
+      title: '💸 Money Transferred (P2P Debit)',
+      badgeText: 'DEBITED',
+      badgeBgColor: '#ef4444',
+      recipientName: sender_name,
+      recipientId: sender_id,
+      summaryText: `You transferred ₹${displayAmt} to ${receiver_name} (${receiver_mobile || receiver_id}).`,
+      details: [
+        { label: 'Amount Debited', value: `₹${displayAmt}`, isBold: true },
+        { label: 'Recipient', value: `${receiver_name} (${receiver_mobile || receiver_id})` },
+        { label: 'Transaction ID', value: txn_id },
+        { label: 'Remaining Balance', value: `₹${Number(sender_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+        { label: 'Transfer Note', value: note || 'P2P Wallet Transfer' },
+        { label: 'Timestamp', value: `${time} IST` },
+      ],
+      instructions: 'If you did not initiate this payment, secure your account immediately.',
+    });
+
+    await sendEmailNotification({
+      to: sender_email,
+      subject: `💸 Debited: ₹${displayAmt} sent to ${receiver_name} (${sender_id})`,
+      html: senderHtml,
+      text: `Debited ₹${displayAmt} sent to ${receiver_name}. Txn: ${txn_id}`,
+      type: 'SYSTEM_ALERT',
+      user_id: sender_id,
+      user_name: sender_name,
+    });
+  }
+
+  // 2. RECEIVER NOTIFICATIONS (Credit Alert)
+  if (receiver_chat_id) {
+    const receiverTg =
+      `🟢 <b>SR GATEWAY • MONEY CREDITED (P2P TRANSFER)</b>\n\n` +
+      `You received funds into your SR Gateway wallet!\n\n` +
+      `💰 <b>Amount Credited:</b> ₹${displayAmt}\n` +
+      `👤 <b>Received From:</b> ${sender_name} (${sender_mobile || sender_id})\n` +
+      `🆔 <b>Txn ID:</b> <code>${txn_id}</code>\n` +
+      `💵 <b>Updated Balance:</b> ₹${Number(receiver_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
+      `📝 <b>Note:</b> ${note || 'P2P Wallet Transfer'}\n` +
+      `⏰ <b>Time:</b> ${time} IST\n\n` +
+      `⚡ <i>Funds available immediately in your wallet.</i>`;
+    await sendTelegramNotification(receiver_chat_id, receiverTg);
+  }
+
+  if (receiver_email && receiver_email.includes('@') && !receiver_email.includes('@srgateway.in')) {
+    const receiverHtml = buildAlertEmailHtml({
+      title: '💰 Money Received (P2P Credit)',
+      badgeText: 'CREDITED',
+      badgeBgColor: '#10b981',
+      recipientName: receiver_name,
+      recipientId: receiver_id,
+      summaryText: `You received ₹${displayAmt} from ${sender_name} (${sender_mobile || sender_id}).`,
+      details: [
+        { label: 'Amount Credited', value: `₹${displayAmt}`, isBold: true },
+        { label: 'Sender', value: `${sender_name} (${sender_mobile || sender_id})` },
+        { label: 'Transaction ID', value: txn_id },
+        { label: 'Updated Balance', value: `₹${Number(receiver_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+        { label: 'Transfer Note', value: note || 'P2P Wallet Transfer' },
+        { label: 'Timestamp', value: `${time} IST` },
+      ],
+      instructions: 'You can withdraw these funds or use them across the gateway.',
+    });
+
+    await sendEmailNotification({
+      to: receiver_email,
+      subject: `💰 Credited: ₹${displayAmt} received from ${sender_name} (${receiver_id})`,
+      html: receiverHtml,
+      text: `Credited ₹${displayAmt} received from ${sender_name}. Txn: ${txn_id}`,
+      type: 'SYSTEM_ALERT',
+      user_id: receiver_id,
+      user_name: receiver_name,
+    });
+  }
+
+  res.json({ status: 'success', message: 'P2P transfer alerts dispatched to sender and receiver' });
+});
+
+// Welcome Bonus Unlocked Alert Endpoint
+app.post('/api/v1/alerts/welcome-bonus-alert', async (req: Request, res: Response) => {
+  const { user_id, user_name, email, chat_id, telegram_id, bonus_amount, new_balance, txn_id } = req.body;
+  const targetTg = chat_id || telegram_id;
+  const time = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+  const displayAmt = Number(bonus_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  const displayName = user_name || 'Valued User';
+  const customId = user_id || 'SR-10029';
+
+  // 1. Telegram
+  if (targetTg) {
+    const tgText =
+      `🎁 <b>SR GATEWAY • WELCOME BONUS UNLOCKED!</b>\n\n` +
+      `🎉 Congratulations! You completed your 1st transaction within 24 hours of registration.\n\n` +
+      `💰 <b>Welcome Bonus Credited:</b> ₹${displayAmt}\n` +
+      `👤 <b>User:</b> ${displayName} (<code>${customId}</code>)\n` +
+      `💵 <b>Updated Wallet Balance:</b> ₹${Number(new_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
+      `🆔 <b>Txn ID:</b> <code>${txn_id}</code>\n` +
+      `⏰ <b>Time:</b> ${time} IST\n\n` +
+      `⚡ <i>Bonus funds are 100% unlocked and available in your wallet!</i>`;
+    await sendTelegramNotification(targetTg, tgText);
+  }
+
+  // 2. Email
+  if (email && email.includes('@') && !email.includes('@srgateway.in')) {
+    const emailHtml = buildAlertEmailHtml({
+      title: '🎁 Welcome Bonus Claimed & Credited!',
+      badgeText: 'BONUS UNLOCKED',
+      badgeBgColor: '#8b5cf6',
+      recipientName: displayName,
+      recipientId: customId,
+      summaryText: `Congratulations! You successfully qualified for the Welcome Bonus by completing your first transaction within 24 hours.`,
+      details: [
+        { label: 'Bonus Amount', value: `₹${displayAmt}`, isBold: true },
+        { label: 'Transaction ID', value: txn_id },
+        { label: 'Updated Balance', value: `₹${Number(new_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+        { label: 'Condition Met', value: '1st Transaction within 24 Hours' },
+        { label: 'Timestamp', value: `${time} IST` },
+      ],
+      instructions: 'Enjoy your welcome reward! Use your wallet for instant payments and peer transfers.',
+    });
+
+    await sendEmailNotification({
+      to: email,
+      subject: `🎁 Welcome Bonus: ₹${displayAmt} unlocked and credited to your SR GATEWAY Wallet (${customId})`,
+      html: emailHtml,
+      text: `Welcome bonus ₹${displayAmt} credited to ${customId}. Txn: ${txn_id}`,
+      type: 'SYSTEM_ALERT',
+      user_id: customId,
+      user_name: displayName,
+    });
+  }
+
+  res.json({ status: 'success', message: 'Welcome bonus alert dispatched' });
+});
+
 app.post('/api/v1/auth/telegram-otp/send', async (req: Request, res: Response) => {
   const { telegram_username, chat_id, bot_token, otp: clientOtp } = req.body;
   const generatedOtp = (clientOtp && clientOtp.toString().trim()) || Math.floor(100000 + Math.random() * 900000).toString();
   const rawId = (chat_id || telegram_username || '').toString().trim();
   const cleanId = rawId.replace(/^@/, '');
   // Support numeric chat_id or @username
-  const targetChat = /^\d+$/.test(rawId) ? rawId : (rawId.startsWith('@') ? rawId : `@${rawId}`);
-  const token = bot_token || process.env.TELEGRAM_BOT_TOKEN || appSettings.otp_telegram_bot_token || '7829103847:AAHx_example_bot_token_key';
+  const targetChat = /^-?\d+$/.test(rawId) ? rawId : (rawId.startsWith('@') ? rawId : `@${rawId}`);
 
   const otpRecord = {
     otp: generatedOtp,
@@ -1372,46 +1766,80 @@ app.post('/api/v1/auth/telegram-otp/send', async (req: Request, res: Response) =
   if (targetChat) telegramOtps[targetChat] = otpRecord;
   telegramOtps['last'] = otpRecord;
 
-  let telegramApiSuccess = false;
-  let apiResponse: any = null;
-  let errorDetail = '';
+  const otpHtml =
+    `🔐 <b>SR GATEWAY IN Verification OTP</b>\n\n` +
+    `Your 6-digit OTP code is: <b>${generatedOtp}</b>\n\n` +
+    `⏰ <b>Validity: 5 Minutes only</b>\n` +
+    `⚠️ <i>Do NOT share this security code with anyone!</i>`;
 
-  try {
-    const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: targetChat,
-        text: `🔐 <b>SR GATEWAY IN Verification OTP</b>\n\nYour 6-digit OTP code is: <b>${generatedOtp}</b>\n\n⏰ <b>Validity: 5 Minutes only</b>\n⚠️ Do NOT share this security code with anyone!`,
-        parse_mode: 'HTML',
-      }),
-    });
-    apiResponse = await tgRes.json();
-    if (apiResponse && apiResponse.ok) {
-      telegramApiSuccess = true;
-    } else {
-      errorDetail = apiResponse?.description || 'Telegram API rejected the request';
-      console.warn('Telegram API Error:', apiResponse);
-    }
-  } catch (err: any) {
-    errorDetail = err?.message || 'Network error connecting to Telegram';
-    console.error('Telegram Bot API dispatch error:', err);
+  const tgResult = await sendTelegramNotification(targetChat, otpHtml, bot_token);
+
+  let messageText = '';
+  if (tgResult.ok) {
+    messageText = `✅ OTP code sent directly to ${targetChat} on Telegram! Check your Telegram app.`;
+  } else if (tgResult.error === 'UNCONFIGURED_BOT_TOKEN' || tgResult.description?.includes('Unauthorized')) {
+    messageText = `⚠️ Telegram Bot Token is missing or invalid. Please configure your Bot Token from @BotFather in Admin Settings or Render Environment (TELEGRAM_BOT_TOKEN).`;
+  } else if (tgResult.description?.includes('chat not found') || tgResult.description?.includes('bot can\'t initiate')) {
+    messageText = `⚠️ Unable to deliver to ${targetChat}. Please open the Telegram Bot (${appSettings.otp_telegram_bot_username || '@SRGatewayBot'}), click START, and use your numeric Chat ID.`;
+  } else {
+    messageText = `Telegram Notice: ${tgResult.description || 'Unable to deliver message'}. Please ensure bot is started in Telegram!`;
   }
 
   res.json({
-    status: telegramApiSuccess ? 'success' : 'dispatched',
+    status: tgResult.ok ? 'success' : 'dispatched',
     code: 200,
     otp: generatedOtp,
-    message: telegramApiSuccess
-      ? `Telegram OTP sent directly to ${targetChat} on Telegram!`
-      : errorDetail
-      ? `Telegram Notice: ${errorDetail}. (Important: User MUST open bot & click START first, or provide numeric Chat ID).`
-      : `OTP dispatched for ${targetChat}. Please make sure you started ${appSettings.otp_telegram_bot_username || '@PAYZYBOT'} on Telegram.`,
-    telegram_api_ok: telegramApiSuccess,
-    error_detail: errorDetail || null,
-    bot_used: appSettings.otp_telegram_bot_username,
+    message: messageText,
+    telegram_api_ok: tgResult.ok,
+    error_detail: tgResult.description || null,
+    bot_used: appSettings.otp_telegram_bot_username || '@SRGatewayBot',
     expires_in_seconds: 300,
   });
+});
+
+// Admin Live Telegram Bot Tester Endpoint
+app.post('/api/v1/admin/test-telegram', async (req: Request, res: Response) => {
+  const { chat_id, bot_token, bot_username } = req.body;
+  const target = (chat_id || '').toString().trim();
+  if (!target) {
+    return res.status(400).json({
+      status: 'error',
+      code: 400,
+      message: 'Please provide a valid Telegram Chat ID or handle to send a test message.',
+    });
+  }
+
+  const testTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+  const testHtml =
+    `🤖 <b>SR GATEWAY BOT • TEST MESSAGE</b>\n\n` +
+    `Congratulations! Your Telegram Bot webhook and API connection are working perfectly.\n\n` +
+    `💬 <b>Target Chat ID:</b> <code>${target}</code>\n` +
+    `⏰ <b>Server Time:</b> ${testTime} IST\n` +
+    `⚡ <i>Your gateway is ready to dispatch instant OTPs, Login alerts, and Transfer receipts!</i>`;
+
+  const result = await sendTelegramNotification(target, testHtml, bot_token);
+
+  if (result.ok) {
+    return res.json({
+      status: 'success',
+      code: 200,
+      message: `✅ Test message successfully delivered to Telegram Chat (${target})!`,
+      message_id: result.message_id,
+      bot_used: bot_username || appSettings.otp_telegram_bot_username,
+    });
+  } else {
+    return res.status(400).json({
+      status: 'error',
+      code: 400,
+      message: result.description || 'Failed to dispatch Telegram message',
+      error: result.error,
+      help: result.description?.includes('Unauthorized')
+        ? 'Your Telegram Bot Token is invalid. Get your token from @BotFather.'
+        : result.description?.includes('chat not found')
+        ? 'User has not started the bot. Open the bot on Telegram and press /start first.'
+        : 'Check your Bot Token and Chat ID.',
+    });
+  }
 });
 
 app.post('/api/v1/auth/telegram-otp/verify', (req: Request, res: Response) => {

@@ -120,6 +120,55 @@ export const AdminPortal: React.FC = () => {
   const [emailLogsList, setEmailLogsList] = useState<any[]>([]);
   const [isLoadingEmailLogs, setIsLoadingEmailLogs] = useState<boolean>(false);
 
+  // Telegram Bot Live Test State
+  const [testTelegramChatId, setTestTelegramChatId] = useState<string>('6624207638');
+  const [isTestingTelegram, setIsTestingTelegram] = useState<boolean>(false);
+  const [testTelegramResult, setTestTelegramResult] = useState<{
+    success: boolean;
+    message: string;
+    help?: string;
+  } | null>(null);
+
+  const handleTestTelegramDispatch = async () => {
+    if (!testTelegramChatId.trim()) {
+      showAlert('Please enter a valid Telegram Chat ID (e.g. 6624207638).');
+      return;
+    }
+    setIsTestingTelegram(true);
+    setTestTelegramResult(null);
+    try {
+      const res = await fetch('/api/v1/admin/test-telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: testTelegramChatId.trim(),
+          bot_token: settingsForm.otp_telegram_bot_token || undefined,
+          bot_username: settingsForm.otp_telegram_bot_username || '@SRGatewayBot',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.status === 'success') {
+        setTestTelegramResult({
+          success: true,
+          message: data.message || `Test message successfully delivered to Chat ID ${testTelegramChatId}!`,
+        });
+      } else {
+        setTestTelegramResult({
+          success: false,
+          message: data.message || 'Telegram Bot rejected dispatch',
+          help: data.help,
+        });
+      }
+    } catch (e: any) {
+      setTestTelegramResult({
+        success: false,
+        message: e?.message || 'Network error connecting to backend server',
+      });
+    } finally {
+      setIsTestingTelegram(false);
+    }
+  };
+
   const fetchEmailLogs = async () => {
     setIsLoadingEmailLogs(true);
     try {
@@ -986,7 +1035,7 @@ export const AdminPortal: React.FC = () => {
                   </div>
                   <div>
                     <h4 className="font-extrabold text-white text-xs flex items-center gap-2">
-                      <span>User Signup Welcome Bonus Control</span>
+                      <span>Dynamic Welcome Bonus Control</span>
                       {settingsForm.signup_bonus_enabled && Number(settingsForm.signup_bonus_amount) > 0 ? (
                         <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
                           ACTIVE (₹{settingsForm.signup_bonus_amount})
@@ -998,7 +1047,7 @@ export const AdminPortal: React.FC = () => {
                       )}
                     </h4>
                     <p className="text-[10px] text-slate-400 font-mono">
-                      By default, new users get ₹0 on registration. Enable this and set an amount only if you want Admin to grant automatic welcome credits.
+                      Dynamic bonus auto-credited when a user makes their 1st transaction (Min. ₹1 Send/Transfer) within 24 hours of registration. If no transaction is done within 24h, the bonus expires.
                     </p>
                   </div>
                 </div>
@@ -1014,7 +1063,7 @@ export const AdminPortal: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <div>
                     <label className="block text-slate-300 font-bold mb-1 font-mono text-[11px]">
-                      Signup Bonus Amount (₹)
+                      Welcome Bonus Amount (₹)
                     </label>
                     <input
                       type="number"
@@ -1026,13 +1075,13 @@ export const AdminPortal: React.FC = () => {
                       className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-purple-300 font-mono font-bold focus:border-purple-500 focus:outline-none"
                     />
                     <p className="text-[10px] text-slate-500 font-mono mt-1">
-                      Amount automatically credited to new user wallet upon registration
+                      Set ₹50, ₹100, or any custom amount to auto-unlock on 1st transaction within 24 hours
                     </p>
                   </div>
                   <div className="flex items-center p-3 bg-purple-950/20 border border-purple-500/20 rounded-xl">
                     <Sparkles className="h-4 w-4 text-purple-400 shrink-0 mr-2" />
                     <span className="text-[11px] text-purple-200">
-                      When enabled, new users will receive ₹{settingsForm.signup_bonus_amount || 0} in their wallet upon completing Telegram-verified registration.
+                      When enabled, new users see the ₹{settingsForm.signup_bonus_amount || 0} Welcome Bonus offer. Making their 1st transfer (Min. ₹1) within 24 hours automatically credits ₹{settingsForm.signup_bonus_amount || 0} with instant Telegram & Email alert!
                     </span>
                   </div>
                 </div>
@@ -1242,7 +1291,7 @@ export const AdminPortal: React.FC = () => {
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder="@PAYZYBOT"
+                      placeholder="@SRGatewayBot"
                       value={settingsForm.otp_telegram_bot_username || ''}
                       onChange={(e) =>
                         setSettingsForm({ ...settingsForm, otp_telegram_bot_username: e.target.value })
@@ -1251,7 +1300,7 @@ export const AdminPortal: React.FC = () => {
                     />
                   </div>
                   <p className="text-[10px] text-slate-500 font-mono mt-1">
-                    e.g. @PAYZYBOT or @SRGatewayINBot
+                    e.g. @SRGatewayBot or your custom Telegram Bot handle
                   </p>
                 </div>
 
@@ -1262,7 +1311,7 @@ export const AdminPortal: React.FC = () => {
                   <div className="relative">
                     <input
                       type="password"
-                      placeholder="7829103847:AAHx..."
+                      placeholder="Paste HTTP API token from @BotFather"
                       value={settingsForm.otp_telegram_bot_token || ''}
                       onChange={(e) =>
                         setSettingsForm({ ...settingsForm, otp_telegram_bot_token: e.target.value })
@@ -1271,26 +1320,79 @@ export const AdminPortal: React.FC = () => {
                     />
                   </div>
                   <p className="text-[10px] text-slate-500 font-mono mt-1">
-                    Bot Father token for dispatching OTP alerts
+                    Token from @BotFather for sending OTPs and alerts (e.g. 7829103847:AAHx...)
                   </p>
                 </div>
               </div>
 
-              <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                  <span className="text-slate-300 text-[11px]">
-                    Active Bot Hook: <strong className="text-cyan-400">{settingsForm.otp_telegram_bot_username || '@PAYZYBOT'}</strong>
+              {/* Live Telegram Message / Bot Test Console */}
+              <div className="p-3.5 bg-slate-900/90 rounded-xl border border-cyan-500/30 space-y-3 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    <span className="text-slate-200 font-bold text-[11px]">
+                      Live Bot Hook: <strong className="text-cyan-400">{settingsForm.otp_telegram_bot_username || '@SRGatewayBot'}</strong>
+                    </span>
+                  </div>
+                  <span className="text-[9px] px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 font-mono border border-cyan-500/20">
+                    REAL-TIME DISPATCH TEST
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => showAlert(`Bot ${settingsForm.otp_telegram_bot_username || '@PAYZYBOT'} synchronized successfully!`)}
-                  className="px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 rounded-xl font-mono text-[10px] font-bold flex items-center gap-1 transition"
-                >
-                  <RefreshCw className="h-3 w-3" />
-                  <span>Test Bot Sync</span>
-                </button>
+
+                <div className="flex flex-col sm:flex-row items-center gap-2">
+                  <div className="flex-1 w-full">
+                    <label className="block text-[10px] text-slate-400 font-mono mb-1">
+                      Enter Target Telegram Chat ID or @Username (e.g. 6624207638):
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="6624207638 or @username"
+                      value={testTelegramChatId}
+                      onChange={(e) => setTestTelegramChatId(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono text-xs focus:border-cyan-500 focus:outline-none"
+                    />
+                  </div>
+                  <div className="w-full sm:w-auto self-end">
+                    <button
+                      type="button"
+                      disabled={isTestingTelegram}
+                      onClick={handleTestTelegramDispatch}
+                      className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white rounded-xl font-mono text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-lg shadow-cyan-900/30 disabled:opacity-50"
+                    >
+                      {isTestingTelegram ? (
+                        <>
+                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          <span>Testing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-3.5 w-3.5" />
+                          <span>Send Test Telegram Alert</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {testTelegramResult && (
+                  <div
+                    className={`p-3 rounded-xl border text-xs font-mono transition ${
+                      testTelegramResult.success
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                        : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                    }`}
+                  >
+                    <div className="font-bold flex items-center gap-1.5">
+                      {testTelegramResult.success ? '✅ Success:' : '❌ Dispatch Notice:'}
+                      <span>{testTelegramResult.message}</span>
+                    </div>
+                    {testTelegramResult.help && (
+                      <div className="mt-1 text-[11px] text-amber-300">
+                        💡 <strong>Hint:</strong> {testTelegramResult.help}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

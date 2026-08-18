@@ -18,7 +18,7 @@ import {
 export const TelegramOtpModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const { currentUser, sendTelegramOtp, updateTelegramChatId, settings } = useWallet();
 
-  const botHandle = settings.otp_telegram_bot_username || '@PAYZYBOT';
+  const botHandle = settings.otp_telegram_bot_username || '@SRGatewayBot';
   const botCleanHandle = botHandle.replace('@', '');
 
   const [newChatId, setNewChatId] = useState(currentUser.telegram_chat_id || currentUser.telegram_id || '');

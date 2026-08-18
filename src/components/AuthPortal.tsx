@@ -524,18 +524,27 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
             {/* 2. REGISTER FORM WITH TELEGRAM BOT INTEGRATION */}
             {mode === 'register' && (
               <form onSubmit={handleRegisterSubmit} className="space-y-3.5 pt-1">
-                {/* Signup Bonus Banner */}
-                <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-teal-500/20 border border-amber-500/30 flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-amber-500/20 text-amber-300">
-                    <Sparkles className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-black text-amber-300">🎁 ₹50 Welcome Bonus Auto-Credited</div>
-                    <div className="text-[10px] text-slate-300">
-                      Create an account now & get instant ₹50 initial wallet credit!
+                {/* Dynamic Signup & Welcome Bonus Banner */}
+                {settings.signup_bonus_enabled && (settings.signup_bonus_amount ?? 50) > 0 ? (
+                  <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/20 via-emerald-500/15 to-teal-500/20 border border-amber-500/40 space-y-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-amber-500/20 text-amber-300 shrink-0">
+                        <Sparkles className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-black text-amber-300">
+                          🎁 ₹{settings.signup_bonus_amount || 50} Welcome Bonus Offer
+                        </div>
+                        <div className="text-[10px] text-slate-300">
+                          Unlock ₹{settings.signup_bonus_amount || 50} bonus on your first transaction!
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-2 bg-slate-950/80 rounded-xl border border-amber-500/20 text-[10px] text-amber-200/90 font-mono leading-relaxed">
+                      ⚡ <strong>Condition:</strong> Make your 1st transaction (Min. ₹1 Send/Transfer) within <strong>24 Hours</strong> of registration to auto-claim your ₹{settings.signup_bonus_amount || 50} bonus! If not completed within 24 hours, the bonus will expire.
                     </div>
                   </div>
-                </div>
+                ) : null}
 
                 <div>
                   <label className="block text-[11px] font-mono text-slate-400 mb-1 font-bold">

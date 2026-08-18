@@ -418,6 +418,138 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setAuditLogs((prev) => [newLog, ...prev]);
   };
 
+  // Helper: Dispatch Deposit Alert (Telegram & Automated Email)
+  const dispatchDepositAlert = (params: {
+    user: UserProfile;
+    amount: number;
+    netAmount: number;
+    utr: string;
+    status: 'PENDING' | 'SUCCESS' | 'REJECTED' | 'APPROVED';
+    newBalance?: number;
+    reason?: string;
+  }) => {
+    try {
+      fetch('/api/v1/alerts/deposit-alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: params.user.user_custom_id,
+          user_name: params.user.full_name,
+          email: params.user.email,
+          chat_id: params.user.telegram_chat_id,
+          telegram_id: params.user.telegram_id,
+          amount: params.amount,
+          net_amount: params.netAmount,
+          utr: params.utr,
+          status: params.status,
+          new_balance: params.newBalance,
+          reason: params.reason,
+        }),
+      }).catch(() => null);
+    } catch (e) {
+      console.warn('Deposit alert dispatch error:', e);
+    }
+  };
+
+  // Helper: Dispatch Withdrawal Alert (Telegram & Automated Email)
+  const dispatchWithdrawalAlert = (params: {
+    user: UserProfile;
+    amount: number;
+    netPayout: number;
+    paymentIdentifier: string;
+    status: 'PENDING' | 'SUCCESS' | 'REJECTED' | 'APPROVED' | 'PAID';
+    utr?: string;
+    reason?: string;
+    remainingBalance?: number;
+  }) => {
+    try {
+      fetch('/api/v1/alerts/withdrawal-alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: params.user.user_custom_id,
+          user_name: params.user.full_name,
+          email: params.user.email,
+          chat_id: params.user.telegram_chat_id,
+          telegram_id: params.user.telegram_id,
+          amount: params.amount,
+          net_payout: params.netPayout,
+          payment_identifier: params.paymentIdentifier,
+          status: params.status,
+          utr: params.utr,
+          reason: params.reason,
+          remaining_balance: params.remainingBalance,
+        }),
+      }).catch(() => null);
+    } catch (e) {
+      console.warn('Withdrawal alert dispatch error:', e);
+    }
+  };
+
+  // Helper: Dispatch P2P Transfer Alert (Telegram & Automated Email to Both Parties)
+  const dispatchTransferAlert = (params: {
+    sender: UserProfile;
+    receiver: UserProfile;
+    amount: number;
+    txnId: string;
+    note?: string;
+    senderBalance: number;
+    receiverBalance: number;
+  }) => {
+    try {
+      fetch('/api/v1/alerts/transfer-alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sender_id: params.sender.user_custom_id,
+          sender_name: params.sender.full_name,
+          sender_email: params.sender.email,
+          sender_chat_id: params.sender.telegram_chat_id || params.sender.telegram_id,
+          sender_mobile: params.sender.mobile,
+          sender_balance: params.senderBalance,
+          receiver_id: params.receiver.user_custom_id,
+          receiver_name: params.receiver.full_name,
+          receiver_email: params.receiver.email,
+          receiver_chat_id: params.receiver.telegram_chat_id || params.receiver.telegram_id,
+          receiver_mobile: params.receiver.mobile,
+          receiver_balance: params.receiverBalance,
+          amount: params.amount,
+          txn_id: params.txnId,
+          note: params.note,
+        }),
+      }).catch(() => null);
+    } catch (e) {
+      console.warn('Transfer alert dispatch error:', e);
+    }
+  };
+
+  // Helper: Dispatch Welcome Bonus Claim Alert
+  const dispatchWelcomeBonusAlert = (params: {
+    user: UserProfile;
+    bonusAmount: number;
+    newBalance: number;
+    txnId: string;
+  }) => {
+    try {
+      fetch('/api/v1/alerts/welcome-bonus-alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: params.user.user_custom_id,
+          user_name: params.user.full_name,
+          email: params.user.email,
+          chat_id: params.user.telegram_chat_id,
+          telegram_id: params.user.telegram_id,
+          bonus_amount: params.bonusAmount,
+          new_balance: params.newBalance,
+          txn_id: params.txnId,
+        }),
+      }).catch(() => null);
+    } catch (e) {
+      console.warn('Welcome bonus alert dispatch error:', e);
+    }
+  };
+
   // Deposit Request Submission
   const submitDepositRequest = (
     amount: number,
@@ -457,6 +589,15 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     setDeposits((prev) => [newDeposit, ...prev]);
     addNotification(currentUser.id, 'Deposit Request Submitted', `Your deposit request of ${formatINR(amount)} (UTR: ${utr}) is under review.`, 'INFO');
+
+    // Trigger Automated Telegram & Email Deposit Alert
+    dispatchDepositAlert({
+      user: currentUser,
+      amount,
+      netAmount,
+      utr: utr.trim(),
+      status: 'PENDING',
+    });
 
     return {
       success: true,
@@ -537,6 +678,18 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     addAuditLog('DEPOSIT_APPROVED', `Approved deposit request of ${formatINR(deposit.amount)} (UTR: ${deposit.utr})`, targetUser, deposit.amount, prevBal, newBal);
     addNotification(resolvedId, 'Deposit Approved! ⚡', `Your wallet has been credited with ${formatINR(deposit.net_amount)}.`, 'SUCCESS');
 
+    // 5. Trigger Automated Telegram & Email Deposit Alert
+    if (targetUser) {
+      dispatchDepositAlert({
+        user: targetUser,
+        amount: deposit.amount,
+        netAmount: deposit.net_amount,
+        utr: deposit.utr,
+        status: 'SUCCESS',
+        newBalance: newBal,
+      });
+    }
+
     // Trigger Webhook log simulation
     setWebhookLogs((prev) => [
       {
@@ -575,6 +728,18 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const targetUser = profiles.find((p) => p.id === deposit.user_id);
     addAuditLog('DEPOSIT_REJECTED', `Rejected deposit ${deposit.id}: ${reason}`, targetUser, deposit.amount);
     addNotification(deposit.user_id, 'Deposit Request Rejected', `Your deposit request for ${formatINR(deposit.amount)} was rejected. Reason: ${reason}`, 'ALERT');
+
+    // Trigger Automated Telegram & Email Alert
+    if (targetUser) {
+      dispatchDepositAlert({
+        user: targetUser,
+        amount: deposit.amount,
+        netAmount: deposit.net_amount,
+        utr: deposit.utr,
+        status: 'REJECTED',
+        reason: reason || 'Invalid transaction UTR or unverified screenshot.',
+      });
+    }
 
     return { success: true, message: 'Deposit request rejected.' };
   };
@@ -667,6 +832,16 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     addNotification(currentUser.id, 'Withdrawal Requested', `Withdrawal request of ${formatINR(amount)} submitted. Net payout: ${formatINR(netPayout)}.`, 'INFO');
 
+    // Trigger Automated Telegram & Email Alert for Withdrawal Request
+    dispatchWithdrawalAlert({
+      user: currentUser,
+      amount,
+      netPayout,
+      paymentIdentifier: paymentIdentifier.trim(),
+      status: 'PENDING',
+      remainingBalance: newAvailable,
+    });
+
     return {
       success: true,
       message: 'Withdrawal request submitted! Funds are locked until admin verification.',
@@ -692,6 +867,17 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const targetUser = profiles.find((p) => p.id === wd.user_id);
     addAuditLog('WITHDRAWAL_APPROVED', `Authorized payout for withdrawal ${wd.id} of ${formatINR(wd.amount)}`, targetUser, wd.amount);
     addNotification(wd.user_id, 'Withdrawal Authorized', `Your withdrawal of ${formatINR(wd.net_payout)} is approved and being processed for payment.`, 'INFO');
+
+    // Trigger Automated Alert
+    if (targetUser) {
+      dispatchWithdrawalAlert({
+        user: targetUser,
+        amount: wd.amount,
+        netPayout: wd.net_payout,
+        paymentIdentifier: wd.payment_identifier,
+        status: 'APPROVED',
+      });
+    }
 
     return { success: true, message: 'Withdrawal approved for payment processing.' };
   };
@@ -763,6 +949,19 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     addAuditLog('WITHDRAWAL_MARKED_PAID', `Marked withdrawal ${wd.id} as PAID (Ref: ${paymentReference})`, targetUser, wd.amount);
     addNotification(targetUserId, 'Withdrawal Paid! 💸', `Your payout of ${formatINR(wd.net_payout)} has been sent! Ref UTR: ${paymentReference}`, 'SUCCESS');
 
+    // Trigger Automated Telegram & Email Alert
+    if (targetUser) {
+      dispatchWithdrawalAlert({
+        user: targetUser,
+        amount: wd.amount,
+        netPayout: wd.net_payout,
+        paymentIdentifier: wd.payment_identifier,
+        status: 'SUCCESS',
+        utr: paymentReference,
+        remainingBalance: userWallet.available_balance,
+      });
+    }
+
     return { success: true, message: `Withdrawal marked as PAID. Reference ${paymentReference} recorded.` };
   };
 
@@ -825,6 +1024,19 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     addAuditLog('WITHDRAWAL_REJECTED', `Rejected withdrawal ${wd.id}: ${reason}`, targetUser, wd.amount);
     addNotification(resolvedId, 'Withdrawal Rejected (Refunded)', `Your withdrawal of ${formatINR(wd.amount)} was rejected. ${formatINR(wd.amount)} has been immediately restored to your available wallet balance. Reason: ${reason}`, 'ALERT');
+
+    // Trigger Automated Telegram & Email Alert
+    if (targetUser) {
+      dispatchWithdrawalAlert({
+        user: targetUser,
+        amount: wd.amount,
+        netPayout: wd.net_payout,
+        paymentIdentifier: wd.payment_identifier,
+        status: 'REJECTED',
+        reason: reason || 'Invalid payment identifier or security check failed.',
+        remainingBalance: restoredAvailable,
+      });
+    }
 
     return { success: true, message: `Withdrawal rejected. ${formatINR(wd.amount)} refunded & restored to user's wallet.` };
   };
@@ -939,6 +1151,140 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     addNotification(currentUser.id, 'Transfer Sent', `Transferred ${formatINR(amount)} to ${recipient.full_name}.`, 'INFO');
     addNotification(recipient.id, 'Funds Received! 🎁', `Received ${formatINR(amount)} from ${currentUser.full_name}.`, 'SUCCESS');
 
+    // Trigger Automated P2P Transfer Telegram & Email Alert for Both Sender & Receiver
+    dispatchTransferAlert({
+      sender: currentUser,
+      receiver: recipient,
+      amount,
+      txnId: senderTx.id,
+      note,
+      senderBalance: senderNewBal,
+      receiverBalance: recipientNewBal,
+    });
+
+    // ----------------------------------------------------
+    // DYNAMIC WELCOME BONUS 1ST TXN QUALIFICATION LOGIC
+    // Condition: 1st transaction (Min ₹1) within 24 hours of registration
+    // ----------------------------------------------------
+    const minTxnRequired = settings.welcome_bonus_min_txn ?? 1;
+    const expiryHours = settings.welcome_bonus_expiry_hours ?? 24;
+
+    const isPendingBonus =
+      currentUser.welcome_bonus_status === 'PENDING' ||
+      (currentUser.welcome_bonus_status === undefined &&
+        settings.signup_bonus_enabled &&
+        (settings.signup_bonus_amount || 0) > 0 &&
+        !currentUser.has_made_first_transaction);
+
+    let finalSenderBal = senderNewBal;
+
+    if (isPendingBonus && amount >= minTxnRequired) {
+      const regTime = new Date(currentUser.created_at || Date.now()).getTime();
+      const expiresAt = currentUser.welcome_bonus_expires_at
+        ? new Date(currentUser.welcome_bonus_expires_at).getTime()
+        : regTime + expiryHours * 60 * 60 * 1000;
+      const isWithin24Hours = Date.now() <= expiresAt;
+
+      if (isWithin24Hours) {
+        const bonusToCredit = currentUser.welcome_bonus_amount || settings.signup_bonus_amount || 50;
+        if (bonusToCredit > 0) {
+          finalSenderBal = senderNewBal + bonusToCredit;
+
+          // Credit bonus to sender wallet
+          setWallets((prev) => ({
+            ...prev,
+            [currentUser.id]: {
+              ...(prev[currentUser.id] || {}),
+              available_balance: finalSenderBal,
+              updated_at: new Date().toISOString(),
+            },
+            [currentUser.user_custom_id]: {
+              ...(prev[currentUser.user_custom_id] || {}),
+              available_balance: finalSenderBal,
+              updated_at: new Date().toISOString(),
+            },
+          }));
+
+          // Welcome Bonus Transaction Ledger Record
+          const bonusTx: Transaction = {
+            id: `TXN-WELCOME-${Date.now()}`,
+            user_id: currentUser.id,
+            user_name: currentUser.full_name,
+            type: 'REFERRAL_BONUS',
+            amount: bonusToCredit,
+            fee: 0,
+            net_amount: bonusToCredit,
+            status: 'SUCCESS',
+            reference_id: `WELCOME-CLAIM-${currentUser.user_custom_id}`,
+            description: `🎁 Welcome Bonus Claimed (1st Txn Completed in 24h)`,
+            balance_before: senderNewBal,
+            balance_after: finalSenderBal,
+            created_at: new Date().toISOString(),
+          };
+          setTransactions((prev) => [bonusTx, ...prev]);
+
+          // Update user profile status
+          setProfiles((prev) =>
+            prev.map((p) =>
+              p.id === currentUser.id
+                ? {
+                    ...p,
+                    welcome_bonus_status: 'CLAIMED',
+                    welcome_bonus_claimed_at: new Date().toISOString(),
+                    has_made_first_transaction: true,
+                  }
+                : p
+            )
+          );
+
+          // Notifications & Alerts
+          addNotification(
+            currentUser.id,
+            '🎁 Welcome Bonus Claimed!',
+            `Congratulations! ₹${bonusToCredit} Welcome Bonus has been credited to your wallet for completing your 1st transaction within 24 hours.`,
+            'SUCCESS'
+          );
+
+          dispatchWelcomeBonusAlert({
+            user: currentUser,
+            bonusAmount: bonusToCredit,
+            newBalance: finalSenderBal,
+            txnId: bonusTx.id,
+          });
+        }
+      } else {
+        // Bonus expired because 24h passed
+        setProfiles((prev) =>
+          prev.map((p) =>
+            p.id === currentUser.id
+              ? {
+                  ...p,
+                  welcome_bonus_status: 'EXPIRED',
+                  has_made_first_transaction: true,
+                }
+              : p
+          )
+        );
+        addNotification(
+          currentUser.id,
+          'Welcome Bonus Expired',
+          'Your 24-hour welcome bonus offer window has expired.',
+          'ALERT'
+        );
+      }
+    } else if (!currentUser.has_made_first_transaction) {
+      setProfiles((prev) =>
+        prev.map((p) =>
+          p.id === currentUser.id
+            ? {
+                ...p,
+                has_made_first_transaction: true,
+              }
+            : p
+        )
+      );
+    }
+
     return {
       success: true,
       message: `Successfully transferred ${formatINR(amount)} to ${recipient.full_name} (${recipient.user_custom_id}).`,
@@ -953,7 +1299,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         status: 'SUCCESS',
         note,
         date: new Date().toISOString(),
-        newBalance: senderNewBal,
+        newBalance: finalSenderBal,
       },
     };
   };
@@ -1231,6 +1577,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const newUserId = `user-${Date.now().toString().slice(-6)}`;
     const userCustomId = `SR-${customIdNumber}`;
 
+    // Dynamic Signup / Welcome bonus configuration from Admin settings
+    const welcomeBonus =
+      settings.signup_bonus_enabled && Number(settings.signup_bonus_amount) > 0
+        ? Number(settings.signup_bonus_amount)
+        : 0;
+
+    const expiryHours = settings.welcome_bonus_expiry_hours || 24;
+
     const newProfile: UserProfile = {
       id: newUserId,
       user_custom_id: userCustomId,
@@ -1242,20 +1596,19 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       role: 'USER',
       status: 'ACTIVE',
       referral_code: `SRREF${customIdNumber}`,
+      welcome_bonus_status: welcomeBonus > 0 ? 'PENDING' : 'NONE',
+      welcome_bonus_amount: welcomeBonus,
+      welcome_bonus_expires_at: new Date(Date.now() + expiryHours * 60 * 60 * 1000).toISOString(),
+      has_made_first_transaction: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
-    // Signup bonus only if enabled and configured by Admin
-    const welcomeBonus =
-      settings.signup_bonus_enabled && Number(settings.signup_bonus_amount) > 0
-        ? Number(settings.signup_bonus_amount)
-        : 0;
-
+    // User wallet starts with ₹0. When they make their 1st transfer within 24h, the ₹welcomeBonus unlocks!
     const newWallet: Wallet = {
       id: `w-${newUserId}`,
       user_id: newUserId,
-      available_balance: welcomeBonus,
+      available_balance: 0,
       locked_balance: 0,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -1291,7 +1644,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         email: cleanEmail,
         telegram_id: newProfile.telegram_id,
         telegram_chat_id: cleanChatId || undefined,
-        opening_balance: welcomeBonus,
+        opening_balance: 0,
       }),
     }).catch((err) => console.error('Failed to trigger register alert:', err));
 
@@ -1307,34 +1660,16 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }).catch(() => null);
 
     if (welcomeBonus > 0) {
-      // Initial bonus transaction
-      const bonusTx: Transaction = {
-        id: `TXN-WELCOME-${Date.now()}`,
-        user_id: newUserId,
-        user_name: newProfile.full_name,
-        type: 'REFERRAL_BONUS',
-        amount: welcomeBonus,
-        fee: 0,
-        net_amount: welcomeBonus,
-        status: 'SUCCESS',
-        reference_id: `WELCOME-${userCustomId}`,
-        description: 'Welcome Signup Bonus Credited 🎁',
-        balance_before: 0,
-        balance_after: welcomeBonus,
-        created_at: new Date().toISOString(),
-      };
-      setTransactions((prev) => [bonusTx, ...prev]);
-
       addNotification(
         newUserId,
-        'Welcome to SR GATEWAY IN! 🎉',
-        `Your account ${userCustomId} is ready. ₹${welcomeBonus} welcome bonus credited!`,
+        'Welcome to SR GATEWAY! 🎁',
+        `Account ${userCustomId} is active! Complete your 1st transfer (Min. ₹1) within 24 Hours to auto-claim your ₹${welcomeBonus} Welcome Bonus!`,
         'SUCCESS'
       );
     } else {
       addNotification(
         newUserId,
-        'Welcome to SR GATEWAY IN! 🎉',
+        'Welcome to SR GATEWAY! 🎉',
         `Your account ${userCustomId} is ready. Wallet A/C is active.`,
         'SUCCESS'
       );
@@ -1352,7 +1687,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return {
       success: true,
       message: `Account created successfully! Your Wallet A/C is ${cleanMobile}.${
-        welcomeBonus > 0 ? ` ₹${welcomeBonus} Welcome Bonus credited.` : ''
+        welcomeBonus > 0
+          ? ` ₹${welcomeBonus} Welcome Bonus offer unlocked for 24 hours! Complete your 1st transaction (Min ₹1) to claim.`
+          : ''
       }`,
       user: newProfile,
     };
@@ -1520,14 +1857,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setPendingOtpUser(currentUser.id);
     }
 
-    const botToken = settings.otp_telegram_bot_token || '7829103847:AAHx_example_bot_token_key';
-    const botUsername = settings.otp_telegram_bot_username || '@PAYZYBOT';
+    const botToken = (settings.otp_telegram_bot_token && !settings.otp_telegram_bot_token.includes('example')) ? settings.otp_telegram_bot_token : undefined;
+    const botUsername = settings.otp_telegram_bot_username || '@SRGatewayBot';
 
     let telegramSent = false;
     let apiMessage = '';
 
     try {
-      // 1. Try sending via Express API server
+      // 1. Send via Express API server (Server will use environment TELEGRAM_BOT_TOKEN or Admin Settings token)
       const backendRes = await fetch('/api/v1/auth/telegram-otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1547,12 +1884,12 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
         if (backendRes.telegram_api_ok) {
           telegramSent = true;
-          apiMessage = `OTP code delivered directly to your Telegram Bot Chat (ID: ${targetChat})! Valid for 5 minutes.`;
+          apiMessage = backendRes.message || `OTP code delivered directly to your Telegram Bot Chat (ID: ${targetChat})! Valid for 5 minutes.`;
         } else {
           apiMessage = backendRes.message || `OTP dispatched for Telegram Chat ${targetChat}. Make sure you clicked START on ${botUsername}!`;
         }
-      } else {
-        // 2. Direct client Telegram Bot API fetch fallback
+      } else if (botToken) {
+        // 2. Direct client Telegram Bot API fetch fallback ONLY if real token exists
         const tgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1573,6 +1910,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         } else {
           apiMessage = `OTP dispatched for Telegram Chat ${targetChat}. Make sure you clicked START on ${botUsername}!`;
         }
+      } else {
+        apiMessage = `OTP generated for Telegram Chat ${targetChat}. Please make sure you have started ${botUsername} in Telegram!`;
       }
     } catch (err) {
       apiMessage = `OTP dispatched to Telegram Chat ${targetChat}. Check messages from Telegram Bot ${botUsername}.`;
