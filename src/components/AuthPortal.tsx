@@ -94,7 +94,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
     clearFeedback();
 
     if (!loginIdentifier.trim()) {
-      setErrorMsg('Please enter your Mobile No, User ID (e.g. SR-10029), Email, or Telegram ID.');
+      setErrorMsg('Please enter your Mobile No, User ID, Email, or Telegram ID.');
       return;
     }
 
@@ -456,7 +456,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
                       type="text"
                       value={loginIdentifier}
                       onChange={(e) => setLoginIdentifier(e.target.value)}
-                      placeholder="e.g. 9876543210 or SR-10029"
+                      placeholder="Registered Mobile, Email, or User ID"
                       className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-2xl text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 transition"
                       required
                     />
@@ -741,7 +741,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
                           type="text"
                           value={otpIdentifier}
                           onChange={(e) => setOtpIdentifier(e.target.value)}
-                          placeholder="e.g. 638291048, @username, or 9876543210"
+                          placeholder="Telegram Chat ID, @username, or Mobile"
                           className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-2xl text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-sky-500 transition"
                           required
                         />
@@ -790,7 +790,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
                         maxLength={6}
                         value={otpCode}
                         onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
-                        placeholder="849201"
+                        placeholder="••••••"
                         className="w-full py-3 bg-slate-950 border border-sky-500 rounded-2xl text-center text-xl tracking-[0.4em] text-white font-mono font-black focus:outline-none transition shadow-inner"
                         autoFocus
                       />

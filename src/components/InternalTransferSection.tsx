@@ -18,7 +18,7 @@ import {
 export const InternalTransferSection: React.FC = () => {
   const { currentUser, currentWallet, allProfiles, transferBalance, formatINR, transactions, openRpinModal } = useWallet();
 
-  const [recipientQuery, setRecipientQuery] = useState<string>('9812345678');
+  const [recipientQuery, setRecipientQuery] = useState<string>('');
   const [amount, setAmount] = useState<number>(500);
   const [note, setNote] = useState<string>('');
   const [statusMsg, setStatusMsg] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
@@ -150,7 +150,7 @@ export const InternalTransferSection: React.FC = () => {
                 <Search className="absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="e.g. 7478338867, 9812345678, or priya@srgateway.in"
+                  placeholder="Enter Registered Mobile Number, User ID, or Email"
                   value={recipientQuery}
                   onChange={(e) => setRecipientQuery(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-11 pr-4 py-3 text-white font-mono font-bold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -177,34 +177,10 @@ export const InternalTransferSection: React.FC = () => {
                   </span>
                 </div>
               ) : (
-                <p className="text-[10px] text-amber-400 mt-1 font-mono">
-                  Enter registered mobile number (e.g. 9812345678) to verify recipient.
+                <p className="text-[10px] text-slate-400 mt-1 font-mono">
+                  Enter registered 10-digit mobile number or User ID to search recipient.
                 </p>
               )}
-            </div>
-
-            {/* Quick Select Preset Recipients */}
-            <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1.5 font-mono">Preset Demo Accounts</label>
-              <div className="flex flex-wrap gap-2">
-                {allProfiles
-                  .filter((p) => p.id !== currentUser.id && p.role !== 'ADMIN')
-                  .map((p) => (
-                    <button
-                      type="button"
-                      key={p.id}
-                      onClick={() => setRecipientQuery(p.mobile)}
-                      className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-2 ${
-                        recipientQuery === p.mobile
-                          ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
-                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <span>{p.full_name}</span>
-                      <span className="font-mono text-[10px] opacity-70">({p.mobile})</span>
-                    </button>
-                  ))}
-              </div>
             </div>
 
             {/* Amount Input */}

@@ -746,6 +746,11 @@ export const AdminPortal: React.FC = () => {
                         >
                           {user.status}
                         </span>
+                        {user.is_demo && (
+                          <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">
+                            DEMO (NO TRANSACTIONS)
+                          </span>
+                        )}
                       </div>
                       <div className="text-[11px] text-slate-400">
                         Mobile: {user.mobile} • Email: {user.email} {user.telegram_id ? `• TG: ${user.telegram_id}` : ''}

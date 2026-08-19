@@ -207,6 +207,26 @@ export const UserDashboard: React.FC<{
 
   return (
     <div className="space-y-6">
+      {/* ⚠️ DEMO ACCOUNT RESTRICTION NOTICE */}
+      {currentUser.is_demo && (
+        <div className="p-4 rounded-3xl bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center justify-between gap-3 text-xs shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-2xl bg-amber-500/20 text-amber-300 shrink-0">
+              <AlertCircle className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="font-extrabold text-white text-sm">Demo Account (Read-Only Mode)</div>
+              <div className="text-[11px] text-amber-200/80 font-mono">
+                This is a demo account. Real transactions, deposits, withdrawals, and balance transfers are strictly disabled.
+              </div>
+            </div>
+          </div>
+          <span className="text-[10px] font-mono font-black bg-amber-500/30 text-amber-200 border border-amber-500/50 px-2.5 py-1 rounded-full uppercase shrink-0">
+            DEMO MODE
+          </span>
+        </div>
+      )}
+
       {/* 🎁 DYNAMIC WELCOME BONUS BANNER (Pending 1st Transaction) */}
       {isBonusPending && !isBonusExpiredState && (
         <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-amber-500/20 via-purple-500/20 to-emerald-500/20 border border-amber-500/40 shadow-xl relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">

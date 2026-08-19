@@ -149,11 +149,10 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const [activeUserId, setActiveUserId] = useState<string | null>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`);
-    if (saved !== null) {
-      if (saved === 'null' || saved === '') return null;
+    if (saved && saved !== 'null' && saved !== 'undefined' && saved.trim() !== '') {
       return saved;
     }
-    return 'user-001';
+    return null;
   });
 
   const [wallets, setWallets] = useState<Record<string, Wallet>>(() => {
@@ -413,13 +412,48 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => clearInterval(interval);
   }, []);
 
-  const currentUser = (activeUserId && profiles.find((p) => p.id === activeUserId || p.user_custom_id === activeUserId)) || profiles[0];
+  const currentUser: UserProfile = (activeUserId && profiles.find((p) => p.id === activeUserId || p.user_custom_id === activeUserId)) || {
+    id: '',
+    user_custom_id: '',
+    full_name: 'Guest User',
+    mobile: '',
+    email: '',
+    role: 'USER',
+    status: 'ACTIVE',
+    referral_code: '',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
   const isAuthenticated = Boolean(activeUserId && profiles.some((p) => p.id === activeUserId || p.user_custom_id === activeUserId));
-  const activeRole = currentUser.role;
+  const activeRole = currentUser.role || 'USER';
 
-  const currentWallet = wallets[currentUser.id] || wallets[currentUser.user_custom_id] || {
-    id: `w-${currentUser.id}`,
-    user_id: currentUser.id,
+  // Demo Account Checker: Strictly prevents any transactions from demo accounts
+  const isDemoAccount = (user?: UserProfile | string | null): boolean => {
+    if (!user) return false;
+    if (typeof user === 'string') {
+      const u = profiles.find((p) => p.id === user || p.user_custom_id === user || p.mobile === user);
+      if (u) return isDemoAccount(u);
+      const str = user.toLowerCase();
+      return str.includes('demo') || str.includes('test_user') || str === 'user-101' || str === 'sr-10029';
+    }
+    if (user.is_demo) return true;
+    const id = (user.id || '').toLowerCase();
+    const customId = (user.user_custom_id || '').toLowerCase();
+    const name = (user.full_name || '').toLowerCase();
+    const email = (user.email || '').toLowerCase();
+    return (
+      id.startsWith('demo') ||
+      id === 'user-101' ||
+      customId.includes('demo') ||
+      customId === 'sr-10029' ||
+      name.includes('demo') ||
+      email.includes('demo@')
+    );
+  };
+
+  const currentWallet = (currentUser.id && (wallets[currentUser.id] || wallets[currentUser.user_custom_id])) || {
+    id: currentUser.id ? `w-${currentUser.id}` : 'w-guest',
+    user_id: currentUser.id || 'guest',
     available_balance: 0,
     locked_balance: 0,
     created_at: new Date().toISOString(),
@@ -439,6 +473,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (firstNonAdmin) {
         setActiveUserId(firstNonAdmin.id);
         localStorage.setItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`, firstNonAdmin.id);
+      } else {
+        setActiveUserId(null);
+        localStorage.removeItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`);
       }
     } else {
       setActiveUserId('admin-001'); // Switch to Admin
@@ -647,6 +684,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     screenshotUrl?: string,
     note?: string
   ) => {
+    if (isDemoAccount(currentUser)) {
+      return { success: false, message: '⚠️ Demo Account Restriction: Deposits are strictly disabled on demo accounts.' };
+    }
     if (!settings.deposit_enabled) {
       return { success: false, message: 'Deposit system is currently unavailable.' };
     }
@@ -835,6 +875,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Withdraw Request Submission (Locking Funds)
   const submitWithdrawalRequest = (amount: number, paymentIdentifier: string, note?: string) => {
+    if (isDemoAccount(currentUser)) {
+      return { success: false, message: '⚠️ Demo Account Restriction: Withdrawals are strictly disabled on demo accounts.' };
+    }
     if (!settings.withdraw_enabled) {
       return { success: false, message: 'Withdrawal system is currently unavailable.' };
     }
@@ -1132,6 +1175,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Internal User-to-User Transfer
   const transferBalance = (recipientQuery: string, amount: number, note?: string) => {
+    if (isDemoAccount(currentUser)) {
+      return { success: false, message: '⚠️ Demo Account Restriction: Outgoing transfers and transactions are strictly disabled on demo accounts.' };
+    }
     if (amount <= 0) return { success: false, message: 'Enter a valid transfer amount.' };
     if (currentWallet.available_balance < amount) {
       return { success: false, message: `Insufficient balance. Available: ${formatINR(currentWallet.available_balance)}.` };
@@ -1149,6 +1195,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     if (!recipient) {
       return { success: false, message: 'Recipient user not found. Search by Registered Mobile Number (Wallet A/C) or Email.' };
+    }
+    if (isDemoAccount(recipient)) {
+      return { success: false, message: '⚠️ Demo Account Restriction: Cannot transfer funds to a demo account.' };
     }
     if (recipient.status === 'BANNED') {
       return { success: false, message: 'Cannot transfer to this recipient account.' };
@@ -1398,6 +1447,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (amount <= 0) return { success: false, message: 'Please enter a valid positive amount.' };
     const targetUser = profiles.find((p) => p.id === targetUserId || p.user_custom_id === targetUserId);
     if (!targetUser) return { success: false, message: 'Target user not found.' };
+    if (isDemoAccount(targetUser)) {
+      return { success: false, message: '⚠️ Demo Account Restriction: Balance adjustments are disabled on demo accounts.' };
+    }
 
     const resolvedId = targetUser.id;
     const resolvedCustomId = targetUser.user_custom_id;
@@ -1453,6 +1505,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (amount <= 0) return { success: false, message: 'Please enter a valid positive amount.' };
     const targetUser = profiles.find((p) => p.id === targetUserId || p.user_custom_id === targetUserId);
     if (!targetUser) return { success: false, message: 'Target user not found.' };
+    if (isDemoAccount(targetUser)) {
+      return { success: false, message: '⚠️ Demo Account Restriction: Balance adjustments are disabled on demo accounts.' };
+    }
 
     const resolvedId = targetUser.id;
     const resolvedCustomId = targetUser.user_custom_id;
@@ -1523,6 +1578,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Daily Bonus Claim
   const claimDailyBonus = () => {
+    if (isDemoAccount(currentUser)) {
+      return { success: false, message: '⚠️ Demo Account Restriction: Bonus claims are disabled on demo accounts.' };
+    }
     if (!settings.daily_bonus_enabled) {
       return { success: false, message: 'Daily bonus feature is currently disabled.' };
     }
@@ -2235,6 +2293,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const processMerchantApiPayment = (amount: number, orderId: string, customerName: string, method: string) => {
+    if (isDemoAccount(currentUser)) {
+      return { success: false, message: '⚠️ Demo Account Restriction: API gateway payments are disabled on demo accounts.' };
+    }
     if (amount <= 0) return { success: false, message: 'Invalid payment amount.' };
 
     const merchant = currentUser;

@@ -15,6 +15,7 @@ export interface UserProfile {
   referred_by?: string;
   rpin?: string; // 4-digit security RPIN
   theme?: 'DARK' | 'LIGHT';
+  is_demo?: boolean;
   welcome_bonus_status?: 'PENDING' | 'CLAIMED' | 'EXPIRED' | 'NONE';
   welcome_bonus_amount?: number;
   welcome_bonus_expires_at?: string; // ISO timestamp 24h from registration
