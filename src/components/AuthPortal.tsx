@@ -94,7 +94,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
     clearFeedback();
 
     if (!loginIdentifier.trim()) {
-      setErrorMsg('कृपया अपना Mobile No, User ID (SR-10029), Email या Telegram ID दर्ज करें।');
+      setErrorMsg('Please enter your Mobile No, User ID (e.g. SR-10029), Email, or Telegram ID.');
       return;
     }
 
@@ -117,24 +117,24 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
   const handleSendRegisterEmailOtp = async () => {
     clearFeedback();
     if (!regFullName.trim()) {
-      setErrorMsg('कृपया अपना पूरा नाम दर्ज करें (Enter full name).');
+      setErrorMsg('Please enter your full name.');
       return;
     }
     const cleanPhone = regMobile.replace(/[^0-9]/g, '');
     if (cleanPhone.length !== 10) {
-      setErrorMsg('कृपया 10 अंकों का वैध मोबाइल नंबर दर्ज करें (Valid 10-digit mobile number).');
+      setErrorMsg('Please enter a valid 10-digit mobile number.');
       return;
     }
     if (!regEmail.trim() || !regEmail.includes('@')) {
-      setErrorMsg('कृपया अपना वैध Gmail / Email पता दर्ज करें (Valid Gmail / Email address is required).');
+      setErrorMsg('Please enter a valid Gmail / Email address.');
       return;
     }
     if (regPassword.length < 4) {
-      setErrorMsg('पासवर्ड कम से कम 4 अक्षरों का होना चाहिए (Password min 4 chars).');
+      setErrorMsg('Password must be at least 4 characters long.');
       return;
     }
     if (regPassword !== regConfirmPassword) {
-      setErrorMsg('दोनों पासवर्ड मेल नहीं खा रहे हैं (Passwords do not match).');
+      setErrorMsg('Passwords do not match. Please re-enter your password.');
       return;
     }
 
@@ -166,7 +166,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
     }
 
     if (!regOtpCode || regOtpCode.length !== 6) {
-      setErrorMsg('कृपया अपने Gmail पर आया 6 अंकों का OTP दर्ज करें (Enter 6-digit Email OTP).');
+      setErrorMsg('Please enter the 6-digit OTP code sent to your Gmail.');
       return;
     }
 
@@ -192,7 +192,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
         setRegisteredUserPopup({
           user: res.user,
           message: res.message,
-          welcomeBonus: settings.signup_bonus_amount || 50,
+          welcomeBonus: settings.signup_bonus_amount !== undefined ? settings.signup_bonus_amount : 5,
         });
       } else if (!res.success) {
         setErrorMsg(res.message);
@@ -207,7 +207,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
   const handleSendTelegramOtp = async () => {
     clearFeedback();
     if (!otpIdentifier.trim()) {
-      setErrorMsg('कृपया Telegram Chat ID या Registered Mobile नंबर दर्ज करें।');
+      setErrorMsg('Please enter your Telegram Chat ID or Registered Mobile number.');
       return;
     }
 
@@ -231,7 +231,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
   const handleVerifyTelegramOtp = () => {
     clearFeedback();
     if (!otpCode || otpCode.length !== 6) {
-      setErrorMsg('कृपया 6 अंकों का OTP दर्ज करें (Enter valid 6-digit OTP).');
+      setErrorMsg('Please enter a valid 6-digit OTP code.');
       return;
     }
 
@@ -525,7 +525,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
             {mode === 'register' && (
               <form onSubmit={handleRegisterSubmit} className="space-y-3.5 pt-1">
                 {/* Dynamic Signup & Welcome Bonus Banner */}
-                {settings.signup_bonus_enabled && (settings.signup_bonus_amount ?? 50) > 0 ? (
+                {settings.signup_bonus_enabled && (settings.signup_bonus_amount ?? 5) > 0 ? (
                   <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/20 via-emerald-500/15 to-teal-500/20 border border-amber-500/40 space-y-2">
                     <div className="flex items-center gap-2.5">
                       <div className="p-2 rounded-xl bg-amber-500/20 text-amber-300 shrink-0">
@@ -533,15 +533,15 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
                       </div>
                       <div>
                         <div className="text-xs font-black text-amber-300">
-                          🎁 ₹{settings.signup_bonus_amount || 50} Welcome Bonus Offer
+                          🎁 ₹{settings.signup_bonus_amount ?? 5} Welcome Bonus Offer
                         </div>
                         <div className="text-[10px] text-slate-300">
-                          Unlock ₹{settings.signup_bonus_amount || 50} bonus on your first transaction!
+                          Unlock ₹{settings.signup_bonus_amount ?? 5} bonus on your first transaction!
                         </div>
                       </div>
                     </div>
                     <div className="p-2 bg-slate-950/80 rounded-xl border border-amber-500/20 text-[10px] text-amber-200/90 font-mono leading-relaxed">
-                      ⚡ <strong>Condition:</strong> Make your 1st transaction (Min. ₹1 Send/Transfer) within <strong>24 Hours</strong> of registration to auto-claim your ₹{settings.signup_bonus_amount || 50} bonus! If not completed within 24 hours, the bonus will expire.
+                      ⚡ <strong>Condition:</strong> Make your 1st transaction (Min. ₹1 Send/Transfer) within <strong>24 Hours</strong> of registration to auto-claim your ₹{settings.signup_bonus_amount ?? 5} bonus! If not completed within 24 hours, the bonus will expire.
                     </div>
                   </div>
                 ) : null}

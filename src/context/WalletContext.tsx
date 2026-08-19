@@ -250,8 +250,12 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     },
   ]);
 
+  const [isHydrated, setIsHydrated] = useState(false);
+
   // Save to LocalStorage whenever critical states change & sync with backend server
   useEffect(() => {
+    if (!isHydrated) return; // Do not overwrite backend on initial un-hydrated mount
+
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_PROFILES`, JSON.stringify(profiles));
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_WALLETS`, JSON.stringify(wallets));
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_SETTINGS`, JSON.stringify(settings));
@@ -261,6 +265,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_AUDITS`, JSON.stringify(auditLogs));
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_NOTIFS`, JSON.stringify(notifications));
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_API_KEYS`, JSON.stringify(apiKeys));
+
+    const isAdmin = activeUserId === 'admin-001' || activeUserId === 'SR-ADMIN-01';
 
     // Non-blocking sync to backend
     fetch('/api/v1/sync-state', {
@@ -273,10 +279,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         deposits,
         withdrawals,
         apiKeys,
-        settings,
+        settings: isAdmin ? settings : undefined,
+        isAdmin,
       }),
     }).catch(() => {});
-  }, [profiles, wallets, settings, deposits, withdrawals, transactions, auditLogs, notifications, apiKeys]);
+  }, [profiles, wallets, settings, deposits, withdrawals, transactions, auditLogs, notifications, apiKeys, isHydrated]);
 
   // Helper to generate User Requested Transaction ID format like SR-S83F84OT9G3KE
   const generateSRTxnId = (suffix = '') => {
@@ -288,25 +295,85 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return `SR-${rand}${suffix ? `-${suffix}` : ''}`;
   };
 
-  // Immediate manual sync function
+  // Immediate manual sync function to synchronize settings, profiles, deposits, withdrawals, wallets & txns
   const refreshFromBackend = async () => {
     try {
       const res = await fetch('/api/v1/sync-state');
       if (!res.ok) return;
       const data = await res.json();
       if (data.status === 'success') {
-        // Merge server transactions if any new exist
+        // 1. Sync global settings (welcome bonus amount, enabled flag, UPI ID, Bank details, QR, limits, banners)
+        if (data.settings && typeof data.settings === 'object' && Object.keys(data.settings).length > 0) {
+          setSettings((prev) => {
+            const next = { ...prev, ...data.settings };
+            localStorage.setItem(`${LOCAL_STORAGE_KEY}_SETTINGS`, JSON.stringify(next));
+            return next;
+          });
+        }
+
+        // 2. Sync profiles (all registered users across devices)
+        if (Array.isArray(data.profiles) && data.profiles.length > 0) {
+          setProfiles((prev) => {
+            const map = new Map<string, UserProfile>();
+            prev.forEach((p) => map.set(p.id, p));
+            data.profiles.forEach((p: any) => {
+              if (p && p.id) {
+                map.set(p.id, { ...(map.get(p.id) || {}), ...p });
+              }
+            });
+            const updated = Array.from(map.values());
+            localStorage.setItem(`${LOCAL_STORAGE_KEY}_PROFILES`, JSON.stringify(updated));
+            return updated;
+          });
+        }
+
+        // 3. Sync deposits (user submitted deposit requests)
+        if (Array.isArray(data.deposits)) {
+          setDeposits((prev) => {
+            const map = new Map<string, DepositRequest>();
+            prev.forEach((d) => map.set(d.id, d));
+            data.deposits.forEach((d: any) => {
+              if (d && d.id) {
+                map.set(d.id, { ...(map.get(d.id) || {}), ...d });
+              }
+            });
+            const updated = Array.from(map.values());
+            localStorage.setItem(`${LOCAL_STORAGE_KEY}_DEPOSITS`, JSON.stringify(updated));
+            return updated;
+          });
+        }
+
+        // 4. Sync withdrawals (user submitted withdrawal requests)
+        if (Array.isArray(data.withdrawals)) {
+          setWithdrawals((prev) => {
+            const map = new Map<string, WithdrawalRequest>();
+            prev.forEach((w) => map.set(w.id, w));
+            data.withdrawals.forEach((w: any) => {
+              if (w && w.id) {
+                map.set(w.id, { ...(map.get(w.id) || {}), ...w });
+              }
+            });
+            const updated = Array.from(map.values());
+            localStorage.setItem(`${LOCAL_STORAGE_KEY}_WITHDRAWALS`, JSON.stringify(updated));
+            return updated;
+          });
+        }
+
+        // 5. Merge server transactions if any new exist
         if (Array.isArray(data.transactions) && data.transactions.length > 0) {
           setTransactions((prev) => {
             const existingIds = new Set(prev.map((t) => t.id));
             const newItems = data.transactions.filter((t: any) => !existingIds.has(t.id));
             if (newItems.length > 0) {
-              return [...newItems, ...prev];
+              const merged = [...newItems, ...prev];
+              localStorage.setItem(`${LOCAL_STORAGE_KEY}_TRANSACTIONS`, JSON.stringify(merged));
+              return merged;
             }
             return prev;
           });
         }
-        // Merge wallets - update live balance whenever available_balance or locked_balance changes
+
+        // 6. Merge wallets - update live balance whenever available_balance or locked_balance changes
         if (data.wallets && typeof data.wallets === 'object') {
           setWallets((prev) => {
             let changed = false;
@@ -324,12 +391,17 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 }
               }
             });
+            if (changed) {
+              localStorage.setItem(`${LOCAL_STORAGE_KEY}_WALLETS`, JSON.stringify(next));
+            }
             return changed ? next : prev;
           });
         }
       }
     } catch {
       // Safe silence on dev reload
+    } finally {
+      setIsHydrated(true);
     }
   };
 
@@ -385,12 +457,21 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const updateSettings = (newSettings: Partial<AppSettings>) => {
     setSettings((prev) => {
       const merged = { ...prev, ...newSettings };
-      // Push to backend settings API immediately
+      localStorage.setItem(`${LOCAL_STORAGE_KEY}_SETTINGS`, JSON.stringify(merged));
+
+      // Push to backend settings API and sync-state immediately
       fetch('/api/v1/admin/settings', {
-        method: 'PUT',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(merged),
       }).catch(() => null);
+
+      fetch('/api/v1/sync-state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: merged }),
+      }).catch(() => null);
+
       return merged;
     });
     addAuditLog('SETTINGS_UPDATED', `Updated system configuration settings.`);

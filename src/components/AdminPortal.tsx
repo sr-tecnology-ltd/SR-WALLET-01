@@ -109,6 +109,10 @@ export const AdminPortal: React.FC = () => {
   // Admin Settings Form State
   const [settingsForm, setSettingsForm] = useState(settings);
 
+  useEffect(() => {
+    setSettingsForm(settings);
+  }, [settings]);
+
   // Email Test & Logs State
   const [testEmailRecipient, setTestEmailRecipient] = useState<string>('sk190rihan@gmail.com');
   const [testEmailType, setTestEmailType] = useState<'LOGIN_ALERT' | 'DEPOSIT_ALERT' | 'WITHDRAW_ALERT'>('LOGIN_ALERT');

@@ -20,7 +20,7 @@ export const INITIAL_SETTINGS: AppSettings = {
   deposit_charge_percent: 0,
   withdraw_charge_percent: 5,
   signup_bonus_enabled: true,
-  signup_bonus_amount: 50,
+  signup_bonus_amount: 5,
   welcome_bonus_min_txn: 1,
   welcome_bonus_expiry_hours: 24,
   referral_enabled: true,

@@ -165,7 +165,10 @@ export const UserDashboard: React.FC<{
   ];
 
   // Dynamic Welcome Bonus calculation & countdown
-  const bonusAmount = currentUser.welcome_bonus_amount || settings.signup_bonus_amount || 50;
+  const bonusAmount =
+    currentUser.welcome_bonus_amount !== undefined
+      ? currentUser.welcome_bonus_amount
+      : (settings.signup_bonus_amount !== undefined ? settings.signup_bonus_amount : 5);
   const isBonusPending =
     currentUser.welcome_bonus_status === 'PENDING' ||
     (currentUser.welcome_bonus_status === undefined &&

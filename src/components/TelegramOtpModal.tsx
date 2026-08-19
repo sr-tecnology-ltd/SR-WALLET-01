@@ -133,7 +133,7 @@ export const TelegramOtpModal: React.FC<{ isOpen: boolean; onClose: () => void }
         <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-[11px] text-amber-300 flex items-start gap-2">
           <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
           <div>
-            <strong>1 Telegram Chat ID = 1 Account Rule:</strong> Ek Telegram Chat ID sirf ek hi account ke sath link ho sakti hai. Dusre account par connect karne par "already connected" alert aayega.
+            <strong>1 Telegram Chat ID = 1 Account Policy:</strong> Each Telegram Chat ID can only be linked to one user account. Attempting to link an already registered ID will be rejected.
           </div>
         </div>
 
@@ -200,7 +200,7 @@ export const TelegramOtpModal: React.FC<{ isOpen: boolean; onClose: () => void }
               </button>
             </div>
             <p className="text-[10px] text-slate-400">
-              💡 <strong>Step:</strong> Pehle Telegram me <strong>{botHandle}</strong> ko khol kar <strong className="text-emerald-400">START</strong> karein, fir Send OTP dabayein.
+              💡 <strong>Step:</strong> Open <strong>{botHandle}</strong> in Telegram and send <strong className="text-emerald-400">/start</strong> first, then click Send OTP.
             </p>
           </div>
 

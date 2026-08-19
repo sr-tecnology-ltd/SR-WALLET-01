@@ -29,8 +29,10 @@ let appSettings: Record<string, any> = {
   maximum_withdraw: 100000,
   deposit_charge_percent: 0,
   withdraw_charge_percent: 1.5,
-  signup_bonus_enabled: false,
-  signup_bonus_amount: 0,
+  signup_bonus_enabled: true,
+  signup_bonus_amount: 5,
+  welcome_bonus_min_txn: 1,
+  welcome_bonus_expiry_hours: 24,
   referral_enabled: true,
   referral_bonus_type: 'FIXED' as const,
   referral_bonus_amount: 50,
@@ -40,16 +42,20 @@ let appSettings: Record<string, any> = {
   notice_banner_enabled: true,
   notice_banner_title: '⚡ SR GATEWAY MERCHANT API V1.0 LIVE',
   notice_banner_message: 'High speed UPI QR, PhonePe & Telegram Bot payment gateway for high volume merchants.',
-  notice_banner_button_text: 'Get API Key',
-  notice_banner_button_url: '#api',
+  notice_banner_button_text: 'Deposit Now',
+  notice_banner_button_url: '#deposit',
   telegram_channel_enabled: true,
-  telegram_channel_name: '@SRGatewayOfficial',
-  telegram_channel_url: 'https://t.me/SRGatewayOfficial',
+  telegram_channel_name: 'SR TECHNOLOGY LTD',
+  telegram_channel_url: 'https://t.me/SRTECHNOLOGYLTD1',
   support_url: 'https://t.me/SRGatewaySupportBot',
   otp_telegram_bot_username: process.env.TELEGRAM_BOT_USERNAME || '@SRGatewayBot',
   otp_telegram_bot_token: process.env.TELEGRAM_BOT_TOKEN || '',
-  admin_upi_id: 'srgateway.admin@upi',
-  admin_qr_url: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=srgateway.admin@upi%26pn=SR%20GATEWAY%20ADMIN',
+  admin_upi_id: 'srgateway@icici',
+  admin_qr_url: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&q=80',
+  admin_bank_name: 'HDFC Bank Ltd',
+  admin_bank_account_name: 'SR Gateway Payments',
+  admin_bank_account_no: '50200088192031',
+  admin_bank_ifsc: 'HDFC0001092',
   // Automated Email Alert Settings
   email_alerts_enabled: true,
   email_login_alert_enabled: true,
@@ -2609,11 +2615,26 @@ app.delete('/api/v1/keys/revoke/:keyId', (req: Request, res: Response) => {
 });
 
 // 11. Admin Endpoints
+app.get('/api/v1/settings', (req: Request, res: Response) => {
+  res.json({ status: 'success', code: 200, settings: appSettings });
+});
+
 app.get('/api/v1/admin/settings', (req: Request, res: Response) => {
   res.json({ status: 'success', code: 200, settings: appSettings });
 });
 
 app.post('/api/v1/admin/settings', (req: Request, res: Response) => {
+  const incoming = req.body || {};
+  appSettings = { ...appSettings, ...incoming };
+  res.json({
+    status: 'success',
+    code: 200,
+    message: 'Admin system settings updated successfully',
+    settings: appSettings,
+  });
+});
+
+app.put('/api/v1/admin/settings', (req: Request, res: Response) => {
   const incoming = req.body || {};
   appSettings = { ...appSettings, ...incoming };
   res.json({
@@ -3066,17 +3087,32 @@ app.post('/api/v1/sync-state', (req: Request, res: Response) => {
     });
   }
 
-  if (incomingSettings) {
+  // Only allow admin to update system-wide app settings
+  if (incomingSettings && (req.body.isAdmin === true || req.body.role === 'ADMIN')) {
     appSettings = { ...appSettings, ...incomingSettings };
   }
+
+  // Extract deduped unique profiles
+  const profileMap = new Map<string, any>();
+  Object.values(users).forEach((u: any) => {
+    if (u && u.id) {
+      profileMap.set(u.id, u);
+    }
+  });
+  const dedupedProfiles = Array.from(profileMap.values());
 
   res.json({
     status: 'success',
     code: 200,
     message: 'Backend synchronized successfully',
+    profiles: dedupedProfiles,
     wallets,
-    transactions: transactions.slice(0, 50),
-    users_count: Object.keys(users).length,
+    transactions: transactions.slice(0, 100),
+    deposits: depositRequests,
+    withdrawals: withdrawalRequests,
+    api_keys: apiKeys,
+    settings: appSettings,
+    users_count: dedupedProfiles.length,
     wallets_count: Object.keys(wallets).length,
     api_keys_count: apiKeys.length,
     transactions_count: transactions.length,
@@ -3085,13 +3121,25 @@ app.post('/api/v1/sync-state', (req: Request, res: Response) => {
 });
 
 app.get('/api/v1/sync-state', (req: Request, res: Response) => {
+  const profileMap = new Map<string, any>();
+  Object.values(users).forEach((u: any) => {
+    if (u && u.id) {
+      profileMap.set(u.id, u);
+    }
+  });
+  const dedupedProfiles = Array.from(profileMap.values());
+
   res.json({
     status: 'success',
     code: 200,
+    profiles: dedupedProfiles,
     wallets,
-    transactions: transactions.slice(0, 50),
+    transactions: transactions.slice(0, 100),
+    deposits: depositRequests,
+    withdrawals: withdrawalRequests,
     api_keys: apiKeys,
     settings: appSettings,
+    users_count: dedupedProfiles.length,
     timestamp: new Date().toISOString(),
   });
 });
