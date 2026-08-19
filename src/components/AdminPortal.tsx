@@ -51,6 +51,8 @@ export const AdminPortal: React.FC = () => {
     transactions,
     addBalanceByAdmin,
     cutBalanceByAdmin,
+    resetAllUserBalances,
+    wipeAllUserData,
     banUser,
     unbanUser,
     settings,
@@ -128,6 +130,43 @@ export const AdminPortal: React.FC = () => {
     message: string;
     help?: string;
   } | null>(null);
+
+  // System Maintenance & Reset Actions State
+  const [isResetBalancesModalOpen, setIsResetBalancesModalOpen] = useState<boolean>(false);
+  const [isResetBalancesLoading, setIsResetBalancesLoading] = useState<boolean>(false);
+  const [isWipeUsersModalOpen, setIsWipeUsersModalOpen] = useState<boolean>(false);
+  const [isWipeUsersLoading, setIsWipeUsersLoading] = useState<boolean>(false);
+  const [resetConfirmText, setResetConfirmText] = useState<string>('');
+  const [wipeConfirmText, setWipeConfirmText] = useState<string>('');
+  const [actionAlertMsg, setActionAlertMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleConfirmResetAllBalances = async () => {
+    setIsResetBalancesLoading(true);
+    try {
+      const res = await resetAllUserBalances();
+      setActionAlertMsg({ type: 'success', text: res.message || 'All user balances have been reset to ₹0.00' });
+      setIsResetBalancesModalOpen(false);
+      setResetConfirmText('');
+    } catch (e: any) {
+      setActionAlertMsg({ type: 'error', text: e?.message || 'Failed to reset user balances.' });
+    } finally {
+      setIsResetBalancesLoading(false);
+    }
+  };
+
+  const handleConfirmWipeAllUsers = async () => {
+    setIsWipeUsersLoading(true);
+    try {
+      const res = await wipeAllUserData();
+      setActionAlertMsg({ type: 'success', text: res.message || 'All user data wiped successfully. Users can now re-register.' });
+      setIsWipeUsersModalOpen(false);
+      setWipeConfirmText('');
+    } catch (e: any) {
+      setActionAlertMsg({ type: 'error', text: e?.message || 'Failed to wipe user data.' });
+    } finally {
+      setIsWipeUsersLoading(false);
+    }
+  };
 
   const handleTestTelegramDispatch = async () => {
     if (!testTelegramChatId.trim()) {
@@ -580,11 +619,92 @@ export const AdminPortal: React.FC = () => {
 
       {/* TAB 2: USER MANAGEMENT */}
       {activeAdminTab === 'USERS' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-6 sm:p-8 shadow-xl space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-6 sm:p-8 shadow-xl space-y-6">
+          {actionAlertMsg && (
+            <div
+              className={`p-4 rounded-2xl border flex items-center justify-between text-xs font-bold ${
+                actionAlertMsg.type === 'success'
+                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                  : 'bg-rose-500/15 border-rose-500/40 text-rose-300'
+              }`}
+            >
+              <span>{actionAlertMsg.text}</span>
+              <button
+                onClick={() => setActionAlertMsg(null)}
+                className="text-slate-400 hover:text-white px-2 py-0.5"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Master Admin Danger Controls Bar */}
+          <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-amber-500/30 rounded-2xl p-5 shadow-lg space-y-4">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-amber-400" />
+              <div>
+                <h4 className="text-sm font-extrabold text-white">System Maintenance & Global Reset Controls</h4>
+                <p className="text-[11px] text-slate-400">
+                  Execute master actions across all registered user accounts with one click
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Button 1: Reset All Balances */}
+              <div className="bg-amber-950/20 border border-amber-500/30 rounded-xl p-4 flex flex-col justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-amber-400" />
+                    <span className="font-extrabold text-xs text-amber-300">Clear All User Balances</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Instantly sets every user's available and locked balance to <strong className="text-amber-300">₹0.00</strong>. Master Admin balance remains protected.
+                  </p>
+                </div>
+                <button
+                  id="admin-reset-all-balances-btn"
+                  onClick={() => {
+                    setResetConfirmText('');
+                    setIsResetBalancesModalOpen(true);
+                  }}
+                  className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  <span>Clear All User Balance (0 RS)</span>
+                </button>
+              </div>
+
+              {/* Button 2: Wipe All User Data */}
+              <div className="bg-rose-950/20 border border-rose-500/30 rounded-xl p-4 flex flex-col justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Trash2 className="h-4 w-4 text-rose-400" />
+                    <span className="font-extrabold text-xs text-rose-300">Wipe All Registered Users</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Permanently deletes all registered user profiles and records. <strong className="text-rose-300">Users can then re-register</strong> with the same mobile, email, or chat ID.
+                  </p>
+                </div>
+                <button
+                  id="admin-wipe-all-users-btn"
+                  onClick={() => {
+                    setWipeConfirmText('');
+                    setIsWipeUsersModalOpen(true);
+                  }}
+                  className="w-full py-2.5 px-4 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Factory Wipe All User Data</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
             <div>
               <h3 className="text-lg font-black text-white">Registered Users Directory</h3>
-              <p className="text-xs text-slate-400">Add balance, cut balance, or suspend user accounts</p>
+              <p className="text-xs text-slate-400">Total Registered: {allProfiles.filter(p => p.role !== 'ADMIN').length} Users • Add balance, cut balance, or suspend user accounts</p>
             </div>
 
             <div className="relative sm:w-80">
@@ -1906,6 +2026,164 @@ export const AdminPortal: React.FC = () => {
               </button>
               <button onClick={handleWithdrawalReject} className="px-5 py-2 bg-rose-600 text-white font-bold rounded-xl">
                 Confirm Reject & Unlock Funds
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: RESET ALL BALANCES CONFIRMATION */}
+      {isResetBalancesModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-amber-500/40 rounded-3xl p-6 max-w-md w-full space-y-5 shadow-2xl font-sans">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-amber-500/20 text-amber-400 rounded-2xl border border-amber-500/30">
+                <RotateCcw className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-white">Reset All User Balances to ₹0?</h3>
+                <p className="text-xs text-amber-400 font-semibold">Mass Balance Cleansing Action</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-slate-300 space-y-2">
+              <p>
+                ⚠️ This will immediately set all non-admin user wallets (<strong className="text-white">{allProfiles.filter(p => p.role !== 'ADMIN').length} accounts</strong>) to:
+              </p>
+              <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-center font-mono font-black text-amber-300 text-sm">
+                Available: ₹0.00 • Locked: ₹0.00
+              </div>
+              <p className="text-[11px] text-slate-400">
+                • Master Admin balance and system logs will be preserved.<br />
+                • Real-time notifications and audit entries will be recorded.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                Type <span className="font-mono text-amber-400 font-black">RESET</span> to confirm:
+              </label>
+              <input
+                type="text"
+                placeholder="Type RESET"
+                value={resetConfirmText}
+                onChange={(e) => setResetConfirmText(e.target.value.toUpperCase())}
+                className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3.5 py-2.5 text-white font-mono font-bold text-sm tracking-wider outline-none"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-1">
+              <button
+                type="button"
+                disabled={isResetBalancesLoading}
+                onClick={() => {
+                  setIsResetBalancesModalOpen(false);
+                  setResetConfirmText('');
+                }}
+                className="px-4 py-2.5 text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isResetBalancesLoading || resetConfirmText !== 'RESET'}
+                onClick={handleConfirmResetAllBalances}
+                className={`px-5 py-2.5 text-xs font-black rounded-xl transition shadow-lg flex items-center gap-2 ${
+                  resetConfirmText === 'RESET' && !isResetBalancesLoading
+                    ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 hover:from-amber-400 hover:to-amber-500 cursor-pointer'
+                    : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
+                }`}
+              >
+                {isResetBalancesLoading ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span>Resetting Balances...</span>
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="h-4 w-4" />
+                    <span>Confirm Reset (0 RS)</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: FACTORY WIPE ALL USERS CONFIRMATION */}
+      {isWipeUsersModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-rose-500/40 rounded-3xl p-6 max-w-md w-full space-y-5 shadow-2xl font-sans">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-rose-500/20 text-rose-400 rounded-2xl border border-rose-500/30">
+                <Trash2 className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-white">Factory Wipe All User Data?</h3>
+                <p className="text-xs text-rose-400 font-semibold">Delete All Registered User Accounts</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-slate-300 space-y-2">
+              <p>
+                🚨 <strong className="text-rose-400">All registered user profiles, credentials, and data will be permanently wiped</strong> ({allProfiles.filter(p => p.role !== 'ADMIN').length} registered users).
+              </p>
+              <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-slate-300 text-[11px] leading-relaxed">
+                ✅ <strong>Re-registration allowed:</strong> Users can immediately register fresh accounts using the same mobile numbers, Gmail addresses, and Telegram Chat IDs.
+              </div>
+              <p className="text-[10px] text-slate-400">
+                • Master Admin (<span className="text-white font-mono">admin-001</span>) remains safe and logged in.<br />
+                • System will clear user registry cache and sync with server.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                Type <span className="font-mono text-rose-400 font-black">DELETE</span> to confirm:
+              </label>
+              <input
+                type="text"
+                placeholder="Type DELETE"
+                value={wipeConfirmText}
+                onChange={(e) => setWipeConfirmText(e.target.value.toUpperCase())}
+                className="w-full bg-slate-950 border border-slate-800 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-white font-mono font-bold text-sm tracking-wider outline-none"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-1">
+              <button
+                type="button"
+                disabled={isWipeUsersLoading}
+                onClick={() => {
+                  setIsWipeUsersModalOpen(false);
+                  setWipeConfirmText('');
+                }}
+                className="px-4 py-2.5 text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isWipeUsersLoading || wipeConfirmText !== 'DELETE'}
+                onClick={handleConfirmWipeAllUsers}
+                className={`px-5 py-2.5 text-xs font-black rounded-xl transition shadow-lg flex items-center gap-2 ${
+                  wipeConfirmText === 'DELETE' && !isWipeUsersLoading
+                    ? 'bg-gradient-to-r from-rose-600 to-red-600 text-white hover:from-rose-500 hover:to-red-500 cursor-pointer'
+                    : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
+                }`}
+              >
+                {isWipeUsersLoading ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span>Wiping All Users...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4" />
+                    <span>Confirm Wipe All Users</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
