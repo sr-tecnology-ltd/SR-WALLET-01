@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useWallet } from '../context/WalletContext';
 import {
   ShieldCheck,
@@ -110,12 +110,22 @@ export const AdminPortal: React.FC = () => {
   const [settingsForm, setSettingsForm] = useState<AppSettings>(settings);
   const [isSettingsDirty, setIsSettingsDirty] = useState<boolean>(false);
   const [isSavingSettings, setIsSavingSettings] = useState<boolean>(false);
+  const hasInitializedSettings = useRef(false);
 
   useEffect(() => {
-    if (!isSettingsDirty) {
+    if (!hasInitializedSettings.current) {
       setSettingsForm(settings);
+      hasInitializedSettings.current = true;
     }
-  }, [settings, isSettingsDirty]);
+  }, [settings]);
+
+  const handleSettingChange = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
+    setIsSettingsDirty(true);
+    setSettingsForm((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
 
   // Email Test & Logs State
   const [testEmailRecipient, setTestEmailRecipient] = useState<string>('sk190rihan@gmail.com');
@@ -418,11 +428,7 @@ export const AdminPortal: React.FC = () => {
     const reader = new FileReader();
     reader.onload = (event) => {
       if (event.target?.result) {
-        setIsSettingsDirty(true);
-        setSettingsForm({
-          ...settingsForm,
-          admin_qr_url: event.target.result as string,
-        });
+        handleSettingChange('admin_qr_url', event.target.result as string);
         showAlert('✅ QR code image loaded from device! Click Save Settings to apply.');
       }
     };
@@ -1126,7 +1132,7 @@ export const AdminPortal: React.FC = () => {
                 <input
                   type="checkbox"
                   checked={settingsForm.deposit_enabled}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, deposit_enabled: e.target.checked })}
+                  onChange={(e) => handleSettingChange('deposit_enabled', e.target.checked)}
                   className="w-5 h-5 accent-emerald-500 cursor-pointer"
                 />
               </div>
@@ -1139,7 +1145,7 @@ export const AdminPortal: React.FC = () => {
                 <input
                   type="checkbox"
                   checked={settingsForm.withdraw_enabled}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, withdraw_enabled: e.target.checked })}
+                  onChange={(e) => handleSettingChange('withdraw_enabled', e.target.checked)}
                   className="w-5 h-5 accent-indigo-500 cursor-pointer"
                 />
               </div>
@@ -1152,7 +1158,7 @@ export const AdminPortal: React.FC = () => {
                 <input
                   type="number"
                   value={settingsForm.minimum_deposit}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, minimum_deposit: Number(e.target.value) })}
+                  onChange={(e) => handleSettingChange('minimum_deposit', Number(e.target.value))}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
                 />
               </div>
@@ -1162,7 +1168,7 @@ export const AdminPortal: React.FC = () => {
                 <input
                   type="number"
                   value={settingsForm.minimum_withdraw}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, minimum_withdraw: Number(e.target.value) })}
+                  onChange={(e) => handleSettingChange('minimum_withdraw', Number(e.target.value))}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
                 />
               </div>
@@ -1172,7 +1178,7 @@ export const AdminPortal: React.FC = () => {
                 <input
                   type="number"
                   value={settingsForm.deposit_charge_percent}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, deposit_charge_percent: Number(e.target.value) })}
+                  onChange={(e) => handleSettingChange('deposit_charge_percent', Number(e.target.value))}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
                 />
               </div>
@@ -1182,7 +1188,7 @@ export const AdminPortal: React.FC = () => {
                 <input
                   type="number"
                   value={settingsForm.withdraw_charge_percent}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, withdraw_charge_percent: Number(e.target.value) })}
+                  onChange={(e) => handleSettingChange('withdraw_charge_percent', Number(e.target.value))}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
                 />
               </div>
@@ -1216,7 +1222,7 @@ export const AdminPortal: React.FC = () => {
                 <input
                   type="checkbox"
                   checked={settingsForm.signup_bonus_enabled}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, signup_bonus_enabled: e.target.checked })}
+                  onChange={(e) => handleSettingChange('signup_bonus_enabled', e.target.checked)}
                   className="w-5 h-5 accent-purple-500 cursor-pointer"
                 />
               </div>
@@ -1232,7 +1238,7 @@ export const AdminPortal: React.FC = () => {
                       placeholder="e.g. 50 or 100"
                       value={settingsForm.signup_bonus_amount}
                       onChange={(e) =>
-                        setSettingsForm({ ...settingsForm, signup_bonus_amount: Math.max(0, Number(e.target.value)) })
+                        handleSettingChange('signup_bonus_amount', Math.max(0, Number(e.target.value)))
                       }
                       className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-purple-300 font-mono font-bold focus:border-purple-500 focus:outline-none"
                     />
@@ -1260,7 +1266,7 @@ export const AdminPortal: React.FC = () => {
                 <input
                   type="checkbox"
                   checked={settingsForm.notice_banner_enabled}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, notice_banner_enabled: e.target.checked })}
+                  onChange={(e) => handleSettingChange('notice_banner_enabled', e.target.checked)}
                   className="w-5 h-5 accent-amber-500 cursor-pointer"
                 />
               </div>
@@ -1270,13 +1276,13 @@ export const AdminPortal: React.FC = () => {
                   type="text"
                   placeholder="Notice Title"
                   value={settingsForm.notice_banner_title}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, notice_banner_title: e.target.value })}
+                  onChange={(e) => handleSettingChange('notice_banner_title', e.target.value)}
                   className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
                 />
                 <textarea
                   placeholder="Notice Message Body"
                   value={settingsForm.notice_banner_message}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, notice_banner_message: e.target.value })}
+                  onChange={(e) => handleSettingChange('notice_banner_message', e.target.value)}
                   className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white text-xs h-20"
                 />
               </div>
@@ -1320,7 +1326,7 @@ export const AdminPortal: React.FC = () => {
                       type="text"
                       placeholder="https://your-domain.com/deposit-qr.png or image URL"
                       value={settingsForm.admin_qr_url || ''}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, admin_qr_url: e.target.value })}
+                      onChange={(e) => handleSettingChange('admin_qr_url', e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-emerald-300 font-mono text-xs focus:border-emerald-500 focus:outline-none"
                     />
                     <p className="text-[10px] text-slate-400 font-mono">
@@ -1343,7 +1349,7 @@ export const AdminPortal: React.FC = () => {
                       type="text"
                       placeholder="e.g. HDFC Bank Ltd"
                       value={settingsForm.admin_bank_name || ''}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, admin_bank_name: e.target.value })}
+                      onChange={(e) => handleSettingChange('admin_bank_name', e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
                     />
                   </div>
@@ -1353,7 +1359,7 @@ export const AdminPortal: React.FC = () => {
                       type="text"
                       placeholder="e.g. SR Gateway Payments"
                       value={settingsForm.admin_bank_account_name || ''}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, admin_bank_account_name: e.target.value })}
+                      onChange={(e) => handleSettingChange('admin_bank_account_name', e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
                     />
                   </div>
@@ -1363,7 +1369,7 @@ export const AdminPortal: React.FC = () => {
                       type="text"
                       placeholder="e.g. 50200088192031"
                       value={settingsForm.admin_bank_account_no || ''}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, admin_bank_account_no: e.target.value })}
+                      onChange={(e) => handleSettingChange('admin_bank_account_no', e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-300 font-mono font-bold"
                     />
                   </div>
@@ -1373,7 +1379,7 @@ export const AdminPortal: React.FC = () => {
                       type="text"
                       placeholder="e.g. HDFC0001092"
                       value={settingsForm.admin_bank_ifsc || ''}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, admin_bank_ifsc: e.target.value })}
+                      onChange={(e) => handleSettingChange('admin_bank_ifsc', e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-amber-300 font-mono font-bold"
                     />
                   </div>
@@ -1387,7 +1393,7 @@ export const AdminPortal: React.FC = () => {
                     type="text"
                     placeholder="Telegram Channel Name"
                     value={settingsForm.telegram_channel_name}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, telegram_channel_name: e.target.value })}
+                    onChange={(e) => handleSettingChange('telegram_channel_name', e.target.value)}
                     className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
                   />
                 </div>
@@ -1397,7 +1403,7 @@ export const AdminPortal: React.FC = () => {
                     type="text"
                     placeholder="Telegram Channel URL"
                     value={settingsForm.telegram_channel_url}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, telegram_channel_url: e.target.value })}
+                    onChange={(e) => handleSettingChange('telegram_channel_url', e.target.value)}
                     className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
                   />
                 </div>
@@ -1407,7 +1413,7 @@ export const AdminPortal: React.FC = () => {
                     type="text"
                     placeholder="Admin UPI ID for Deposits"
                     value={settingsForm.admin_upi_id}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, admin_upi_id: e.target.value })}
+                    onChange={(e) => handleSettingChange('admin_upi_id', e.target.value)}
                     className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-emerald-300 font-mono font-bold"
                   />
                 </div>
@@ -1417,7 +1423,7 @@ export const AdminPortal: React.FC = () => {
                     type="text"
                     placeholder="Admin Support URL"
                     value={settingsForm.support_url}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, support_url: e.target.value })}
+                    onChange={(e) => handleSettingChange('support_url', e.target.value)}
                     className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
                   />
                 </div>
@@ -1456,7 +1462,7 @@ export const AdminPortal: React.FC = () => {
                       placeholder="@SRGatewayBot"
                       value={settingsForm.otp_telegram_bot_username || ''}
                       onChange={(e) =>
-                        setSettingsForm({ ...settingsForm, otp_telegram_bot_username: e.target.value })
+                        handleSettingChange('otp_telegram_bot_username', e.target.value)
                       }
                       className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-cyan-300 font-mono font-bold focus:border-cyan-500 focus:outline-none"
                     />
@@ -1476,7 +1482,7 @@ export const AdminPortal: React.FC = () => {
                       placeholder="Paste HTTP API token from @BotFather"
                       value={settingsForm.otp_telegram_bot_token || ''}
                       onChange={(e) =>
-                        setSettingsForm({ ...settingsForm, otp_telegram_bot_token: e.target.value })
+                        handleSettingChange('otp_telegram_bot_token', e.target.value)
                       }
                       className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-emerald-400 font-mono font-bold focus:border-cyan-500 focus:outline-none"
                     />
@@ -1591,11 +1597,8 @@ export const AdminPortal: React.FC = () => {
                     onChange={(e) => {
                       const cleanBot = e.target.value;
                       const botHandle = cleanBot.startsWith('@') ? cleanBot : `@${cleanBot}`;
-                      setSettingsForm({
-                        ...settingsForm,
-                        support_telegram_bot_username: cleanBot,
-                        support_url: `https://t.me/${botHandle.replace('@', '')}`,
-                      });
+                      handleSettingChange('support_telegram_bot_username', cleanBot);
+                      handleSettingChange('support_url', `https://t.me/${botHandle.replace('@', '')}`);
                     }}
                     className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-indigo-300 font-mono font-bold focus:border-indigo-500 focus:outline-none"
                   />
@@ -1612,7 +1615,7 @@ export const AdminPortal: React.FC = () => {
                     type="text"
                     placeholder="https://t.me/SRGateway_Support_Bot"
                     value={settingsForm.support_url || ''}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, support_url: e.target.value })}
+                    onChange={(e) => handleSettingChange('support_url', e.target.value)}
                     className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-300 font-mono focus:border-indigo-500 focus:outline-none"
                   />
                   <p className="text-[10px] text-slate-500 font-mono mt-1">
@@ -1629,7 +1632,7 @@ export const AdminPortal: React.FC = () => {
                     type="text"
                     placeholder="https://srgateway.onrender.com"
                     value={settingsForm.app_url || 'https://srgateway.onrender.com'}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, app_url: e.target.value })}
+                    onChange={(e) => handleSettingChange('app_url', e.target.value)}
                     className="w-full bg-slate-900 border border-emerald-500/40 rounded-xl px-3 py-2 text-emerald-300 font-mono font-bold focus:border-emerald-500 focus:outline-none"
                   />
                   <p className="text-[10px] text-slate-500 font-mono mt-1">
@@ -1667,7 +1670,7 @@ export const AdminPortal: React.FC = () => {
                 <input
                   type="checkbox"
                   checked={settingsForm.email_alerts_enabled}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, email_alerts_enabled: e.target.checked })}
+                  onChange={(e) => handleSettingChange('email_alerts_enabled', e.target.checked)}
                   className="w-5 h-5 accent-emerald-500 cursor-pointer"
                 />
               </div>
@@ -1682,7 +1685,7 @@ export const AdminPortal: React.FC = () => {
                   <input
                     type="checkbox"
                     checked={settingsForm.email_login_alert_enabled}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, email_login_alert_enabled: e.target.checked })}
+                    onChange={(e) => handleSettingChange('email_login_alert_enabled', e.target.checked)}
                     className="w-4 h-4 accent-indigo-500 cursor-pointer"
                   />
                 </div>
@@ -1695,7 +1698,7 @@ export const AdminPortal: React.FC = () => {
                   <input
                     type="checkbox"
                     checked={settingsForm.email_deposit_alert_enabled}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, email_deposit_alert_enabled: e.target.checked })}
+                    onChange={(e) => handleSettingChange('email_deposit_alert_enabled', e.target.checked)}
                     className="w-4 h-4 accent-emerald-500 cursor-pointer"
                   />
                 </div>
@@ -1708,7 +1711,7 @@ export const AdminPortal: React.FC = () => {
                   <input
                     type="checkbox"
                     checked={settingsForm.email_withdraw_alert_enabled}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, email_withdraw_alert_enabled: e.target.checked })}
+                    onChange={(e) => handleSettingChange('email_withdraw_alert_enabled', e.target.checked)}
                     className="w-4 h-4 accent-purple-500 cursor-pointer"
                   />
                 </div>
@@ -1727,7 +1730,7 @@ export const AdminPortal: React.FC = () => {
                       type="text"
                       placeholder="smtp.gmail.com"
                       value={settingsForm.smtp_host || 'smtp.gmail.com'}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, smtp_host: e.target.value })}
+                      onChange={(e) => handleSettingChange('smtp_host', e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
                     />
                   </div>
@@ -1737,7 +1740,7 @@ export const AdminPortal: React.FC = () => {
                       type="number"
                       placeholder="587"
                       value={settingsForm.smtp_port || 587}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, smtp_port: Number(e.target.value) })}
+                      onChange={(e) => handleSettingChange('smtp_port', Number(e.target.value))}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
                     />
                   </div>
@@ -1747,7 +1750,7 @@ export const AdminPortal: React.FC = () => {
                       type="text"
                       placeholder="support@srgateway.in or gmail"
                       value={settingsForm.smtp_user || ''}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, smtp_user: e.target.value })}
+                      onChange={(e) => handleSettingChange('smtp_user', e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-300 font-bold"
                     />
                   </div>
@@ -1757,7 +1760,7 @@ export const AdminPortal: React.FC = () => {
                       type="password"
                       placeholder="Google App Password (16-char)"
                       value={settingsForm.smtp_pass || ''}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, smtp_pass: e.target.value })}
+                      onChange={(e) => handleSettingChange('smtp_pass', e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-amber-300 font-bold"
                     />
                   </div>
@@ -1770,7 +1773,7 @@ export const AdminPortal: React.FC = () => {
                       type="text"
                       placeholder="SR GATEWAY Security & Alerts"
                       value={settingsForm.smtp_from_name || 'SR GATEWAY Alerts'}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, smtp_from_name: e.target.value })}
+                      onChange={(e) => handleSettingChange('smtp_from_name', e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
                     />
                   </div>
@@ -1780,7 +1783,7 @@ export const AdminPortal: React.FC = () => {
                       type="text"
                       placeholder="sr.notify.hub@gmail.com"
                       value={settingsForm.smtp_from_email || settingsForm.smtp_user || 'sr.notify.hub@gmail.com'}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, smtp_from_email: e.target.value })}
+                      onChange={(e) => handleSettingChange('smtp_from_email', e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
                     />
                   </div>

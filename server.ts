@@ -717,22 +717,18 @@ function findRegisteredUser(identifier: string | number | undefined | null): {
   };
 }
 
-// Helper: Resolve User & Wallet (with fallback to default user for senders if omitted)
-function resolveUserAndWallet(identifier: string | number | undefined | null): { user: any; wallet: any } {
+// Helper: Resolve User & Wallet (with strict check - no fake admin fallback)
+function resolveUserAndWallet(identifier: string | number | undefined | null): { user: any; wallet: any; isLinked: boolean } {
   if (!identifier) {
-    const adminUser = users['SR-ADMIN-01'];
-    const adminWallet = wallets['SR-ADMIN-01'];
-    return { user: adminUser, wallet: adminWallet };
+    return { user: null, wallet: null, isLinked: false };
   }
 
   const lookup = findRegisteredUser(identifier);
   if (lookup.found && lookup.user && lookup.wallet) {
-    return { user: lookup.user, wallet: lookup.wallet };
+    return { user: lookup.user, wallet: lookup.wallet, isLinked: true };
   }
 
-  const adminUser = users['SR-ADMIN-01'];
-  const adminWallet = wallets['SR-ADMIN-01'];
-  return { user: adminUser, wallet: adminWallet };
+  return { user: null, wallet: null, isLinked: false };
 }
 
 // Helper: Execute User-to-User Transfer Core Logic with strict receiver registration check & live balance updates
@@ -1039,7 +1035,9 @@ function resolveApiKeyRecord(rawKeyInput: string | undefined | null): {
 
   if (matched && matched.is_active !== false) {
     matched.last_used_at = new Date().toISOString();
-    const { user, wallet } = resolveUserAndWallet(matched.user_id);
+    const resolved = resolveUserAndWallet(matched.user_id);
+    const user = resolved.user || users['SR-ADMIN-01'];
+    const wallet = resolved.wallet || wallets['SR-ADMIN-01'];
     return {
       isValid: true,
       keyRecord: matched,
@@ -1054,7 +1052,9 @@ function resolveApiKeyRecord(rawKeyInput: string | undefined | null): {
     if (!u || !u.user_custom_id) continue;
     const customClean = u.user_custom_id.toLowerCase().replace(/[^a-z0-9]/g, '');
     if (customClean && (keyLower.startsWith(`sr_live_${customClean}`) || keyLower.startsWith(`sr_sec_${customClean}`))) {
-      const { user, wallet } = resolveUserAndWallet(u.user_custom_id);
+      const resolved = resolveUserAndWallet(u.user_custom_id);
+      const user = resolved.user || u;
+      const wallet = resolved.wallet || wallets[u.id] || wallets[u.user_custom_id] || { id: `w-${u.id}`, user_id: u.id, available_balance: 0, locked_balance: 0 };
       const newKeyRec = {
         id: `KEY-${u.user_custom_id}-${Date.now()}`,
         user_id: u.user_custom_id,
@@ -2045,40 +2045,6 @@ app.post('/api/v1/auth/email-otp/verify', (req: Request, res: Response) => {
     remaining_attempts: 5 - currentAttempts,
     message: `❌ Invalid OTP code. ${5 - currentAttempts} attempt(s) remaining.`,
   });
-});
-
-// Telegram Webhook Handler (For /start, /id, and Bot interactions)
-app.post('/api/v1/telegram-webhook', async (req: Request, res: Response) => {
-  try {
-    const update = req.body;
-    if (update && update.message) {
-      const chatId = update.message.chat?.id;
-      const text = (update.message.text || '').trim();
-      const from = update.message.from || {};
-      const senderName = [from.first_name, from.last_name].filter(Boolean).join(' ') || from.username || 'User';
-
-      if (chatId) {
-        if (text.startsWith('/start') || text.startsWith('/id') || text.startsWith('/help')) {
-          const replyText =
-            `🤖 <b>Welcome to SR GATEWAY BOT!</b>\n\n` +
-            `Hello <b>${senderName}</b>! Your Telegram Chat is connected.\n\n` +
-            `🆔 <b>Your Telegram Chat ID:</b> <code>${chatId}</code>\n` +
-            `👤 <b>Username:</b> @${from.username || 'none'}\n\n` +
-            `📋 <b>How to link your Telegram Alerts:</b>\n` +
-            `1. Copy your numeric Chat ID: <code>${chatId}</code>\n` +
-            `2. Paste it in the SR Gateway app under <b>Telegram Bot OTP & Alerts</b>.\n` +
-            `3. Verify the 6-digit OTP to enable live instant alerts for Deposits, Withdrawals & P2P Transfers!\n\n` +
-            `⚡ <i>Need help? Contact support on our gateway portal.</i>`;
-
-          await sendTelegramNotification(chatId.toString(), replyText);
-        }
-      }
-    }
-    return res.json({ ok: true });
-  } catch (err) {
-    console.error('Telegram webhook error:', err);
-    return res.json({ ok: true });
-  }
 });
 
 app.post('/api/v1/auth/telegram-otp/send', async (req: Request, res: Response) => {
@@ -3476,13 +3442,34 @@ let lastTelegramUpdateId = 0;
 let isPollingActive = false;
 let pollingIntervalTimeout: any = null;
 
+// Track processed updates / messages to prevent duplicate processing from webhook + polling
+const processedTelegramUpdates = new Set<string>();
+function isUpdateAlreadyProcessed(key: string): boolean {
+  if (!key) return false;
+  if (processedTelegramUpdates.has(key)) return true;
+  processedTelegramUpdates.add(key);
+  if (processedTelegramUpdates.size > 2000) {
+    const keysToRemove = Array.from(processedTelegramUpdates).slice(0, 500);
+    keysToRemove.forEach((k) => processedTelegramUpdates.delete(k));
+  }
+  return false;
+}
+
 async function processTelegramMessageUpdate(update: any) {
   try {
+    const updateId = update?.update_id;
     const message = update?.message || update?.edited_message || update?.channel_post;
     if (!message || !message.text) return;
 
     const chatId = message.chat?.id;
     if (!chatId) return;
+
+    // Deduplication check
+    const dedupKey = updateId ? `upd_${updateId}` : `msg_${chatId}_${message.message_id || message.date}_${message.text.slice(0, 20)}`;
+    if (isUpdateAlreadyProcessed(dedupKey)) {
+      console.log(`[TELEGRAM DEDUP] Skipping duplicate update: ${dedupKey}`);
+      return;
+    }
 
     const from = message.from || {};
     const senderName = [from.first_name, from.last_name].filter(Boolean).join(' ') || from.username || 'User';
@@ -3499,16 +3486,15 @@ async function processTelegramMessageUpdate(update: any) {
 
     // Command: /start or /help or /id
     if (text.startsWith('/start') || text.startsWith('/help') || text.startsWith('/id')) {
-      const { user, wallet } = resolveUserAndWallet(senderTgIdentifier);
-      const isLinked = user && user.user_custom_id && user.user_custom_id !== 'SR-10029';
+      const { user, wallet, isLinked } = resolveUserAndWallet(senderTgIdentifier);
 
       const welcomeMsg =
         `🤖 <b>Welcome to SR GATEWAY BOT!</b>\n\n` +
         `Hello <b>${senderName}</b>! Your Telegram Chat is connected to SR Gateway.\n\n` +
         `🆔 <b>Your Telegram Chat ID:</b> <code>${chatId}</code>\n` +
         `👤 <b>Username:</b> @${from.username || 'none'}\n` +
-        `💼 <b>Linked Account:</b> ${isLinked ? `${user.full_name} (<code>${user.user_custom_id}</code>)` : '<i>Not linked yet</i>'}\n` +
-        `💰 <b>Available Balance:</b> ₹${wallet.available_balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n\n` +
+        `💼 <b>Linked Account:</b> ${isLinked && user ? `${user.full_name} (<code>${user.user_custom_id}</code>)` : '<i>Not linked yet</i>'}\n` +
+        `💰 <b>Available Balance:</b> ${isLinked && wallet ? `₹${wallet.available_balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '<i>Link your wallet on portal to view balance</i>'}\n\n` +
         `📋 <b>How to link your Telegram for Live Alerts:</b>\n` +
         `1. Copy your numeric Chat ID: <code>${chatId}</code>\n` +
         `2. Open <b>SR Gateway</b> app > Click <b>Telegram Bot OTP & Alerts</b>.\n` +
@@ -3528,7 +3514,17 @@ async function processTelegramMessageUpdate(update: any) {
 
     // Command: /balance or /bal
     if (text.startsWith('/balance') || text.startsWith('/bal')) {
-      const { user, wallet } = resolveUserAndWallet(senderTgIdentifier);
+      const { user, wallet, isLinked } = resolveUserAndWallet(senderTgIdentifier);
+      if (!isLinked || !user || !wallet) {
+        await replyTelegram(
+          `⚠️ <b>Telegram Account Not Linked</b>\n\n` +
+          `Your Telegram account is not linked to any SR Gateway wallet yet.\n\n` +
+          `🆔 <b>Your Chat ID:</b> <code>${chatId}</code>\n\n` +
+          `👉 <b>How to link:</b> Open SR Gateway Web Portal (${appSettings.app_url || 'https://srgateway.onrender.com'}), navigate to <b>Telegram Bot OTP & Alerts</b>, and enter your Chat ID.`
+        );
+        return;
+      }
+
       const balMsg =
         `💰 <b>SR GATEWAY Wallet Balance</b>\n\n` +
         `👤 <b>Account:</b> ${user.full_name} (<code>${user.user_custom_id}</code>)\n` +
@@ -3543,6 +3539,15 @@ async function processTelegramMessageUpdate(update: any) {
 
     // Command: /pay or /transfer
     if (text.startsWith('/pay') || text.startsWith('/transfer') || text.startsWith('/send')) {
+      const { isLinked } = resolveUserAndWallet(senderTgIdentifier);
+      if (!isLinked) {
+        await replyTelegram(
+          `❌ <b>Transfer Failed</b>\n\n` +
+          `Your Telegram account is not linked to an SR Gateway wallet. Please link your account on the portal first to transfer funds.`
+        );
+        return;
+      }
+
       const parts = text.split(/\s+/);
       if (parts.length < 3) {
         await replyTelegram(
@@ -3579,9 +3584,17 @@ async function processTelegramMessageUpdate(update: any) {
 
     // Command: /history or /txns
     if (text.startsWith('/history') || text.startsWith('/txns')) {
-      const { user } = resolveUserAndWallet(senderTgIdentifier);
+      const { user, isLinked } = resolveUserAndWallet(senderTgIdentifier);
+      if (!isLinked || !user) {
+        await replyTelegram(
+          `📜 <b>No Linked Account</b>\n\n` +
+          `Please link your Telegram on the SR Gateway portal to view transaction history.`
+        );
+        return;
+      }
+
       const userTxns = transactions
-        .filter((t) => t.user_id === user.user_custom_id || t.user_id === 'SR-10029')
+        .filter((t) => t.user_id === user.user_custom_id || t.user_id === user.id)
         .slice(0, 5);
 
       if (userTxns.length === 0) {
