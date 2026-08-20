@@ -43,8 +43,10 @@ export const DeveloperApiSection: React.FC = () => {
   const [copiedWebhookCurl, setCopiedWebhookCurl] = useState(false);
   const [copiedTemplateUrl, setCopiedTemplateUrl] = useState(false);
 
-  // Active View Tab: 'TELEGRAM_SIMULATOR' | 'SANDBOX'
-  const [activeViewTab, setActiveViewTab] = useState<'TELEGRAM_SIMULATOR' | 'SANDBOX'>('TELEGRAM_SIMULATOR');
+  // Active View Tab: 'TELEGRAM_SIMULATOR' | 'SANDBOX' | 'CODE_DOCS'
+  const [activeViewTab, setActiveViewTab] = useState<'TELEGRAM_SIMULATOR' | 'SANDBOX' | 'CODE_DOCS'>('SANDBOX');
+  const [selectedLanguage, setSelectedLanguage] = useState<'php' | 'curl' | 'nodejs' | 'python'>('php');
+  const [copiedCodeSnippet, setCopiedCodeSnippet] = useState(false);
 
   // Filter API keys for the current user to guarantee isolation
   const userApiKeys = apiKeys.filter(
@@ -107,19 +109,21 @@ export const DeveloperApiSection: React.FC = () => {
   ]);
   const [isBotRunning, setIsBotRunning] = useState(false);
 
-  // Dynamically resolve Gateway URL based on the real browser window origin or custom domain
-  const currentOrigin = typeof window !== 'undefined' && window.location.origin
-    ? window.location.origin
-    : 'https://srgateway.in';
+  // Permanent Gateway Production URL (Always fixed to https://srgateway.onrender.com)
+  const permanentAppUrl = settings.app_url || 'https://srgateway.onrender.com';
+  const currentOrigin = permanentAppUrl;
 
-  const requestedApiUrl = `${currentOrigin}/Api/api.php?token=${activeApiKey}&paytm=${defaultRecipientNumber}&amount=100&comment=Payment_Transfer`;
-  const requestedApiTemplate = `${currentOrigin}/Api/api.php?token=${activeApiKey}&paytm={wallet}&amount={amount}&comment={comment}`;
-  const phpTransferUrl = `${currentOrigin}/Api/api.php?token=${activeApiKey}&paytm=${defaultRecipientNumber}&amount=100&comment=Payment_Order_101`;
-  const phpBalanceUrl = `${currentOrigin}/Api/api.php?token=${activeApiKey}&action=balance`;
-  const telegramWebhookUrl = `${currentOrigin}/api/telegram-webhook`;
+  const requestedApiUrl = `${permanentAppUrl}/Api/api.php?token=${activeApiKey}&paytm=${defaultRecipientNumber}&amount=100&comment=Payment_Transfer`;
+  const requestedApiTemplate = `${permanentAppUrl}/Api/api.php?token=${activeApiKey}&paytm={wallet}&amount={amount}&comment={comment}`;
+  const phpTransferUrl = `${permanentAppUrl}/Api/api.php?token=${activeApiKey}&paytm=${defaultRecipientNumber}&amount=100&comment=Payment_Order_101`;
+  const phpBalanceUrl = `${permanentAppUrl}/Api/api.php?token=${activeApiKey}&action=balance`;
+  const phpCheckUserUrl = `${permanentAppUrl}/Api/api.php?token=${activeApiKey}&action=check_user&number=${defaultRecipientNumber}`;
+  const restTransferUrl = `${permanentAppUrl}/api/v1/transfer`;
+  const restBalanceUrl = `${permanentAppUrl}/api/v1/balance?user_id=${currentUser.user_custom_id}`;
+  const telegramWebhookUrl = `${permanentAppUrl}/api/telegram-webhook`;
   const webhookSetCurl = `curl -F "url=${telegramWebhookUrl}" https://api.telegram.org/bot${settings.otp_telegram_bot_token || 'YOUR_BOT_TOKEN'}/setWebhook`;
 
-  const copyUrl = (url: string, type: 'balance' | 'transfer' | 'webhook' | 'curl' | 'template') => {
+  const copyUrl = (url: string, type: 'balance' | 'transfer' | 'webhook' | 'curl' | 'template' | 'check_user' | 'rest') => {
     navigator.clipboard.writeText(url);
     if (type === 'balance') {
       setCopiedBalanceUrl(true);
@@ -282,30 +286,23 @@ export const DeveloperApiSection: React.FC = () => {
             </p>
           </div>
 
-          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-3.5 text-right font-mono shrink-0 flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-            <div>
-              <div className="text-[10px] text-emerald-300 uppercase font-extrabold">Active Live Gateway</div>
-              <div className="text-xs font-bold text-white truncate max-w-[200px]">{currentOrigin}</div>
+          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 shrink-0">
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-3.5 text-right font-mono flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+              <div>
+                <div className="text-[10px] text-emerald-300 uppercase font-extrabold flex items-center justify-end gap-1.5">
+                  <span>Permanent Gateway App URL</span>
+                  <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 rounded text-[9px] font-bold">PROD</span>
+                </div>
+                <div className="text-xs font-bold text-white font-mono">{permanentAppUrl}</div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Main View Navigation Tabs */}
-      <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-900 rounded-2xl border border-slate-800 text-xs font-bold">
-        <button
-          onClick={() => setActiveViewTab('TELEGRAM_SIMULATOR')}
-          className={`py-3 rounded-xl transition flex items-center justify-center gap-2 ${
-            activeViewTab === 'TELEGRAM_SIMULATOR'
-              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-              : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <Bot className="h-4 w-4" />
-          <span>Telegram Bot Live Simulator</span>
-        </button>
-
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-1.5 bg-slate-900 rounded-2xl border border-slate-800 text-xs font-bold">
         <button
           onClick={() => setActiveViewTab('SANDBOX')}
           className={`py-3 rounded-xl transition flex items-center justify-center gap-2 ${
@@ -315,7 +312,31 @@ export const DeveloperApiSection: React.FC = () => {
           }`}
         >
           <Terminal className="h-4 w-4" />
-          <span>Live API Credentials & Interactive Sandbox</span>
+          <span>API Credentials & Tester</span>
+        </button>
+
+        <button
+          onClick={() => setActiveViewTab('CODE_DOCS')}
+          className={`py-3 rounded-xl transition flex items-center justify-center gap-2 ${
+            activeViewTab === 'CODE_DOCS'
+              ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Code className="h-4 w-4" />
+          <span>API Endpoints & Code SDKs</span>
+        </button>
+
+        <button
+          onClick={() => setActiveViewTab('TELEGRAM_SIMULATOR')}
+          className={`py-3 rounded-xl transition flex items-center justify-center gap-2 ${
+            activeViewTab === 'TELEGRAM_SIMULATOR'
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Bot className="h-4 w-4" />
+          <span>Telegram Bot Simulator</span>
         </button>
       </div>
 
@@ -653,18 +674,19 @@ export const DeveloperApiSection: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               <div className="lg:col-span-6 space-y-3 font-sans text-xs">
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">Select Endpoint Format</label>
+                  <label className="block text-slate-300 font-bold mb-1">Select Endpoint Format (Base: {permanentAppUrl})</label>
                   <select
                     value={activeEndpoint}
                     onChange={(e) => setActiveEndpoint(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:outline-none focus:border-indigo-500"
                   >
-                    <option value="GET /Api/api.php (Token + Paytm Query URL)">GET /Api/api.php (Token + Paytm URL - Live Debit & Credit)</option>
-                    <option value="POST /api.php (JSON Transfer)">POST /Api/api.php (JSON Body - Live Debit & Credit)</option>
-                    <option value="GET /Api/api.php (Receiver User Check / Registration Verification)">GET /Api/api.php (Receiver Check & Identify - ?action=check_user)</option>
-                    <option value="GET /api/v1/user/verify (REST Receiver Verify)">GET /api/v1/user/verify (REST Receiver Identity Check)</option>
-                    <option value="GET /api.php (Balance)">GET /Api/api.php (Live Balance Check)</option>
-                    <option value="POST /api.php (JSON Balance)">POST /Api/api.php (JSON Balance Check)</option>
+                    <option value="GET /Api/api.php (Token + Paytm Query URL)">GET {permanentAppUrl}/Api/api.php?token=...&paytm=...&amount=...</option>
+                    <option value="POST /api.php (JSON Transfer)">POST {permanentAppUrl}/Api/api.php (JSON Transfer)</option>
+                    <option value="GET /Api/api.php (Receiver User Check / Registration Verification)">GET {permanentAppUrl}/Api/api.php?token=...&action=check_user</option>
+                    <option value="GET /api.php (Balance)">GET {permanentAppUrl}/Api/api.php?token=...&action=balance</option>
+                    <option value="POST /api.php (JSON Balance)">POST {permanentAppUrl}/Api/api.php (JSON Balance Check)</option>
+                    <option value="POST /transfer">POST {permanentAppUrl}/api/v1/transfer (REST P2P)</option>
+                    <option value="GET /balance">GET {permanentAppUrl}/api/v1/balance (REST Balance)</option>
                   </select>
                 </div>
 
@@ -721,6 +743,275 @@ export const DeveloperApiSection: React.FC = () => {
                   )}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW 3: CODE SDKS & OFFICIAL API ENDPOINTS DOCUMENTATION */}
+      {activeViewTab === 'CODE_DOCS' && (
+        <div className="space-y-6">
+          {/* Base URL Master Card */}
+          <div className="rounded-[2rem] bg-slate-900 border border-emerald-500/30 p-6 shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  <Globe className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white flex items-center gap-2">
+                    <span>SR Gateway Official Production Base URL</span>
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 text-[10px] font-mono font-bold">
+                      LIVE PRODUCTION
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Use this permanent base URL for all external API requests, merchant checkouts, and scripts.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(permanentAppUrl);
+                    setCopiedTemplateUrl(true);
+                    setTimeout(() => setCopiedTemplateUrl(false), 2000);
+                  }}
+                  className="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold font-mono transition flex items-center gap-1.5"
+                >
+                  {copiedTemplateUrl ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                  <span>{copiedTemplateUrl ? 'Copied Base URL!' : 'Copy Base URL'}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl font-mono text-sm text-emerald-400 flex items-center justify-between">
+              <span className="font-bold select-all">{permanentAppUrl}</span>
+              <span className="text-[10px] text-slate-500 uppercase tracking-widest font-sans font-bold">HTTPS SSL SECURED</span>
+            </div>
+          </div>
+
+          {/* Endpoints Table */}
+          <div className="rounded-[2rem] bg-slate-900 border border-slate-800 p-6 shadow-xl space-y-4">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Server className="h-4 w-4 text-indigo-400" />
+              <span>Full API Endpoints Specification</span>
+            </h3>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left font-mono text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-800 text-slate-400 text-[11px] font-sans">
+                    <th className="py-2.5 px-3">Method</th>
+                    <th className="py-2.5 px-3">Endpoint Path</th>
+                    <th className="py-2.5 px-3 font-sans">Parameters / Payload</th>
+                    <th className="py-2.5 px-3 font-sans">Function</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                  <tr className="hover:bg-slate-800/30 transition">
+                    <td className="py-3 px-3"><span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">GET</span></td>
+                    <td className="py-3 px-3 text-white font-bold">/Api/api.php</td>
+                    <td className="py-3 px-3 text-amber-300">?token, ?paytm, ?amount, ?comment</td>
+                    <td className="py-3 px-3 font-sans text-xs text-slate-300">Instant direct wallet-to-wallet transfer</td>
+                  </tr>
+                  <tr className="hover:bg-slate-800/30 transition">
+                    <td className="py-3 px-3"><span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-bold">POST</span></td>
+                    <td className="py-3 px-3 text-white font-bold">/Api/api.php</td>
+                    <td className="py-3 px-3 text-amber-300">{`{ token, paytm, amount, comment }`}</td>
+                    <td className="py-3 px-3 font-sans text-xs text-slate-300">JSON payload instant wallet transfer</td>
+                  </tr>
+                  <tr className="hover:bg-slate-800/30 transition">
+                    <td className="py-3 px-3"><span className="px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-bold">GET</span></td>
+                    <td className="py-3 px-3 text-white font-bold">/Api/api.php</td>
+                    <td className="py-3 px-3 text-sky-300">?token=YOUR_TOKEN&action=balance</td>
+                    <td className="py-3 px-3 font-sans text-xs text-slate-300">Live wallet balance inquiry</td>
+                  </tr>
+                  <tr className="hover:bg-slate-800/30 transition">
+                    <td className="py-3 px-3"><span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold">GET</span></td>
+                    <td className="py-3 px-3 text-white font-bold">/Api/api.php</td>
+                    <td className="py-3 px-3 text-amber-300">?token=YOUR_TOKEN&action=check_user&number=9876543210</td>
+                    <td className="py-3 px-3 font-sans text-xs text-slate-300">Lookup recipient name & wallet validity</td>
+                  </tr>
+                  <tr className="hover:bg-slate-800/30 transition">
+                    <td className="py-3 px-3"><span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold">POST</span></td>
+                    <td className="py-3 px-3 text-white font-bold">/api/telegram-webhook</td>
+                    <td className="py-3 px-3 text-purple-300">Telegram Bot Update Payload</td>
+                    <td className="py-3 px-3 font-sans text-xs text-slate-300">Automated Telegram Bot Webhook endpoint</td>
+                  </tr>
+                  <tr className="hover:bg-slate-800/30 transition">
+                    <td className="py-3 px-3"><span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">POST</span></td>
+                    <td className="py-3 px-3 text-white font-bold">/api/v1/transfer</td>
+                    <td className="py-3 px-3 text-amber-300">{`{ recipient, amount, note }`}</td>
+                    <td className="py-3 px-3 font-sans text-xs text-slate-300">REST API authenticated P2P transfer</td>
+                  </tr>
+                  <tr className="hover:bg-slate-800/30 transition">
+                    <td className="py-3 px-3"><span className="px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-bold">GET</span></td>
+                    <td className="py-3 px-3 text-white font-bold">/api/v1/balance</td>
+                    <td className="py-3 px-3 text-sky-300">?user_id=SR-10029</td>
+                    <td className="py-3 px-3 font-sans text-xs text-slate-300">REST API wallet balance check</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Multi-Language Ready Code Snippets */}
+          <div className="rounded-[2rem] bg-slate-900 border border-slate-800 p-6 shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="p-2 rounded-xl bg-amber-500/20 text-amber-300">
+                  <FileCode2 className="h-5 w-5" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Ready Integration Code Snippets</h3>
+                  <p className="text-xs text-slate-400">Copy and paste into your backend to accept or dispatch automated payments</p>
+                </div>
+              </div>
+
+              {/* Language Selector */}
+              <div className="flex items-center gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs font-mono">
+                {(['php', 'curl', 'nodejs', 'python'] as const).map((lang) => (
+                  <button
+                    key={lang}
+                    onClick={() => setSelectedLanguage(lang)}
+                    className={`px-3 py-1.5 rounded-lg uppercase font-bold transition ${
+                      selectedLanguage === lang
+                        ? 'bg-indigo-600 text-white shadow-md'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {lang === 'nodejs' ? 'Node.js' : lang}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Code Box */}
+            <div className="relative rounded-2xl bg-slate-950 border border-slate-800 p-4 font-mono text-xs text-slate-300 overflow-x-auto">
+              <button
+                onClick={() => {
+                  let codeToCopy = '';
+                  if (selectedLanguage === 'php') {
+                    codeToCopy = `<?php
+// SR GATEWAY - PHP Instant Transfer Integration
+$token = "${activeApiKey}";
+$paytm = "9876543210"; // Recipient Mobile or User ID
+$amount = 100;
+$comment = "Order_Payment_101";
+
+$apiUrl = "${permanentAppUrl}/Api/api.php?token=" . urlencode($token) . "&paytm=" . urlencode($paytm) . "&amount=" . $amount . "&comment=" . urlencode($comment);
+
+$response = file_get_contents($apiUrl);
+$result = json_decode($response, true);
+
+if ($result && isset($result['status']) && $result['status'] === 'success') {
+    echo "Payment Successful! Txn ID: " . $result['txn_id'];
+} else {
+    echo "Payment Failed: " . ($result['message'] ?? 'Unknown Error');
+}
+?>`;
+                  } else if (selectedLanguage === 'curl') {
+                    codeToCopy = `curl -X GET "${permanentAppUrl}/Api/api.php?token=${activeApiKey}&paytm=9876543210&amount=100&comment=API_Payout"`;
+                  } else if (selectedLanguage === 'nodejs') {
+                    codeToCopy = `// Node.js (fetch / axios)
+const apiUrl = "${permanentAppUrl}/Api/api.php";
+
+async function makePayment() {
+  const params = new URLSearchParams({
+    token: "${activeApiKey}",
+    paytm: "9876543210",
+    amount: "100",
+    comment: "Order_101"
+  });
+
+  const response = await fetch(\`\${apiUrl}?\${params.toString()}\`);
+  const data = await response.json();
+  console.log("SR Gateway Response:", data);
+}
+
+makePayment();`;
+                  } else if (selectedLanguage === 'python') {
+                    codeToCopy = `import requests
+
+url = "${permanentAppUrl}/Api/api.php"
+params = {
+    "token": "${activeApiKey}",
+    "paytm": "9876543210",
+    "amount": "100",
+    "comment": "Python_Payout"
+}
+
+response = requests.get(url, params=params)
+data = response.json()
+print("Payment Result:", data)`;
+                  }
+                  navigator.clipboard.writeText(codeToCopy);
+                  setCopiedCodeSnippet(true);
+                  setTimeout(() => setCopiedCodeSnippet(false), 2000);
+                }}
+                className="absolute top-4 right-4 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-sans font-bold flex items-center gap-1.5 border border-slate-700 transition"
+              >
+                {copiedCodeSnippet ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                <span>{copiedCodeSnippet ? 'Copied Code!' : 'Copy Code'}</span>
+              </button>
+
+              <pre className="text-slate-200 leading-relaxed overflow-x-auto pt-2">
+                {selectedLanguage === 'php' && `<?php
+// SR GATEWAY - PHP Instant Transfer Integration
+$token = "${activeApiKey}";
+$paytm = "9876543210"; // Recipient Mobile or User ID
+$amount = 100;
+$comment = "Order_Payment_101";
+
+$apiUrl = "${permanentAppUrl}/Api/api.php?token=" . urlencode($token) . "&paytm=" . urlencode($paytm) . "&amount=" . $amount . "&comment=" . urlencode($comment);
+
+$response = file_get_contents($apiUrl);
+$result = json_decode($response, true);
+
+if ($result && isset($result['status']) && $result['status'] === 'success') {
+    echo "Payment Successful! Txn ID: " . $result['txn_id'];
+} else {
+    echo "Payment Failed: " . ($result['message'] ?? 'Unknown Error');
+}
+?>`}
+
+                {selectedLanguage === 'curl' && `# cURL CLI Instant Request
+curl -X GET "${permanentAppUrl}/Api/api.php?token=${activeApiKey}&paytm=9876543210&amount=100&comment=API_Payout"`}
+
+                {selectedLanguage === 'nodejs' && `// Node.js (fetch / axios)
+const apiUrl = "${permanentAppUrl}/Api/api.php";
+
+async function makePayment() {
+  const params = new URLSearchParams({
+    token: "${activeApiKey}",
+    paytm: "9876543210",
+    amount: "100",
+    comment: "Order_101"
+  });
+
+  const response = await fetch(\`\${apiUrl}?\${params.toString()}\`);
+  const data = await response.json();
+  console.log("SR Gateway Response:", data);
+}
+
+makePayment();`}
+
+                {selectedLanguage === 'python' && `import requests
+
+url = "${permanentAppUrl}/Api/api.php"
+params = {
+    "token": "${activeApiKey}",
+    "paytm": "9876543210",
+    "amount": "100",
+    "comment": "Python_Payout"
+}
+
+response = requests.get(url, params=params)
+data = response.json()
+print("Payment Result:", data)`}
+              </pre>
             </div>
           </div>
         </div>

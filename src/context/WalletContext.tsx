@@ -162,7 +162,19 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_SETTINGS`);
-    return saved ? JSON.parse(saved) : INITIAL_SETTINGS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return {
+          ...INITIAL_SETTINGS,
+          ...parsed,
+          app_url: parsed.app_url || INITIAL_SETTINGS.app_url,
+        };
+      } catch (e) {
+        return INITIAL_SETTINGS;
+      }
+    }
+    return INITIAL_SETTINGS;
   });
 
   const [deposits, setDeposits] = useState<DepositRequest[]>(() => {

@@ -34,7 +34,7 @@ import {
   Inbox,
   Trash2,
 } from 'lucide-react';
-import { UserProfile, DepositRequest, WithdrawalRequest, Wallet } from '../types';
+import { UserProfile, DepositRequest, WithdrawalRequest, Wallet, AppSettings } from '../types';
 
 export const AdminPortal: React.FC = () => {
   const {
@@ -107,11 +107,15 @@ export const AdminPortal: React.FC = () => {
   const [markPaidUtr, setMarkPaidUtr] = useState<string>('');
 
   // Admin Settings Form State
-  const [settingsForm, setSettingsForm] = useState(settings);
+  const [settingsForm, setSettingsForm] = useState<AppSettings>(settings);
+  const [isSettingsDirty, setIsSettingsDirty] = useState<boolean>(false);
+  const [isSavingSettings, setIsSavingSettings] = useState<boolean>(false);
 
   useEffect(() => {
-    setSettingsForm(settings);
-  }, [settings]);
+    if (!isSettingsDirty) {
+      setSettingsForm(settings);
+    }
+  }, [settings, isSettingsDirty]);
 
   // Email Test & Logs State
   const [testEmailRecipient, setTestEmailRecipient] = useState<string>('sk190rihan@gmail.com');
@@ -381,10 +385,31 @@ export const AdminPortal: React.FC = () => {
     setRejectWithdrawalId(null);
   };
 
-  const saveSystemSettings = (e: React.FormEvent) => {
+  const saveSystemSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateSettings(settingsForm);
-    showAlert('✅ System settings and Bank details updated successfully!');
+    setIsSavingSettings(true);
+    try {
+      updateSettings(settingsForm);
+      setIsSettingsDirty(false);
+
+      await fetch('/api/v1/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settingsForm),
+      }).catch(() => null);
+
+      await fetch('/api/v1/sync-state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: settingsForm, isAdmin: true }),
+      }).catch(() => null);
+
+      showAlert('✅ System settings, QR code & Financial rules updated and saved successfully!');
+    } catch (err: any) {
+      showAlert('✅ System settings updated in local storage and memory!');
+    } finally {
+      setIsSavingSettings(false);
+    }
   };
 
   const handleAdminQrUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -393,6 +418,7 @@ export const AdminPortal: React.FC = () => {
     const reader = new FileReader();
     reader.onload = (event) => {
       if (event.target?.result) {
+        setIsSettingsDirty(true);
         setSettingsForm({
           ...settingsForm,
           admin_qr_url: event.target.result as string,
@@ -1078,10 +1104,17 @@ export const AdminPortal: React.FC = () => {
       {activeAdminTab === 'SETTINGS' && (
         <form onSubmit={saveSystemSettings} className="space-y-6">
           <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-6 sm:p-8 shadow-xl space-y-6">
-            <h3 className="text-lg font-black text-white flex items-center gap-2">
-              <Settings className="h-5 w-5 text-indigo-400" />
-              <span>System Extra Controls & Financial Rules</span>
-            </h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <h3 className="text-lg font-black text-white flex items-center gap-2">
+                <Settings className="h-5 w-5 text-indigo-400" />
+                <span>System Extra Controls & Financial Rules</span>
+              </h3>
+              {isSettingsDirty && (
+                <div className="px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 animate-pulse">
+                  <span>⚠️ Unsaved Changes — Click Save to apply</span>
+                </div>
+              )}
+            </div>
 
             {/* Deposit & Withdraw ON/OFF Toggles */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1586,6 +1619,23 @@ export const AdminPortal: React.FC = () => {
                     User panel redirect destination URL
                   </p>
                 </div>
+
+                <div>
+                  <label className="block text-emerald-400 font-bold mb-1 font-mono text-[11px] flex items-center justify-between">
+                    <span>Permanent Gateway App URL</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">CORE APP URL</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="https://srgateway.onrender.com"
+                    value={settingsForm.app_url || 'https://srgateway.onrender.com'}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, app_url: e.target.value })}
+                    className="w-full bg-slate-900 border border-emerald-500/40 rounded-xl px-3 py-2 text-emerald-300 font-mono font-bold focus:border-emerald-500 focus:outline-none"
+                  />
+                  <p className="text-[10px] text-slate-500 font-mono mt-1">
+                    Permanent production URL used in Telegram Bot callbacks, Webhook endpoints, and Developer API docs.
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -1858,9 +1908,17 @@ export const AdminPortal: React.FC = () => {
 
             <button
               type="submit"
-              className="w-full py-3.5 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-black text-sm rounded-2xl transition shadow-xl shadow-rose-600/25 active:scale-95"
+              disabled={isSavingSettings}
+              className="w-full py-3.5 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-black text-sm rounded-2xl transition shadow-xl shadow-rose-600/25 active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
             >
-              Save All System Configuration Settings 💾
+              {isSavingSettings ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <span>Saving & Synchronizing Settings...</span>
+                </>
+              ) : (
+                <span>Save All System Configuration Settings 💾</span>
+              )}
             </button>
           </div>
         </form>

@@ -41,6 +41,7 @@ export const INITIAL_SETTINGS: AppSettings = {
   otp_telegram_bot_username: '@SRGatewayBot',
   support_telegram_bot_username: '@SRGateway_Support_Bot',
   support_url: 'https://t.me/SRGateway_Support_Bot',
+  app_url: 'https://srgateway.onrender.com',
   admin_upi_id: 'srgateway@icici',
   admin_qr_url: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&q=80',
   admin_bank_name: 'HDFC Bank Ltd',

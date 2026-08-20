@@ -196,6 +196,7 @@ export interface AppSettings {
   otp_telegram_bot_username?: string;
   support_telegram_bot_username?: string;
   support_url: string;
+  app_url?: string;
   admin_upi_id: string;
   admin_qr_url: string;
   admin_bank_name?: string;
