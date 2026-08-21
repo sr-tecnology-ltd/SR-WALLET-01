@@ -263,6 +263,8 @@ export const AdminPortal: React.FC = () => {
     setIsSendingTestEmail(true);
     setTestEmailResult(null);
     try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 6000);
       const res = await fetch('/api/v1/admin/test-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -276,7 +278,9 @@ export const AdminPortal: React.FC = () => {
           smtp_from_name: settingsForm.smtp_from_name,
           smtp_from_email: settingsForm.smtp_from_email,
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timer);
       const data = await res.json();
       setTestEmailResult({
         success: data.status === 'success',
@@ -288,7 +292,7 @@ export const AdminPortal: React.FC = () => {
     } catch (err: any) {
       setTestEmailResult({
         success: false,
-        message: err.message || 'Failed to dispatch test email request.',
+        message: err.name === 'AbortError' ? 'SMTP Test timed out (server took >6s). Check host/port/app-password.' : (err.message || 'Failed to dispatch test email request.'),
       });
     } finally {
       setIsSendingTestEmail(false);

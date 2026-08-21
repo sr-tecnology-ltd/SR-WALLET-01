@@ -2243,11 +2243,15 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const now = Date.now();
 
     try {
+      const controller = new AbortController();
+      const timeoutTimer = setTimeout(() => controller.abort(), 5000);
       const response = await fetch('/api/v1/auth/email-otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: cleanEmail, otp: fallbackOtp }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutTimer);
 
       const data = await response.json();
       const finalOtp = data.otp || fallbackOtp;

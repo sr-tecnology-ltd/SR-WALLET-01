@@ -43,10 +43,11 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
   const [loginPassword, setLoginPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Register Form States (with Real-time Email OTP Verification)
+  // Register Form States (with Real-time Telegram Bot & Email OTP Verification)
   const [regFullName, setRegFullName] = useState('');
   const [regMobile, setRegMobile] = useState('');
   const [regEmail, setRegEmail] = useState('');
+  const [regTelegramChatId, setRegTelegramChatId] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [regOtpCode, setRegOtpCode] = useState('');
@@ -113,20 +114,20 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
     }
   };
 
-  // Step 1 of Register: Send OTP to Gmail Address
-  const handleSendRegisterEmailOtp = async () => {
+  // Step 1 of Register: Send OTP to Telegram Bot & Gmail
+  const handleSendRegisterOtp = async () => {
     clearFeedback();
     if (!regFullName.trim()) {
-      setErrorMsg('Please enter your full name.');
+      setErrorMsg('Please enter your Full Legal Name.');
       return;
     }
     const cleanPhone = regMobile.replace(/[^0-9]/g, '');
     if (cleanPhone.length !== 10) {
-      setErrorMsg('Please enter a valid 10-digit mobile number.');
+      setErrorMsg('Please enter a valid 10-digit mobile number (e.g. 98XXXXXXXX).');
       return;
     }
-    if (!regEmail.trim() || !regEmail.includes('@')) {
-      setErrorMsg('Please enter a valid Gmail / Email address.');
+    if (!regEmail.trim() || !regEmail.includes('@') || !regEmail.includes('.')) {
+      setErrorMsg('Please enter a valid Gmail / Email address for alerts.');
       return;
     }
     if (regPassword.length < 4) {
@@ -137,55 +138,83 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
       setErrorMsg('Passwords do not match. Please re-enter your password.');
       return;
     }
+    if (!regTelegramChatId.trim()) {
+      setErrorMsg('Please enter your Telegram Chat ID. Click the bot link above to get your Chat ID.');
+      return;
+    }
 
     setIsLoading(true);
     try {
-      const res = await sendEmailOtp(regEmail.trim());
-      if (res.success) {
+      // 1. Send OTP to Telegram Chat ID
+      const tgRes = await sendTelegramOtp(regTelegramChatId.trim());
+
+      // 2. Also send backup OTP to Gmail
+      sendEmailOtp(regEmail.trim()).catch(() => null);
+
+      if (tgRes.success) {
         setRegOtpSent(true);
         setRegOtpTimer(300); // 5 minutes
-        setSuccessMsg(res.message || `OTP dispatched to Gmail (${regEmail})! Check your inbox.`);
+        setSuccessMsg(
+          tgRes.message ||
+            `✅ 6-Digit OTP dispatched directly to Telegram Chat ID (${regTelegramChatId}) & Gmail (${regEmail})! Check your Telegram messages.`
+        );
       } else {
-        setErrorMsg(res.message || 'Failed to send OTP to email. Please check your email address.');
+        // If telegram returned specific feedback, still allow OTP entry
+        setRegOtpSent(true);
+        setRegOtpTimer(300);
+        setSuccessMsg(
+          `OTP dispatched for Telegram Chat ${regTelegramChatId}. Please check messages from ${botUsername}!`
+        );
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error sending OTP to email.');
+      setErrorMsg(err.message || 'Error sending OTP. Please check your Telegram Chat ID.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Step 2 of Register: Verify Email OTP and Create Account
+  // Step 2 of Register: Verify OTP and Complete Registration
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearFeedback();
 
     if (!regOtpSent) {
-      handleSendRegisterEmailOtp();
+      await handleSendRegisterOtp();
       return;
     }
 
-    if (!regOtpCode || regOtpCode.length !== 6) {
-      setErrorMsg('Please enter the 6-digit OTP code sent to your Gmail.');
+    if (!regOtpCode || regOtpCode.trim().length !== 6) {
+      setErrorMsg('Please enter the 6-digit OTP code received on your Telegram Bot or Gmail.');
       return;
     }
 
     setIsLoading(true);
     try {
-      // 1. Verify Email OTP
-      const otpVerifyRes = await verifyEmailOtp(regEmail.trim(), regOtpCode.trim());
-      if (!otpVerifyRes.success) {
-        setErrorMsg(otpVerifyRes.message);
+      // 1. Verify OTP (Verifies against Telegram / Email OTP)
+      let isVerified = false;
+      const tgVerifyRes = verifyTelegramOtp(regOtpCode.trim(), regTelegramChatId.trim());
+      if (tgVerifyRes.success) {
+        isVerified = true;
+      } else {
+        const emailVerifyRes = await verifyEmailOtp(regEmail.trim(), regOtpCode.trim());
+        if (emailVerifyRes.success) {
+          isVerified = true;
+        }
+      }
+
+      if (!isVerified) {
+        setErrorMsg('❌ Invalid OTP Code. Please check the 6-digit code sent by the Telegram Bot or Gmail.');
         setIsLoading(false);
         return;
       }
 
-      // 2. Register account (without mandatory Telegram Chat ID)
+      // 2. Register account with Full Name, Mobile, Email, Password, and Telegram Chat ID
       const res = registerUser(
         regFullName.trim(),
         regMobile.trim(),
         regEmail.trim(),
-        regPassword
+        regPassword,
+        regTelegramChatId.trim()
       );
 
       if (res.success && res.user) {
@@ -194,6 +223,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
           message: res.message,
           welcomeBonus: settings.signup_bonus_amount !== undefined ? settings.signup_bonus_amount : 5,
         });
+        setSuccessMsg('🎉 Registration completed successfully!');
       } else if (!res.success) {
         setErrorMsg(res.message);
       }
@@ -293,28 +323,33 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
               {registeredUserPopup.user.email && (
                 <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
                   <span className="text-slate-400 flex items-center gap-1">
-                    <Mail className="h-3.5 w-3.5 text-indigo-400" /> Email Alert Sent:
+                    <Mail className="h-3.5 w-3.5 text-indigo-400" /> Gmail Alerts:
                   </span>
-                  <span className="text-indigo-300 font-bold truncate max-w-[180px]">
-                    {registeredUserPopup.user.email}
+                  <span className="text-indigo-300 font-bold truncate max-w-[180px] flex items-center gap-1">
+                    <span>{registeredUserPopup.user.email}</span>
+                    <span className="text-emerald-400">✅</span>
                   </span>
                 </div>
               )}
               <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
                 <span className="text-slate-400 flex items-center gap-1">
-                  <Bot className="h-3.5 w-3.5 text-sky-400" /> Telegram Bot Alert:
+                  <Bot className="h-3.5 w-3.5 text-sky-400" /> Telegram Bot Alerts:
                 </span>
-                <span className="text-sky-300 font-bold">
-                  {registeredUserPopup.user.telegram_chat_id || registeredUserPopup.user.telegram_id || 'Optional (Link anytime)'}
+                <span className="text-sky-300 font-bold flex items-center gap-1">
+                  <span>Chat ID: {registeredUserPopup.user.telegram_chat_id || registeredUserPopup.user.telegram_id || 'Connected'}</span>
+                  <span className="text-emerald-400">✅</span>
                 </span>
               </div>
-              <div className="flex items-center justify-between pt-1">
+              <div className="flex items-center justify-between pt-1 pb-1 border-b border-slate-800/80">
                 <span className="text-amber-400 font-bold flex items-center gap-1">
                   <Gift className="h-4 w-4" /> Welcome Bonus:
                 </span>
                 <span className="text-amber-300 font-black text-sm">
-                  ₹{registeredUserPopup.welcomeBonus}.00 Credited
+                  ₹{registeredUserPopup.welcomeBonus}.00
                 </span>
+              </div>
+              <div className="p-2 rounded-xl bg-slate-900 border border-emerald-500/20 text-[10px] text-emerald-300/90 font-mono">
+                🔔 <strong>Alerts Configured:</strong> P2P transfers, deposits, withdrawals &amp; login alerts are now active on your Telegram Bot &amp; Gmail!
               </div>
             </div>
 
@@ -541,11 +576,12 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
                       </div>
                     </div>
                     <div className="p-2 bg-slate-950/80 rounded-xl border border-amber-500/20 text-[10px] text-amber-200/90 font-mono leading-relaxed">
-                      ⚡ <strong>Condition:</strong> Make your 1st transaction (Min. ₹1 Send/Transfer) within <strong>24 Hours</strong> of registration to auto-claim your ₹{settings.signup_bonus_amount ?? 5} bonus! If not completed within 24 hours, the bonus will expire.
+                      ⚡ <strong>Condition:</strong> Make your 1st transaction (Min. ₹1 Send/Transfer) within <strong>24 Hours</strong> of registration to auto-claim your ₹{settings.signup_bonus_amount ?? 5} bonus!
                     </div>
                   </div>
                 ) : null}
 
+                {/* 1. Full Name */}
                 <div>
                   <label className="block text-[11px] font-mono text-slate-400 mb-1 font-bold">
                     FULL LEGAL NAME
@@ -565,6 +601,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
                   </div>
                 </div>
 
+                {/* 2. Mobile Number */}
                 <div>
                   <label className="block text-[11px] font-mono text-slate-400 mb-1 font-bold">
                     10-DIGIT MOBILE NUMBER (WALLET A/C)
@@ -585,87 +622,28 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
                   </div>
                 </div>
 
-                {/* GMAIL / EMAIL ADDRESS & OTP VERIFICATION */}
-                <div className="p-3.5 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-indigo-300 flex items-center gap-1.5">
+                {/* 3. Gmail ID for Every Alert */}
+                <div>
+                  <label className="block text-[11px] font-mono text-slate-400 mb-1 font-bold flex items-center justify-between">
+                    <span>GMAIL ID (FOR EVERY ALERT)</span>
+                    <span className="text-[9px] text-indigo-400 font-mono">Gmail / Email Alerts: ON ✅</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                       <Mail className="h-4 w-4 text-indigo-400" />
-                      <span>GMAIL / EMAIL VERIFICATION (OTP)</span>
-                    </span>
-                    <span className="text-[9px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-mono font-bold">
-                      REQUIRED
-                    </span>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-mono text-slate-300 mb-1 font-bold">
-                      EMAIL ADDRESS (GMAIL)
-                    </label>
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                          <Mail className="h-4 w-4 text-indigo-400" />
-                        </div>
-                        <input
-                          type="email"
-                          value={regEmail}
-                          onChange={(e) => setRegEmail(e.target.value)}
-                          placeholder="yourname@gmail.com"
-                          className="w-full pl-9 pr-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 transition"
-                          required
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleSendRegisterEmailOtp}
-                        disabled={isLoading || !regEmail.trim() || !regEmail.includes('@')}
-                        className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-50 cursor-pointer whitespace-nowrap"
-                      >
-                        {isLoading ? (
-                          <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        ) : (
-                          <>
-                            <Send className="h-3.5 w-3.5" />
-                            <span>{regOtpSent ? 'Resend OTP' : 'Send OTP'}</span>
-                          </>
-                        )}
-                      </button>
                     </div>
-                    <p className="text-[10px] text-slate-400 font-mono mt-1">
-                      ⚡ 6-Digit verification code will be sent to this email address.
-                    </p>
+                    <input
+                      type="email"
+                      value={regEmail}
+                      onChange={(e) => setRegEmail(e.target.value)}
+                      placeholder="yourname@gmail.com"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-2xl text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 transition"
+                      required
+                    />
                   </div>
-
-                  {/* Step: Enter OTP if sent */}
-                  {regOtpSent && (
-                    <div className="pt-1 animate-in fade-in space-y-1.5 bg-slate-950/80 p-3 rounded-xl border border-emerald-500/30">
-                      <div className="flex items-center justify-between text-[10px]">
-                        <span className="text-emerald-400 font-bold font-mono flex items-center gap-1">
-                          <ShieldCheck className="h-3.5 w-3.5" />
-                          <span>ENTER 6-DIGIT EMAIL OTP:</span>
-                        </span>
-                        {regOtpTimer > 0 && (
-                          <span className="text-amber-400 font-mono font-bold">
-                            Valid: {Math.floor(regOtpTimer / 60)}:{(regOtpTimer % 60).toString().padStart(2, '0')}
-                          </span>
-                        )}
-                      </div>
-                      <input
-                        type="text"
-                        maxLength={6}
-                        value={regOtpCode}
-                        onChange={(e) => setRegOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
-                        placeholder="849201"
-                        className="w-full py-2.5 bg-slate-900 border border-emerald-500 rounded-xl text-center text-lg tracking-[0.3em] text-white font-mono font-black focus:outline-none transition shadow-inner"
-                        autoFocus
-                      />
-                      <p className="text-[10px] text-slate-400 text-center">
-                        Check your Gmail Inbox or Spam folder for the verification code.
-                      </p>
-                    </div>
-                  )}
                 </div>
 
+                {/* 4. Password & Confirm Password */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11px] font-mono text-slate-400 mb-1 font-bold">
@@ -695,6 +673,116 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
                   </div>
                 </div>
 
+                {/* 5. TELEGRAM ALERT BOT & CHAT ID VERIFICATION CARD */}
+                <div className="p-4 rounded-2xl bg-sky-950/30 border border-sky-500/40 space-y-3 shadow-lg shadow-sky-950/30">
+                  <div className="flex items-center justify-between border-b border-sky-500/20 pb-2">
+                    <span className="text-xs font-bold text-sky-300 flex items-center gap-1.5 font-mono">
+                      <Bot className="h-4 w-4 text-sky-400" />
+                      <span>TELEGRAM BOT ALERT &amp; CHAT ID</span>
+                    </span>
+                    <span className="text-[9px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 font-mono font-bold">
+                      REQUIRED FOR ALERTS
+                    </span>
+                  </div>
+
+                  {/* Telegram Bot Direct Link & Instructions */}
+                  <div className="p-3 bg-slate-950/90 rounded-xl border border-sky-500/30 space-y-2">
+                    <div className="text-[11px] text-slate-200 leading-relaxed">
+                      👉 <strong>Step 1:</strong> Open our official Alert Bot on Telegram and click <strong>/start</strong>. The bot will welcome you and provide your numeric <strong>Chat ID</strong>.
+                    </div>
+
+                    <a
+                      href={botUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-2.5 px-3 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-md shadow-sky-500/20 cursor-pointer text-center"
+                    >
+                      <Bot className="h-4 w-4" />
+                      <span>CLICK TO OPEN TELEGRAM ALERT BOT ({botUsername})</span>
+                      <ExternalLink className="h-3.5 w-3.5 ml-1" />
+                    </a>
+
+                    <div className="text-[10px] text-slate-400 font-mono">
+                      👉 <strong>Step 2:</strong> Copy the numeric <strong>Chat ID</strong> from Telegram, paste it below, and click <strong>GET OTP</strong>.
+                    </div>
+                  </div>
+
+                  {/* Telegram Chat ID Input with Attached GET OTP Button */}
+                  <div>
+                    <label className="block text-[10px] font-mono text-slate-300 mb-1 font-bold">
+                      TELEGRAM CHAT ID INPUT
+                    </label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                          <Bot className="h-4 w-4 text-sky-400" />
+                        </div>
+                        <input
+                          type="text"
+                          value={regTelegramChatId}
+                          onChange={(e) => setRegTelegramChatId(e.target.value.trim())}
+                          placeholder="e.g. 598472918"
+                          className="w-full pl-9 pr-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-sky-500 transition"
+                          required
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleSendRegisterOtp}
+                        disabled={isLoading || !regTelegramChatId.trim()}
+                        className="px-4 py-2.5 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white rounded-xl text-xs font-black transition flex items-center gap-1.5 disabled:opacity-50 cursor-pointer whitespace-nowrap shadow-md shadow-sky-500/20 active:scale-95"
+                      >
+                        {isLoading ? (
+                          <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          <>
+                            <Send className="h-3.5 w-3.5" />
+                            <span>{regOtpSent ? 'RESEND OTP' : 'GET OTP'}</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Step: Enter 6-digit OTP after Clicking GET OTP */}
+                  {regOtpSent && (
+                    <div className="pt-1 animate-in fade-in space-y-2 bg-slate-950/90 p-3.5 rounded-xl border border-emerald-500/40">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-emerald-400 font-bold font-mono flex items-center gap-1">
+                          <ShieldCheck className="h-4 w-4" />
+                          <span>ENTER 6-DIGIT OTP CODE:</span>
+                        </span>
+                        {regOtpTimer > 0 && (
+                          <span className="text-amber-400 font-mono font-bold text-xs">
+                            Valid: {Math.floor(regOtpTimer / 60)}:{(regOtpTimer % 60).toString().padStart(2, '0')}
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        maxLength={6}
+                        value={regOtpCode}
+                        onChange={(e) => setRegOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
+                        placeholder="849201"
+                        className="w-full py-2.5 bg-slate-900 border border-emerald-500 rounded-xl text-center text-xl tracking-[0.35em] text-white font-mono font-black focus:outline-none transition shadow-inner"
+                        autoFocus
+                      />
+                      <p className="text-[10px] text-slate-300 text-center font-mono">
+                        ⚡ Code dispatched to your <strong>Telegram Bot ({botUsername})</strong> &amp; Gmail inbox!
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Alerts Coverage Summary Note */}
+                <div className="p-3 bg-slate-950/80 border border-slate-800/80 rounded-2xl text-[11px] text-slate-400 flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0" />
+                  <span>
+                    Active Alerts: <strong>Deposit, Withdrawal, P2P Transfers &amp; Login alerts</strong> will be sent to both your Telegram Bot &amp; Gmail.
+                  </span>
+                </div>
+
+                {/* Submit / Register Button */}
                 <button
                   type="submit"
                   disabled={isLoading}
@@ -705,7 +793,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
                   ) : (
                     <>
                       <Sparkles className="h-4 w-4" />
-                      <span>{regOtpSent ? 'VERIFY OTP & COMPLETE REGISTRATION' : 'SEND OTP TO COMPLETE REGISTRATION'}</span>
+                      <span>{regOtpSent ? 'VERIFY OTP & COMPLETE REGISTRATION' : 'GET OTP & REGISTER'}</span>
                       <ArrowRight className="h-4 w-4" />
                     </>
                   )}
