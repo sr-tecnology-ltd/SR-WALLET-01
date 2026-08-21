@@ -5,8 +5,16 @@ import { createServer as createViteServer } from 'vite';
 import nodemailer from 'nodemailer';
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const GATEWAY_SECURITY_SALT = process.env.GATEWAY_SECURITY_SALT || 'sr_gw_sec_key_v1_98a7bc6d5e';
+
+// Safety against server crashes
+process.on('uncaughtException', (err) => {
+  console.error('[CRITICAL UNCAUGHT EXCEPTION]', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[CRITICAL UNHANDLED REJECTION]', reason);
+});
 
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
