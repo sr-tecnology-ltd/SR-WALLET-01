@@ -28,6 +28,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
   const {
     loginUser,
     registerUser,
+    switchUser,
     sendTelegramOtp,
     verifyTelegramOtp,
     sendEmailOtp,
@@ -355,12 +356,19 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
 
             <button
               onClick={() => {
-                setRegisteredUserPopup(null);
+                if (registeredUserPopup?.user?.id) {
+                  const uid = registeredUserPopup.user.id;
+                  setRegisteredUserPopup(null);
+                  switchUser(uid);
+                } else {
+                  setRegisteredUserPopup(null);
+                }
               }}
               className="w-full py-4 bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-600 hover:from-emerald-400 hover:to-indigo-500 text-slate-950 hover:text-white font-black rounded-2xl text-xs uppercase tracking-wider transition shadow-xl shadow-emerald-500/30 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
             >
               <KeyRound className="h-4 w-4" />
-              <span>Set Security RPIN & Open Wallet</span>
+              <span>Create Security RPIN &amp; Open Wallet</span>
+              <ArrowRight className="h-4 w-4" />
             </button>
           </div>
         </div>

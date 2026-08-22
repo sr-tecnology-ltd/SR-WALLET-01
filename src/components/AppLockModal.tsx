@@ -35,11 +35,18 @@ export const AppLockModal: React.FC<AppLockModalProps> = ({ onUnlock }) => {
     settings,
   } = useWallet();
 
+  const isFirstTimeSetup = !currentUser.rpin;
+
   const [pin, setPin] = useState(['', '', '', '']);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isResetMode, setIsResetMode] = useState(false);
   const [resetStep, setResetStep] = useState<'SEND_OTP' | 'VERIFY_OTP' | 'NEW_PIN'>('SEND_OTP');
+
+  // Create / Set RPIN States (for new registered users)
+  const [createPin, setCreatePin] = useState(['', '', '', '']);
+  const [confirmCreatePin, setConfirmCreatePin] = useState(['', '', '', '']);
+  const [activePinField, setActivePinField] = useState<'CREATE' | 'CONFIRM'>('CREATE');
 
   // Reset states
   const [otpCode, setOtpCode] = useState('');
@@ -56,6 +63,7 @@ export const AppLockModal: React.FC<AppLockModalProps> = ({ onUnlock }) => {
     return () => clearInterval(interval);
   }, [otpTimer]);
 
+  // Standard unlock digit input
   const handleDigitChange = (index: number, val: string) => {
     const clean = val.replace(/\D/g, '').slice(-1);
     const nextPin = [...pin];
@@ -87,19 +95,75 @@ export const AppLockModal: React.FC<AppLockModalProps> = ({ onUnlock }) => {
     const userRpin = currentUser.rpin || '1234';
 
     if (enteredPin === userRpin) {
-      setSuccessMsg('Security RPIN Verified! Unlocking wallet...');
+      setSuccessMsg('✅ Security RPIN Verified! Unlocking wallet...');
       setTimeout(() => {
         onUnlock();
-      }, 500);
+      }, 400);
     } else {
-      setErrorMsg('Incorrect 4-digit RPIN. Please try again or reset via Telegram OTP.');
+      setErrorMsg('❌ Incorrect 4-digit RPIN. Please try again or use Telegram OTP to reset.');
       setPin(['', '', '', '']);
       const firstInput = document.getElementById('lock-digit-0');
       if (firstInput) firstInput.focus();
     }
   };
 
+  // Keypad click for Create Mode or Unlock Mode
   const handleKeypadClick = (digit: string) => {
+    if (isFirstTimeSetup) {
+      // Create mode keypad handling
+      if (digit === 'DEL') {
+        if (activePinField === 'CONFIRM') {
+          const lastIdx = confirmCreatePin.map((d) => d !== '').lastIndexOf(true);
+          if (lastIdx >= 0) {
+            const next = [...confirmCreatePin];
+            next[lastIdx] = '';
+            setConfirmCreatePin(next);
+          } else {
+            setActivePinField('CREATE');
+          }
+        } else {
+          const lastIdx = createPin.map((d) => d !== '').lastIndexOf(true);
+          if (lastIdx >= 0) {
+            const next = [...createPin];
+            next[lastIdx] = '';
+            setCreatePin(next);
+          }
+        }
+      } else {
+        if (activePinField === 'CREATE') {
+          const emptyIdx = createPin.indexOf('');
+          if (emptyIdx !== -1) {
+            const next = [...createPin];
+            next[emptyIdx] = digit;
+            setCreatePin(next);
+            if (emptyIdx === 3) {
+              setActivePinField('CONFIRM');
+              const firstConfirm = document.getElementById('create-confirm-digit-0');
+              if (firstConfirm) firstConfirm.focus();
+            } else {
+              const nextEl = document.getElementById(`create-digit-${emptyIdx + 1}`);
+              if (nextEl) nextEl.focus();
+            }
+          } else {
+            setActivePinField('CONFIRM');
+          }
+        } else {
+          const emptyIdx = confirmCreatePin.indexOf('');
+          if (emptyIdx !== -1) {
+            const next = [...confirmCreatePin];
+            next[emptyIdx] = digit;
+            setConfirmCreatePin(next);
+            if (emptyIdx < 3) {
+              const nextEl = document.getElementById(`create-confirm-digit-${emptyIdx + 1}`);
+              if (nextEl) nextEl.focus();
+            }
+          }
+        }
+      }
+      return;
+    }
+
+    // Normal Unlock Keypad Handling
     if (digit === 'DEL') {
       const lastIndex = pin.map((d) => d !== '').lastIndexOf(true);
       if (lastIndex >= 0) {
@@ -112,6 +176,43 @@ export const AppLockModal: React.FC<AppLockModalProps> = ({ onUnlock }) => {
       if (emptyIndex !== -1) {
         handleDigitChange(emptyIndex, digit);
       }
+    }
+  };
+
+  // Submit Handler for First Time RPIN Creation (New User)
+  const handleSaveInitialRpin = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setErrorMsg(null);
+    const p1 = createPin.join('');
+    const p2 = confirmCreatePin.join('');
+
+    if (p1.length !== 4) {
+      setErrorMsg('Please enter a 4-digit Security RPIN.');
+      setActivePinField('CREATE');
+      return;
+    }
+    if (p2.length !== 4) {
+      setErrorMsg('Please enter and confirm your 4-digit RPIN.');
+      setActivePinField('CONFIRM');
+      return;
+    }
+    if (p1 !== p2) {
+      setErrorMsg('❌ RPIN and Confirm RPIN do not match. Please re-enter.');
+      setConfirmCreatePin(['', '', '', '']);
+      setActivePinField('CONFIRM');
+      const firstConfirm = document.getElementById('create-confirm-digit-0');
+      if (firstConfirm) firstConfirm.focus();
+      return;
+    }
+
+    const res = setUserRpin(p1);
+    if (res.success) {
+      setSuccessMsg('🎉 4-Digit Security RPIN created successfully! Unlocking your wallet...');
+      setTimeout(() => {
+        onUnlock();
+      }, 700);
+    } else {
+      setErrorMsg(res.message);
     }
   };
 
@@ -192,20 +293,22 @@ export const AppLockModal: React.FC<AppLockModalProps> = ({ onUnlock }) => {
         <div className="text-center space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-[11px] font-mono font-bold tracking-wide">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            <span>PERSONAL WALLET SECURITY</span>
+            <span>{isFirstTimeSetup ? 'SECURITY PIN SETUP (STEP 2)' : 'PERSONAL WALLET SECURITY'}</span>
           </div>
 
           <div className="flex items-center justify-center gap-2.5 pt-1">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-emerald-500 p-0.5 shadow-lg shadow-indigo-500/30 flex items-center justify-center text-white">
-              <ShieldCheck className="h-6 w-6" />
+              <KeyRound className="h-6 w-6" />
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-indigo-200 to-emerald-300">
-              SR GATEWAY IN
+              {isFirstTimeSetup ? 'CREATE SECURITY RPIN' : 'SR GATEWAY IN'}
             </h1>
           </div>
 
           <p className="text-xs text-slate-400 font-medium">
-            Enter your 4-Digit Security RPIN to unlock your wallet dashboard
+            {isFirstTimeSetup
+              ? 'Choose a secure 4-Digit RPIN to protect your wallet, transfers & payouts.'
+              : 'Enter your 4-Digit Security RPIN to unlock your wallet dashboard'}
           </p>
         </div>
 
@@ -255,8 +358,169 @@ export const AppLockModal: React.FC<AppLockModalProps> = ({ onUnlock }) => {
           </div>
         )}
 
-        {!isResetMode ? (
-          /* STANDARD RPIN UNLOCK MODE */
+        {/* SCENARIO 1: FIRST-TIME SETUP -> CREATE 4-DIGIT RPIN */}
+        {isFirstTimeSetup ? (
+          <form onSubmit={handleSaveInitialRpin} className="space-y-5">
+            {/* Enter New 4 Digits */}
+            <div className="space-y-1.5 text-center">
+              <div className="flex items-center justify-between text-[11px] font-mono px-2">
+                <span className="text-indigo-300 font-bold uppercase tracking-wider">
+                  1. ENTER 4-DIGIT RPIN
+                </span>
+                {createPin.every((d) => d !== '') && (
+                  <span className="text-emerald-400 font-bold">✓ Entered</span>
+                )}
+              </div>
+
+              <div className="flex justify-center gap-2.5">
+                {[0, 1, 2, 3].map((idx) => (
+                  <input
+                    key={`create-digit-${idx}`}
+                    id={`create-digit-${idx}`}
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={createPin[idx]}
+                    onFocus={() => setActivePinField('CREATE')}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(-1);
+                      const next = [...createPin];
+                      next[idx] = val;
+                      setCreatePin(next);
+                      setErrorMsg(null);
+                      if (val && idx < 3) {
+                        const nextEl = document.getElementById(`create-digit-${idx + 1}`);
+                        if (nextEl) nextEl.focus();
+                      } else if (val && idx === 3) {
+                        setActivePinField('CONFIRM');
+                        const confirmEl = document.getElementById('create-confirm-digit-0');
+                        if (confirmEl) confirmEl.focus();
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Backspace' && !createPin[idx] && idx > 0) {
+                        const prev = document.getElementById(`create-digit-${idx - 1}`);
+                        if (prev) prev.focus();
+                      }
+                    }}
+                    className={`w-13 h-14 bg-slate-950 border-2 rounded-2xl text-center text-2xl font-mono font-black transition-all focus:outline-none ${
+                      createPin[idx]
+                        ? 'border-indigo-500 text-indigo-400 shadow-lg shadow-indigo-500/20'
+                        : 'border-slate-800 text-slate-400 focus:border-indigo-500'
+                    }`}
+                    autoFocus={idx === 0}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Confirm 4 Digits */}
+            <div className="space-y-1.5 text-center">
+              <div className="flex items-center justify-between text-[11px] font-mono px-2">
+                <span className="text-emerald-300 font-bold uppercase tracking-wider">
+                  2. CONFIRM 4-DIGIT RPIN
+                </span>
+                {confirmCreatePin.every((d) => d !== '') && (
+                  <span className="text-emerald-400 font-bold">✓ Confirmed</span>
+                )}
+              </div>
+
+              <div className="flex justify-center gap-2.5">
+                {[0, 1, 2, 3].map((idx) => (
+                  <input
+                    key={`create-confirm-digit-${idx}`}
+                    id={`create-confirm-digit-${idx}`}
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={confirmCreatePin[idx]}
+                    onFocus={() => setActivePinField('CONFIRM')}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(-1);
+                      const next = [...confirmCreatePin];
+                      next[idx] = val;
+                      setConfirmCreatePin(next);
+                      setErrorMsg(null);
+                      if (val && idx < 3) {
+                        const nextEl = document.getElementById(`create-confirm-digit-${idx + 1}`);
+                        if (nextEl) nextEl.focus();
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Backspace' && !confirmCreatePin[idx] && idx > 0) {
+                        const prev = document.getElementById(`create-confirm-digit-${idx - 1}`);
+                        if (prev) prev.focus();
+                      }
+                    }}
+                    className={`w-13 h-14 bg-slate-950 border-2 rounded-2xl text-center text-2xl font-mono font-black transition-all focus:outline-none ${
+                      confirmCreatePin[idx]
+                        ? 'border-emerald-500 text-emerald-400 shadow-lg shadow-emerald-500/20'
+                        : 'border-slate-800 text-slate-400 focus:border-emerald-500'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* On-Screen Numeric Keypad */}
+            <div className="grid grid-cols-3 gap-2 max-w-xs mx-auto pt-1">
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'CLEAR', '0', 'DEL'].map((k) => {
+                if (k === 'CLEAR') {
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => {
+                        setCreatePin(['', '', '', '']);
+                        setConfirmCreatePin(['', '', '', '']);
+                        setActivePinField('CREATE');
+                        const firstInput = document.getElementById('create-digit-0');
+                        if (firstInput) firstInput.focus();
+                      }}
+                      className="h-11 rounded-2xl bg-slate-950/60 hover:bg-slate-800 border border-slate-800 text-slate-400 text-[10px] font-bold transition flex items-center justify-center cursor-pointer"
+                    >
+                      CLEAR
+                    </button>
+                  );
+                }
+                if (k === 'DEL') {
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => handleKeypadClick('DEL')}
+                      className="h-11 rounded-2xl bg-slate-950 hover:bg-rose-500/20 border border-slate-800 hover:border-rose-500/30 text-rose-400 text-xs font-bold transition flex items-center justify-center cursor-pointer"
+                    >
+                      ⌫ DEL
+                    </button>
+                  );
+                }
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => handleKeypadClick(k)}
+                    className="h-11 rounded-2xl bg-slate-950 hover:bg-indigo-600/30 border border-slate-800/80 hover:border-indigo-500/40 text-white font-mono text-base font-black transition active:scale-95 cursor-pointer shadow-sm"
+                  >
+                    {k}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Submit Create Button */}
+            <button
+              type="submit"
+              disabled={createPin.join('').length !== 4 || confirmCreatePin.join('').length !== 4}
+              className="w-full py-3.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-600 hover:from-emerald-400 hover:to-indigo-500 text-slate-950 hover:text-white font-black rounded-2xl text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-500/25 active:scale-98 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <KeyRound className="h-4 w-4" />
+              <span>SAVE 4-DIGIT RPIN &amp; UNLOCK WALLET</span>
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </form>
+        ) : !isResetMode ? (
+          /* SCENARIO 2: RETURNING USER -> STANDARD RPIN UNLOCK MODE */
           <div className="space-y-6">
             {/* 4 Digit PIN Masked Boxes */}
             <div className="space-y-2 text-center">
@@ -333,7 +597,7 @@ export const AppLockModal: React.FC<AppLockModalProps> = ({ onUnlock }) => {
 
             {/* Bottom Actions */}
             <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-800/80">
-              <span className="text-slate-500 font-mono text-[11px]">Demo Default: <strong>1234</strong></span>
+              <span className="text-slate-500 font-mono text-[11px]">Personal Security PIN</span>
               <button
                 type="button"
                 onClick={() => {
@@ -345,12 +609,12 @@ export const AppLockModal: React.FC<AppLockModalProps> = ({ onUnlock }) => {
                 className="text-indigo-400 hover:text-indigo-300 font-bold underline cursor-pointer flex items-center gap-1"
               >
                 <Bot className="h-3.5 w-3.5 text-sky-400" />
-                <span>Reset with Telegram OTP</span>
+                <span>Forgot RPIN? Reset via Telegram</span>
               </button>
             </div>
           </div>
         ) : (
-          /* TELEGRAM OTP RPIN RESET FLOW */
+          /* SCENARIO 3: TELEGRAM OTP RPIN RESET FLOW */
           <div className="space-y-4 pt-1 animate-in fade-in">
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <div className="flex items-center gap-2">
@@ -529,7 +793,7 @@ export const AppLockModal: React.FC<AppLockModalProps> = ({ onUnlock }) => {
                   className="w-full py-3.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-600 hover:from-emerald-400 hover:to-indigo-500 text-slate-950 hover:text-white font-black rounded-2xl text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-500/25 active:scale-98 cursor-pointer flex items-center justify-center gap-2"
                 >
                   <ShieldCheck className="h-4 w-4" />
-                  <span>Save New RPIN & Unlock</span>
+                  <span>Save New RPIN &amp; Unlock</span>
                 </button>
               </form>
             )}
