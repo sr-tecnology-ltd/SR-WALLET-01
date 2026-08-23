@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
+import fs from 'fs';
 import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
 import nodemailer from 'nodemailer';
@@ -160,8 +161,9 @@ let users: Record<string, any> = {
     user_custom_id: 'SR-ADMIN-01',
     full_name: 'SR Gateway System Admin',
     mobile: '+91 90000 00000',
-    email: 'sr.notify.hub@gmail.com',
-    telegram_id: '@srgateway_official',
+    email: '',
+    telegram_id: '',
+    telegram_chat_id: '',
     role: 'ADMIN',
     status: 'ACTIVE',
     referral_code: 'ADMIN001',
@@ -194,7 +196,6 @@ let wallets: Record<string, any> = {
 };
 
 let transactions: any[] = [];
-
 let depositRequests: any[] = [];
 let withdrawalRequests: any[] = [];
 let apiKeys: any[] = [
@@ -212,9 +213,118 @@ let apiKeys: any[] = [
 ];
 
 let merchantOrders: Record<string, any> = {};
-
 let telegramOtps: Record<string, { otp: string; expiresAt: number }> = {};
 let emailOtps: Record<string, { otp: string; expiresAt: number }> = {};
+
+// ==========================================
+// PERSISTENT FILE DATABASE (ACID DISK STORAGE)
+// ==========================================
+const DATA_DIR = path.join(process.cwd(), 'data');
+const DB_FILE = path.join(DATA_DIR, 'srgateway_database.json');
+
+function saveDatabase() {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+
+    const uniqueUserMap = new Map<string, any>();
+    for (const u of Object.values(users)) {
+      if (u && (u.id || u.user_custom_id)) {
+        const key = u.id || u.user_custom_id;
+        uniqueUserMap.set(key, u);
+      }
+    }
+
+    const payload = {
+      version: '1.0.0',
+      last_saved: new Date().toISOString(),
+      appSettings,
+      users: Array.from(uniqueUserMap.values()),
+      wallets,
+      transactions: transactions.slice(0, 500),
+      depositRequests: depositRequests.slice(0, 300),
+      withdrawalRequests: withdrawalRequests.slice(0, 300),
+      apiKeys,
+    };
+
+    fs.writeFileSync(DB_FILE, JSON.stringify(payload, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('[PERSISTENCE ERROR] Failed to save database:', err);
+  }
+}
+
+function loadDatabase() {
+  try {
+    if (!fs.existsSync(DB_FILE)) {
+      console.log('[PERSISTENCE] Initializing new storage database file.');
+      saveDatabase();
+      return;
+    }
+
+    const raw = fs.readFileSync(DB_FILE, 'utf-8');
+    const data = JSON.parse(raw);
+
+    if (data && typeof data === 'object') {
+      if (data.appSettings && typeof data.appSettings === 'object') {
+        appSettings = { ...appSettings, ...data.appSettings };
+      }
+
+      if (Array.isArray(data.users)) {
+        for (const u of data.users) {
+          if (!u) continue;
+          if (u.id) users[u.id] = u;
+          if (u.user_custom_id) users[u.user_custom_id] = u;
+          if (u.mobile) {
+            const clean = normalizePhone(u.mobile);
+            if (clean) users[clean] = u;
+          }
+          if (u.telegram_chat_id) {
+            const cid = u.telegram_chat_id.toString().trim();
+            users[cid] = u;
+            const digits = cid.replace(/[^0-9]/g, '');
+            if (digits) users[digits] = u;
+          }
+          if (u.telegram_id) {
+            const tid = u.telegram_id.toString().trim().replace(/^@/, '').toLowerCase();
+            users[tid] = u;
+            users[`@${tid}`] = u;
+          }
+          if (u.email) {
+            users[u.email.toLowerCase().trim()] = u;
+          }
+        }
+      }
+
+      if (data.wallets && typeof data.wallets === 'object') {
+        wallets = { ...wallets, ...data.wallets };
+      }
+
+      if (Array.isArray(data.transactions) && data.transactions.length > 0) {
+        transactions = data.transactions;
+      }
+
+      if (Array.isArray(data.depositRequests)) {
+        depositRequests = data.depositRequests;
+      }
+
+      if (Array.isArray(data.withdrawalRequests)) {
+        withdrawalRequests = data.withdrawalRequests;
+      }
+
+      if (Array.isArray(data.apiKeys)) {
+        apiKeys = data.apiKeys;
+      }
+
+      console.log(`[PERSISTENCE] Loaded ${data.users?.length || 0} registered users, ${Object.keys(wallets).length} wallets from disk!`);
+    }
+  } catch (err) {
+    console.error('[PERSISTENCE ERROR] Failed to load database:', err);
+  }
+}
+
+// Initial database load on boot
+loadDatabase();
 
 // Helper: Normalize phone numbers to 10-digit standard
 function normalizePhone(num: string | number | undefined | null): string {
@@ -685,9 +795,12 @@ function findRegisteredUser(identifier: string | number | undefined | null): {
   const uniqueUsers: any[] = [];
   const seenIds = new Set<string>();
   for (const u of Object.values(users)) {
-    if (u && u.user_custom_id && !seenIds.has(u.user_custom_id)) {
-      seenIds.add(u.user_custom_id);
-      uniqueUsers.push(u);
+    if (u && (u.user_custom_id || u.id)) {
+      const key = u.user_custom_id || u.id;
+      if (!seenIds.has(key)) {
+        seenIds.add(key);
+        uniqueUsers.push(u);
+      }
     }
   }
 
@@ -697,9 +810,15 @@ function findRegisteredUser(identifier: string | number | undefined | null): {
     if (u.mobile && cleanPhone.length === 10 && normalizePhone(u.mobile) === cleanPhone) return true;
     if (u.mobile && u.mobile.replace(/[^0-9]/g, '').includes(cleanPhone) && cleanPhone.length >= 8) return true;
     if (u.email && u.email.toLowerCase() === lower) return true;
+    // Check telegram_chat_id (exact numeric or string match)
+    if (u.telegram_chat_id) {
+      const chatStr = u.telegram_chat_id.toString().trim();
+      if (chatStr === raw || chatStr === cleanTg || chatStr.toLowerCase() === lower) return true;
+    }
+    // Check telegram_id (with or without @)
     if (u.telegram_id) {
-      const uTg = u.telegram_id.replace(/^@/, '').toLowerCase();
-      if (uTg === cleanTg || u.telegram_id === raw) return true;
+      const uTg = u.telegram_id.toString().trim().replace(/^@/, '').toLowerCase();
+      if (uTg === cleanTg || u.telegram_id === raw || uTg === lower || u.telegram_id.replace(/[^0-9]/g, '') === raw) return true;
     }
     return false;
   });
@@ -736,6 +855,39 @@ function resolveUserAndWallet(identifier: string | number | undefined | null): {
   const lookup = findRegisteredUser(identifier);
   if (lookup.found && lookup.user && lookup.wallet) {
     return { user: lookup.user, wallet: lookup.wallet, isLinked: true };
+  }
+
+  return { user: null, wallet: null, isLinked: false };
+}
+
+// Helper: Resolve Telegram User by any combination of chat_id, username, or sender ID
+function resolveTelegramUser(
+  chatId: string | number | undefined | null,
+  fromUsername?: string | null,
+  fromId?: string | number | null
+): { user: any; wallet: any; isLinked: boolean } {
+  const candidates = [
+    chatId ? chatId.toString().trim() : null,
+    fromId ? fromId.toString().trim() : null,
+    fromUsername ? `@${fromUsername.toString().replace(/^@/, '').trim()}` : null,
+    fromUsername ? fromUsername.toString().replace(/^@/, '').trim() : null,
+  ].filter(Boolean) as string[];
+
+  for (const cand of candidates) {
+    const lookup = findRegisteredUser(cand);
+    if (lookup.found && lookup.user && lookup.wallet) {
+      // Ensure telegram_chat_id is populated in the user object and users dictionary
+      if (chatId && !lookup.user.telegram_chat_id) {
+        lookup.user.telegram_chat_id = chatId.toString().trim();
+      }
+      if (chatId) {
+        users[chatId.toString().trim()] = lookup.user;
+      }
+      if (fromUsername && !lookup.user.telegram_id) {
+        lookup.user.telegram_id = `@${fromUsername.toString().replace(/^@/, '').trim()}`;
+      }
+      return { user: lookup.user, wallet: lookup.wallet, isLinked: true };
+    }
   }
 
   return { user: null, wallet: null, isLinked: false };
@@ -2912,14 +3064,15 @@ app.post('/api/v1/admin/reset-all-balances', handleResetAllBalances);
 
 // Admin Wipe All Registered Users Data
 const handleWipeAllUsers = (req: Request, res: Response) => {
-  // Preserve Master Admin only
-  const adminUser = users['SR-ADMIN-01'] || users['admin-001'] || {
+  // Master Admin with fresh, unlinked credentials
+  const adminUser = {
     id: 'admin-001',
     user_custom_id: 'SR-ADMIN-01',
     full_name: 'SR Gateway System Admin',
     mobile: '+91 90000 00000',
-    email: 'sr.notify.hub@gmail.com',
-    telegram_id: '@srgateway_official',
+    email: '',
+    telegram_id: '',
+    telegram_chat_id: '',
     role: 'ADMIN',
     status: 'ACTIVE',
     referral_code: 'ADMIN001',
@@ -2927,7 +3080,7 @@ const handleWipeAllUsers = (req: Request, res: Response) => {
     updated_at: new Date().toISOString(),
   };
 
-  const adminWallet = wallets['SR-ADMIN-01'] || wallets['admin-001'] || {
+  const adminWallet = {
     id: 'w-admin',
     user_id: 'admin-001',
     available_balance: 2500000.0,
@@ -2968,10 +3121,13 @@ const handleWipeAllUsers = (req: Request, res: Response) => {
     },
   ];
 
+  // Persist clean slate to disk database
+  saveDatabase();
+
   res.json({
     status: 'success',
     code: 200,
-    message: 'Factory wipe complete: All registered users, linked emails, telegram chat IDs, and OTP records deleted. New registrations enabled.',
+    message: 'Factory wipe complete: All old accounts, emails, Telegram chat IDs, and test balances removed. Database reset for clean official launch.',
   });
 };
 
@@ -3359,14 +3515,32 @@ app.post('/api/v1/sync-state', (req: Request, res: Response) => {
 
   if (Array.isArray(profiles)) {
     profiles.forEach((p: any) => {
+      if (!p) return;
+      const existing = users[p.user_custom_id] || users[p.id] || {};
+      const merged = { ...existing, ...p };
       if (p.user_custom_id) {
-        users[p.user_custom_id] = { ...(users[p.user_custom_id] || {}), ...p };
+        users[p.user_custom_id] = merged;
       }
       if (p.id) {
-        users[p.id] = { ...(users[p.id] || {}), ...p };
+        users[p.id] = merged;
       }
       if (p.mobile) {
-        users[normalizePhone(p.mobile)] = { ...(users[normalizePhone(p.mobile)] || {}), ...p };
+        const clean = normalizePhone(p.mobile);
+        if (clean) users[clean] = merged;
+      }
+      if (p.telegram_chat_id) {
+        const cid = p.telegram_chat_id.toString().trim();
+        users[cid] = merged;
+        const digits = cid.replace(/[^0-9]/g, '');
+        if (digits) users[digits] = merged;
+      }
+      if (p.telegram_id) {
+        const tid = p.telegram_id.toString().trim().replace(/^@/, '').toLowerCase();
+        users[tid] = merged;
+        users[`@${tid}`] = merged;
+      }
+      if (p.email) {
+        users[p.email.toLowerCase().trim()] = merged;
       }
     });
   }
@@ -3431,6 +3605,9 @@ app.post('/api/v1/sync-state', (req: Request, res: Response) => {
   if (incomingSettings && (req.body.isAdmin === true || req.body.role === 'ADMIN')) {
     appSettings = { ...appSettings, ...incomingSettings };
   }
+
+  // Save changes to persistent storage disk
+  saveDatabase();
 
   // Extract deduped unique profiles
   const profileMap = new Map<string, any>();
@@ -3524,37 +3701,41 @@ async function processTelegramMessageUpdate(update: any) {
     const from = message.from || {};
     const senderName = [from.first_name, from.last_name].filter(Boolean).join(' ') || from.username || 'User';
     const username = from.username ? `@${from.username}` : '';
-    const senderTgIdentifier = username || chatId.toString();
     const text = message.text.trim();
     const activeToken = getTelegramBotToken();
 
-    console.log(`[TELEGRAM INCOMING] ChatID: ${chatId} | From: ${senderName} | Text: "${text}"`);
+    console.log(`[TELEGRAM INCOMING] ChatID: ${chatId} | From: ${senderName} (${username || 'no-username'}) | Text: "${text}"`);
 
     const replyTelegram = async (replyText: string) => {
       await sendTelegramNotification(chatId.toString(), replyText, activeToken);
     };
 
+    // Auto-resolve user using all candidates: Chat ID, Telegram User ID, and Username
+    const { user, wallet, isLinked } = resolveTelegramUser(chatId, from.username, from.id);
+
     // Command: /start or /help or /id
     if (text.startsWith('/start') || text.startsWith('/help') || text.startsWith('/id')) {
-      const { user, wallet, isLinked } = resolveUserAndWallet(senderTgIdentifier);
       const usernameText = from.username ? `@${from.username}` : (username || '@username');
 
       const welcomeMsg =
         `🤖 <b>Welcome to SR GATEWAY BOT!</b>\n\n` +
-        `Hello <b>${senderName}</b>! Your Telegram Chat is connected to SR Gateway.\n\n` +
+        `Hello <b>${user ? user.full_name : senderName}</b>! Your Telegram Chat is connected to SR Gateway.\n\n` +
         `🆔 <b>Your Telegram Chat ID:</b> <code>${chatId}</code>\n` +
         `👤 <b>Username:</b> ${usernameText}\n` +
-        `💼 <b>Linked Account:</b> ${isLinked && user ? `${user.full_name} (<code>${user.user_custom_id}</code>)` : 'Not linked yet'}\n` +
-        `💰 <b>Available Balance:</b> ${isLinked && wallet ? `₹${wallet.available_balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : 'Link your wallet on portal to view balance'}\n\n` +
-        `📋 <b>How to link your Telegram for Live bot Alerts:</b>\n` +
-        `1. Copy your numeric Chat ID: <code>${chatId}</code>\n` +
-        `2. Open SR Gateway app &gt; Click Telegram Bot OTP &amp; Alerts.\n` +
-        `3. Enter your Chat id and verify OTP to get instant Deposit, Withdrawal &amp; P2P alerts!\n\n` +
+        `💼 <b>Linked Account:</b> ${isLinked && user ? `<b>${user.full_name}</b> (<code>${user.user_custom_id}</code>)` : 'Not linked yet'}\n` +
+        `💰 <b>Available Balance:</b> ${isLinked && wallet ? `<b>₹${Number(wallet.available_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>` : 'Link your wallet on portal to view balance'}\n` +
+        (isLinked && user ? `📱 <b>Registered Mobile:</b> ${user.mobile || 'Linked'}\n🟢 <b>Live Account Alerts:</b> ACTIVE\n\n` : '\n') +
+        (!isLinked
+          ? `📋 <b>How to link your Telegram for Live bot Alerts:</b>\n` +
+            `1. Copy your numeric Chat ID: <code>${chatId}</code>\n` +
+            `2. Open SR Gateway app &gt; Click Telegram Bot OTP &amp; Alerts.\n` +
+            `3. Enter your Chat id and verify OTP to get instant Deposit, Withdrawal &amp; P2P alerts!\n\n`
+          : '') +
         `<b>Available Bot Commands:</b>\n` +
         `• /balance - Check live wallet balance\n` +
-        `• /pay &lt;number/&lt;amount&gt; [note] - Instant User-to-User Transfer\n` +
+        `• /pay &lt;number&gt; &lt;amount&gt; [note] - Instant User-to-User Transfer\n` +
         `• /history - View recent wallet transactions\n\n` +
-        `🌐 <b>Official Web Portal:</b> https://srgateway.onrender.com\n` +
+        `🌐 <b>Official Web Portal:</b> ${appSettings.app_url || 'https://srgateway.onrender.com'}\n` +
         `⚡ Need help? Contact 24/7 support on our gateway portal.`;
 
       await replyTelegram(welcomeMsg);
@@ -3563,7 +3744,6 @@ async function processTelegramMessageUpdate(update: any) {
 
     // Command: /balance or /bal
     if (text.startsWith('/balance') || text.startsWith('/bal')) {
-      const { user, wallet, isLinked } = resolveUserAndWallet(senderTgIdentifier);
       if (!isLinked || !user || !wallet) {
         await replyTelegram(
           `⚠️ <b>Telegram Account Not Linked</b>\n\n` +
@@ -3576,10 +3756,12 @@ async function processTelegramMessageUpdate(update: any) {
 
       const balMsg =
         `💰 <b>SR GATEWAY Wallet Balance</b>\n\n` +
-        `👤 <b>Account:</b> ${user.full_name} (<code>${user.user_custom_id}</code>)\n` +
-        `🟢 <b>Available Balance:</b> ₹${wallet.available_balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
-        `🔒 <b>Locked Balance:</b> ₹${wallet.locked_balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
-        `💵 <b>Total Balance:</b> ₹${(wallet.available_balance + wallet.locked_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n\n` +
+        `👤 <b>Account Holder:</b> ${user.full_name}\n` +
+        `🆔 <b>User ID:</b> <code>${user.user_custom_id}</code>\n` +
+        `📱 <b>Mobile:</b> ${user.mobile || 'Registered'}\n` +
+        `🟢 <b>Available Balance:</b> ₹${Number(wallet.available_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
+        `🔒 <b>Locked Balance:</b> ₹${Number(wallet.locked_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
+        `💵 <b>Total Balance:</b> ₹${(Number(wallet.available_balance) + Number(wallet.locked_balance)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n\n` +
         `🕒 <i>Server Time: ${new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</i>`;
 
       await replyTelegram(balMsg);
@@ -3588,8 +3770,7 @@ async function processTelegramMessageUpdate(update: any) {
 
     // Command: /pay or /transfer
     if (text.startsWith('/pay') || text.startsWith('/transfer') || text.startsWith('/send')) {
-      const { isLinked } = resolveUserAndWallet(senderTgIdentifier);
-      if (!isLinked) {
+      if (!isLinked || !user) {
         await replyTelegram(
           `❌ <b>Transfer Failed</b>\n\n` +
           `Your Telegram account is not linked to an SR Gateway wallet. Please link your account on the portal first to transfer funds.`
@@ -3611,7 +3792,7 @@ async function processTelegramMessageUpdate(update: any) {
       const amount = parseFloat(parts[2]);
       const note = parts.slice(3).join(' ') || 'Telegram Bot Transfer';
 
-      const result = executeUserToUserTransfer(senderTgIdentifier, recipient, amount, note, 'Telegram Bot');
+      const result = executeUserToUserTransfer(user.user_custom_id || user.id, recipient, amount, note, 'Telegram Bot');
 
       if (!result.success) {
         await replyTelegram(`❌ <b>Transfer Failed:</b>\n${result.message}`);
@@ -3633,7 +3814,6 @@ async function processTelegramMessageUpdate(update: any) {
 
     // Command: /history or /txns
     if (text.startsWith('/history') || text.startsWith('/txns')) {
-      const { user, isLinked } = resolveUserAndWallet(senderTgIdentifier);
       if (!isLinked || !user) {
         await replyTelegram(
           `📜 <b>No Linked Account</b>\n\n` +
@@ -3711,6 +3891,20 @@ async function startTelegramPollingWorker() {
   const token = getTelegramBotToken();
   if (!isRealTelegramToken(token)) {
     console.log('[TELEGRAM POLLING] No valid Telegram Bot Token configured. Polling inactive.');
+    return;
+  }
+
+  // Prevent duplicate polling when preview sandboxes run simultaneously with live Render deployment
+  const isAisDev = Boolean(
+    process.env.AIS_ENV ||
+    process.env.HOSTNAME?.includes('ais-') ||
+    process.env.HOSTNAME?.includes('localhost')
+  );
+  const isRender = Boolean(process.env.RENDER || process.env.RENDER_SERVICE_ID);
+  const allowDevPolling = process.env.ENABLE_DEV_TELEGRAM_POLLING === 'true';
+
+  if (isAisDev && !isRender && !allowDevPolling) {
+    console.log('[TELEGRAM POLLING] Running in AI Studio preview sandbox. Polling delegated to primary live deployment on Render (https://srgateway.onrender.com) to avoid duplicate bot responses.');
     return;
   }
 
@@ -3803,26 +3997,25 @@ app.post('/api/v1/telegram-bot/simulate-command', async (req: Request, res: Resp
 
   // Directly process internal command logic and capture response
   const text = command.trim();
-  const senderTg = username || chat_id;
+  const { user, wallet, isLinked } = resolveTelegramUser(chat_id, username);
 
   if (text.startsWith('/start') || text.startsWith('/help')) {
-    const { user, wallet, isLinked } = resolveUserAndWallet(senderTg);
     const startMsg =
       `🤖 Welcome to SR GATEWAY BOT!\n\n` +
       `Hello ${user?.full_name || 'SR TECNOLOGY LTD™'}! Your Telegram Chat is connected to SR Gateway.\n\n` +
-      `🆔 Your Telegram Chat ID: ${chat_id || '182238448'}\n` +
+      `🆔 Your Telegram Chat ID: ${chat_id || '6561010416'}\n` +
       `👤 Username: ${username || '@username'}\n` +
       `💼 Linked Account: ${isLinked && user ? `${user.full_name} (${user.user_custom_id})` : 'Not linked yet'}\n` +
-      `💰 Available Balance: ${isLinked && wallet ? `₹${wallet.available_balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : 'Link your wallet on portal to view balance'}\n\n` +
+      `💰 Available Balance: ${isLinked && wallet ? `₹${Number(wallet.available_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : 'Link your wallet on portal to view balance'}\n\n` +
       `📋 How to link your Telegram for Live bot Alerts:\n` +
       `1. Copy your numeric Chat ID: ${chat_id || '6561010416'}\n` +
       `2. Open SR Gateway app > Click Telegram Bot OTP & Alerts.\n` +
       `3. Enter your Chat id and verify OTP to get instant Deposit, Withdrawal & P2P alerts!\n\n` +
       `Available Bot Commands:\n` +
       `• /balance - Check live wallet balance\n` +
-      `• /pay <number/<amount> [note] - Instant User-to-User Transfer\n` +
+      `• /pay <number> <amount> [note] - Instant User-to-User Transfer\n` +
       `• /history - View recent wallet transactions\n\n` +
-      `🌐 Official Web Portal: https://srgateway.onrender.com\n` +
+      `🌐 Official Web Portal: ${appSettings.app_url || 'https://srgateway.onrender.com'}\n` +
       `⚡ Need help? Contact 24/7 support on our gateway portal.`;
 
     return res.json({
@@ -3830,17 +4023,28 @@ app.post('/api/v1/telegram-bot/simulate-command', async (req: Request, res: Resp
       command,
       bot_response: startMsg,
       chat_id,
+      linked: isLinked,
+      user: user || null,
+      balance: wallet?.available_balance ?? 0,
     });
   }
 
   if (text.startsWith('/balance') || text.startsWith('/bal')) {
-    const { user, wallet } = resolveUserAndWallet(senderTg);
+    if (!isLinked || !user || !wallet) {
+      return res.json({
+        status: 'error',
+        command,
+        bot_response: `⚠️ Telegram Account Not Linked\n\nYour Telegram account is not linked to any SR Gateway wallet yet. Open the web portal and link your Chat ID ${chat_id}.`,
+        linked: false,
+      });
+    }
     return res.json({
       status: 'success',
       command,
-      bot_response: `💰 Available Balance: ₹${wallet.available_balance} (Locked: ₹${wallet.locked_balance})`,
+      bot_response: `💰 SR GATEWAY Wallet Balance\n\n👤 Account: ${user.full_name} (${user.user_custom_id})\n🟢 Available Balance: ₹${Number(wallet.available_balance).toFixed(2)}\n🔒 Locked Balance: ₹${Number(wallet.locked_balance).toFixed(2)}\n💵 Total Balance: ₹${(Number(wallet.available_balance) + Number(wallet.locked_balance)).toFixed(2)}`,
       wallet_balance: wallet.available_balance,
       user_id: user.user_custom_id,
+      linked: true,
     });
   }
 
@@ -3853,7 +4057,8 @@ app.post('/api/v1/telegram-bot/simulate-command', async (req: Request, res: Resp
     const amount = parseFloat(parts[2]);
     const note = parts.slice(3).join(' ') || 'Telegram Bot Transfer';
 
-    const result = executeUserToUserTransfer(senderTg, recipient, amount, note, 'Telegram Bot');
+    const senderIdentifier = user?.user_custom_id || user?.id || username || chat_id;
+    const result = executeUserToUserTransfer(senderIdentifier, recipient, amount, note, 'Telegram Bot');
     return res.json({
       status: result.success ? 'success' : 'error',
       command,

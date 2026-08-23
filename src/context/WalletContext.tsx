@@ -2172,18 +2172,44 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     // 3. Update User Profile with new Telegram Chat ID
+    const updatedUser = {
+      ...currentUser,
+      telegram_chat_id: cleanNumber || targetIdentifier,
+      telegram_id: cleanTag,
+      updated_at: new Date().toISOString(),
+    };
+
     setProfiles((prev) =>
-      prev.map((p) =>
-        p.id === currentUser.id
-          ? {
-              ...p,
-              telegram_chat_id: cleanNumber || targetIdentifier,
-              telegram_id: cleanTag,
-              updated_at: new Date().toISOString(),
-            }
-          : p
-      )
+      prev.map((p) => (p.id === currentUser.id ? updatedUser : p))
     );
+
+    // Sync updated profile to server backend immediately
+    fetch('/api/v1/sync-state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profiles: profiles.map((p) => (p.id === currentUser.id ? updatedUser : p)),
+        wallets,
+      }),
+    }).catch(() => null);
+
+    // Send connection success alert directly on Telegram
+    const targetChat = cleanNumber || targetIdentifier;
+    if (targetChat) {
+      fetch('/api/v1/alerts/login-alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: currentUser.user_custom_id,
+          user_name: currentUser.full_name,
+          chat_id: targetChat,
+          telegram_id: cleanTag,
+          device_name: 'Telegram Bot Alert Node',
+          location: 'Live Gateway Bot',
+          ip_address: 'Connected',
+        }),
+      }).catch(() => null);
+    }
 
     addNotification(
       currentUser.id,
