@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useWallet } from '../context/WalletContext';
 import {
   ShieldCheck,
@@ -313,34 +313,42 @@ export const AdminPortal: React.FC = () => {
     setTimeout(() => setAdminAlertMsg(null), 3500);
   };
 
-  // Metrics
-  const totalUsersCount = allProfiles.filter((p) => p.role !== 'ADMIN').length;
-  const activeUsersCount = allProfiles.filter((p) => p.role !== 'ADMIN' && p.status === 'ACTIVE').length;
-  const bannedUsersCount = allProfiles.filter((p) => p.role !== 'ADMIN' && p.status === 'BANNED').length;
+  // Metrics (Memoized for high UI responsiveness)
+  const totalUsersCount = useMemo(() => allProfiles.filter((p) => p.role !== 'ADMIN').length, [allProfiles]);
+  const activeUsersCount = useMemo(() => allProfiles.filter((p) => p.role !== 'ADMIN' && p.status === 'ACTIVE').length, [allProfiles]);
+  const bannedUsersCount = useMemo(() => allProfiles.filter((p) => p.role !== 'ADMIN' && p.status === 'BANNED').length, [allProfiles]);
 
-  const totalSystemBalance = (Object.values(allWallets) as Wallet[]).reduce((sum, w) => sum + w.available_balance, 0);
-  const totalLockedBalance = (Object.values(allWallets) as Wallet[]).reduce((sum, w) => sum + w.locked_balance, 0);
+  const totalSystemBalance = useMemo(
+    () => (Object.values(allWallets) as Wallet[]).reduce((sum, w) => sum + (w?.available_balance || 0), 0),
+    [allWallets]
+  );
+  const totalLockedBalance = useMemo(
+    () => (Object.values(allWallets) as Wallet[]).reduce((sum, w) => sum + (w?.locked_balance || 0), 0),
+    [allWallets]
+  );
 
-  const pendingDeposits = deposits.filter((d) => d.status === 'PENDING');
-  const pendingDepositsSum = pendingDeposits.reduce((sum, d) => sum + d.amount, 0);
+  const pendingDeposits = useMemo(() => deposits.filter((d) => d.status === 'PENDING'), [deposits]);
+  const pendingDepositsSum = useMemo(() => pendingDeposits.reduce((sum, d) => sum + d.amount, 0), [pendingDeposits]);
 
-  const pendingWithdrawals = withdrawals.filter((w) => w.status === 'PENDING' || w.status === 'APPROVED');
-  const pendingWithdrawalsSum = pendingWithdrawals.reduce((sum, w) => sum + w.amount, 0);
+  const pendingWithdrawals = useMemo(() => withdrawals.filter((w) => w.status === 'PENDING' || w.status === 'APPROVED'), [withdrawals]);
+  const pendingWithdrawalsSum = useMemo(() => pendingWithdrawals.reduce((sum, w) => sum + w.amount, 0), [pendingWithdrawals]);
 
-  // Filtered Users
-  const filteredUsers = allProfiles
-    .filter((p) => p.role !== 'ADMIN')
-    .filter((p) => {
-      if (!userSearch.trim()) return true;
-      const q = userSearch.toLowerCase();
-      return (
-        p.full_name.toLowerCase().includes(q) ||
-        p.user_custom_id.toLowerCase().includes(q) ||
-        p.mobile.toLowerCase().includes(q) ||
-        p.email.toLowerCase().includes(q) ||
-        (p.telegram_id && p.telegram_id.toLowerCase().includes(q))
-      );
-    });
+  // Filtered Users (Memoized)
+  const filteredUsers = useMemo(() => {
+    const q = userSearch.trim().toLowerCase();
+    return allProfiles
+      .filter((p) => p.role !== 'ADMIN')
+      .filter((p) => {
+        if (!q) return true;
+        return (
+          (p.full_name || '').toLowerCase().includes(q) ||
+          (p.user_custom_id || '').toLowerCase().includes(q) ||
+          (p.mobile || '').toLowerCase().includes(q) ||
+          (p.email || '').toLowerCase().includes(q) ||
+          (p.telegram_id && p.telegram_id.toLowerCase().includes(q))
+        );
+      });
+  }, [allProfiles, userSearch]);
 
   const handleAdminAddBalance = () => {
     if (!selectedUserForModal) return;

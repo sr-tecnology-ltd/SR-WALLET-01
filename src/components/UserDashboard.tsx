@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useWallet } from '../context/WalletContext';
 import {
   Wallet,
@@ -58,32 +58,45 @@ export const UserDashboard: React.FC<{
     toggleRoleMode,
   } = useWallet();
 
-  // User-specific metrics
-  const myDeposits = deposits.filter((d) => d.user_id === currentUser.id || d.user_id === currentUser.user_custom_id);
-  const totalDepositAmount = myDeposits
-    .filter((d) => d.status === 'SUCCESS')
-    .reduce((sum, d) => sum + d.net_amount, 0);
-  const pendingDepositCount = myDeposits.filter((d) => d.status === 'PENDING').length;
-  const pendingDepositSum = myDeposits
-    .filter((d) => d.status === 'PENDING')
-    .reduce((sum, d) => sum + d.amount, 0);
-
-  const myWithdrawals = withdrawals.filter((w) => w.user_id === currentUser.id || w.user_id === currentUser.user_custom_id);
-  const totalWithdrawalAmount = myWithdrawals
-    .filter((w) => w.status === 'SUCCESS')
-    .reduce((sum, w) => sum + w.net_payout, 0);
-  const pendingWithdrawalCount = myWithdrawals.filter((w) => w.status === 'PENDING').length;
-  const pendingWithdrawalSum = myWithdrawals
-    .filter((w) => w.status === 'PENDING')
-    .reduce((sum, w) => sum + w.amount, 0);
-
-  const myTransactions = transactions.filter(
-    (t) =>
-      t.user_id === currentUser.id ||
-      t.user_id === currentUser.user_custom_id ||
-      t.user_custom_id === currentUser.user_custom_id ||
-      (currentUser.mobile && t.description?.includes(currentUser.mobile.replace(/[^0-9]/g, '').slice(-10)))
+  // User-specific metrics (Memoized)
+  const myDeposits = useMemo(
+    () => deposits.filter((d) => d.user_id === currentUser.id || d.user_id === currentUser.user_custom_id),
+    [deposits, currentUser.id, currentUser.user_custom_id]
   );
+  const totalDepositAmount = useMemo(
+    () => myDeposits.filter((d) => d.status === 'SUCCESS').reduce((sum, d) => sum + d.net_amount, 0),
+    [myDeposits]
+  );
+  const pendingDepositCount = useMemo(() => myDeposits.filter((d) => d.status === 'PENDING').length, [myDeposits]);
+  const pendingDepositSum = useMemo(
+    () => myDeposits.filter((d) => d.status === 'PENDING').reduce((sum, d) => sum + d.amount, 0),
+    [myDeposits]
+  );
+
+  const myWithdrawals = useMemo(
+    () => withdrawals.filter((w) => w.user_id === currentUser.id || w.user_id === currentUser.user_custom_id),
+    [withdrawals, currentUser.id, currentUser.user_custom_id]
+  );
+  const totalWithdrawalAmount = useMemo(
+    () => myWithdrawals.filter((w) => w.status === 'SUCCESS').reduce((sum, w) => sum + w.net_payout, 0),
+    [myWithdrawals]
+  );
+  const pendingWithdrawalCount = useMemo(() => myWithdrawals.filter((w) => w.status === 'PENDING').length, [myWithdrawals]);
+  const pendingWithdrawalSum = useMemo(
+    () => myWithdrawals.filter((w) => w.status === 'PENDING').reduce((sum, w) => sum + w.amount, 0),
+    [myWithdrawals]
+  );
+
+  const myTransactions = useMemo(() => {
+    const userCleanPhone = currentUser.mobile ? currentUser.mobile.replace(/[^0-9]/g, '').slice(-10) : '';
+    return transactions.filter(
+      (t) =>
+        t.user_id === currentUser.id ||
+        t.user_id === currentUser.user_custom_id ||
+        t.user_custom_id === currentUser.user_custom_id ||
+        (userCleanPhone && t.description?.includes(userCleanPhone))
+    );
+  }, [transactions, currentUser.id, currentUser.user_custom_id, currentUser.mobile]);
 
   // System Services Grid Configuration (Cleaned & Updated as requested)
   const systemServices = [
@@ -179,13 +192,17 @@ export const UserDashboard: React.FC<{
   const [timeLeftStr, setTimeLeftStr] = useState<string>('');
   const [isBonusExpiredState, setIsBonusExpiredState] = useState(false);
 
+  const userBonusExpiry = currentUser.welcome_bonus_expires_at || '';
+  const userCreatedAt = currentUser.created_at || '';
+  const bonusExpiryHours = settings.welcome_bonus_expiry_hours || 24;
+
   useEffect(() => {
     if (!isBonusPending) return;
 
     const calculateRemaining = () => {
-      const expiry = currentUser.welcome_bonus_expires_at
-        ? new Date(currentUser.welcome_bonus_expires_at).getTime()
-        : new Date(currentUser.created_at || Date.now()).getTime() + (settings.welcome_bonus_expiry_hours || 24) * 60 * 60 * 1000;
+      const expiry = userBonusExpiry
+        ? new Date(userBonusExpiry).getTime()
+        : new Date(userCreatedAt || Date.now()).getTime() + bonusExpiryHours * 60 * 60 * 1000;
 
       const diff = expiry - Date.now();
       if (diff <= 0) {
@@ -203,7 +220,7 @@ export const UserDashboard: React.FC<{
     calculateRemaining();
     const interval = setInterval(calculateRemaining, 1000);
     return () => clearInterval(interval);
-  }, [currentUser, settings, isBonusPending]);
+  }, [userBonusExpiry, userCreatedAt, bonusExpiryHours, isBonusPending]);
 
   return (
     <div className="space-y-6">

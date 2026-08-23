@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   UserProfile,
   Wallet,
@@ -97,6 +97,7 @@ interface WalletContextType {
   registerUser: (fullName: string, mobile: string, email: string, password: string, telegramChatId?: string) => { success: boolean; message: string; user?: UserProfile };
   loginUser: (identifier: string, password?: string) => { success: boolean; message: string };
   logoutUser: () => void;
+  updateProfile: (updates: Partial<UserProfile>) => { success: boolean; message: string };
   sendTelegramOtp: (identifier: string) => Promise<{ success: boolean; message: string; telegramSent?: boolean; otp?: string; expiresAt?: number }>;
   verifyTelegramOtp: (otpInput: string) => { success: boolean; message: string };
   updateTelegramChatId: (newChatId: string, otpCode: string) => { success: boolean; message: string };
@@ -306,64 +307,97 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return `SR-${rand}${suffix ? `-${suffix}` : ''}`;
   };
 
+  // Cache last synced payload signature to avoid state churn & unnecessary re-renders
+  const lastSyncSignatureRef = useRef<string>('');
+  const isSyncingRef = useRef<boolean>(false);
+
   // Immediate manual sync function to synchronize settings, profiles, deposits, withdrawals, wallets & txns
-  const refreshFromBackend = async () => {
+  const refreshFromBackend = useCallback(async () => {
+    if (isSyncingRef.current) return;
+    isSyncingRef.current = true;
     try {
       const res = await fetch('/api/v1/sync-state');
       if (!res.ok) return;
       const data = await res.json();
       if (data.status === 'success') {
-        // 1. Sync global settings (welcome bonus amount, enabled flag, UPI ID, Bank details, QR, limits, banners)
+        // Fast signature check to avoid redundant JSON parsing & state updates
+        const signature = `${JSON.stringify(data.settings || {})}_${(data.profiles || []).length}_${(data.deposits || []).length}_${(data.withdrawals || []).length}_${(data.transactions || []).length}_${JSON.stringify(data.wallets || {})}`;
+        if (signature === lastSyncSignatureRef.current) {
+          return;
+        }
+        lastSyncSignatureRef.current = signature;
+
+        // 1. Sync global settings (only update state if content differs)
         if (data.settings && typeof data.settings === 'object' && Object.keys(data.settings).length > 0) {
           setSettings((prev) => {
+            const hasChanged = JSON.stringify(prev) !== JSON.stringify({ ...prev, ...data.settings });
+            if (!hasChanged) return prev;
             const next = { ...prev, ...data.settings };
             localStorage.setItem(`${LOCAL_STORAGE_KEY}_SETTINGS`, JSON.stringify(next));
             return next;
           });
         }
 
-        // 2. Sync profiles (all registered users across devices)
+        // 2. Sync profiles (only update state if changes detected)
         if (Array.isArray(data.profiles) && data.profiles.length > 0) {
           setProfiles((prev) => {
             const map = new Map<string, UserProfile>();
             prev.forEach((p) => map.set(p.id, p));
+            let hasChanged = false;
             data.profiles.forEach((p: any) => {
               if (p && p.id) {
-                map.set(p.id, { ...(map.get(p.id) || {}), ...p });
+                const existing = map.get(p.id);
+                if (!existing || JSON.stringify(existing) !== JSON.stringify({ ...existing, ...p })) {
+                  map.set(p.id, { ...(existing || {}), ...p });
+                  hasChanged = true;
+                }
               }
             });
+            if (!hasChanged) return prev;
             const updated = Array.from(map.values());
             localStorage.setItem(`${LOCAL_STORAGE_KEY}_PROFILES`, JSON.stringify(updated));
             return updated;
           });
         }
 
-        // 3. Sync deposits (user submitted deposit requests)
+        // 3. Sync deposits (only update state if changes detected)
         if (Array.isArray(data.deposits)) {
           setDeposits((prev) => {
             const map = new Map<string, DepositRequest>();
             prev.forEach((d) => map.set(d.id, d));
+            let hasChanged = false;
             data.deposits.forEach((d: any) => {
               if (d && d.id) {
-                map.set(d.id, { ...(map.get(d.id) || {}), ...d });
+                const existing = map.get(d.id);
+                if (!existing || JSON.stringify(existing) !== JSON.stringify({ ...existing, ...d })) {
+                  map.set(d.id, { ...(existing || {}), ...d });
+                  hasChanged = true;
+                }
               }
             });
+            if (!hasChanged && prev.length === map.size) return prev;
             const updated = Array.from(map.values());
             localStorage.setItem(`${LOCAL_STORAGE_KEY}_DEPOSITS`, JSON.stringify(updated));
             return updated;
           });
         }
 
-        // 4. Sync withdrawals (user submitted withdrawal requests)
+        // 4. Sync withdrawals (only update state if changes detected)
         if (Array.isArray(data.withdrawals)) {
           setWithdrawals((prev) => {
             const map = new Map<string, WithdrawalRequest>();
             prev.forEach((w) => map.set(w.id, w));
+            let hasChanged = false;
             data.withdrawals.forEach((w: any) => {
               if (w && w.id) {
-                map.set(w.id, { ...(map.get(w.id) || {}), ...w });
+                const existing = map.get(w.id);
+                if (!existing || JSON.stringify(existing) !== JSON.stringify({ ...existing, ...w })) {
+                  map.set(w.id, { ...(existing || {}), ...w });
+                  hasChanged = true;
+                }
               }
             });
+            if (!hasChanged && prev.length === map.size) return prev;
             const updated = Array.from(map.values());
             localStorage.setItem(`${LOCAL_STORAGE_KEY}_WITHDRAWALS`, JSON.stringify(updated));
             return updated;
@@ -404,27 +438,47 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             });
             if (changed) {
               localStorage.setItem(`${LOCAL_STORAGE_KEY}_WALLETS`, JSON.stringify(next));
+              return next;
             }
-            return changed ? next : prev;
+            return prev;
           });
         }
       }
     } catch {
       // Safe silence on dev reload
     } finally {
+      isSyncingRef.current = false;
       setIsHydrated(true);
     }
-  };
-
-  // Periodic background poll from backend to capture external API & Bot transactions
-  useEffect(() => {
-    // Run on mount and periodically
-    refreshFromBackend();
-    const interval = setInterval(refreshFromBackend, 2500);
-    return () => clearInterval(interval);
   }, []);
 
-  const currentUser: UserProfile = (activeUserId && profiles.find((p) => p.id === activeUserId || p.user_custom_id === activeUserId)) || {
+  // Periodic background poll from backend with visibility optimization (6s interval when active, paused when hidden)
+  useEffect(() => {
+    refreshFromBackend();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshFromBackend();
+      }
+    };
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        refreshFromBackend();
+      }
+    }, 6000);
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+    };
+  }, [refreshFromBackend]);
+
+  const defaultGuestUser: UserProfile = useMemo(() => ({
     id: '',
     user_custom_id: '',
     full_name: 'Guest User',
@@ -435,12 +489,22 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     referral_code: '',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-  };
-  const isAuthenticated = Boolean(activeUserId && profiles.some((p) => p.id === activeUserId || p.user_custom_id === activeUserId));
+  }), []);
+
+  const currentUser: UserProfile = useMemo(() => {
+    if (!activeUserId) return defaultGuestUser;
+    const found = profiles.find((p) => p.id === activeUserId || p.user_custom_id === activeUserId);
+    return found || defaultGuestUser;
+  }, [activeUserId, profiles, defaultGuestUser]);
+
+  const isAuthenticated = useMemo(() => {
+    return Boolean(activeUserId && profiles.some((p) => p.id === activeUserId || p.user_custom_id === activeUserId));
+  }, [activeUserId, profiles]);
+
   const activeRole = currentUser.role || 'USER';
 
   // Demo Account Checker: Strictly prevents any transactions from demo accounts
-  const isDemoAccount = (user?: UserProfile | string | null): boolean => {
+  const isDemoAccount = useCallback((user?: UserProfile | string | null): boolean => {
     if (!user) return false;
     if (typeof user === 'string') {
       const u = profiles.find((p) => p.id === user || p.user_custom_id === user || p.mobile === user);
@@ -461,16 +525,21 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       name.includes('demo') ||
       email.includes('demo@')
     );
-  };
+  }, [profiles]);
 
-  const currentWallet = (currentUser.id && (wallets[currentUser.id] || wallets[currentUser.user_custom_id])) || {
-    id: currentUser.id ? `w-${currentUser.id}` : 'w-guest',
-    user_id: currentUser.id || 'guest',
-    available_balance: 0,
-    locked_balance: 0,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
+  const currentWallet: Wallet = useMemo(() => {
+    if (currentUser.id && (wallets[currentUser.id] || wallets[currentUser.user_custom_id])) {
+      return wallets[currentUser.id] || wallets[currentUser.user_custom_id];
+    }
+    return {
+      id: currentUser.id ? `w-${currentUser.id}` : 'w-guest',
+      user_id: currentUser.id || 'guest',
+      available_balance: 0,
+      locked_balance: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  }, [currentUser.id, currentUser.user_custom_id, wallets]);
 
   const switchUser = (userId: string) => {
     if (profiles.some((p) => p.id === userId)) {
@@ -2134,6 +2203,58 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     localStorage.removeItem('sr_auth_token');
   };
 
+  const updateProfile = (updates: Partial<UserProfile>) => {
+    if (!currentUser) return { success: false, message: 'No active user session' };
+
+    const cleanedChatId = updates.telegram_chat_id ? updates.telegram_chat_id.toString().trim() : undefined;
+    const cleanedTgId = updates.telegram_id ? updates.telegram_id.toString().trim() : undefined;
+    const cleanedEmail = updates.email !== undefined ? updates.email.trim().toLowerCase() : undefined;
+    const cleanedMobile = updates.mobile !== undefined ? updates.mobile.trim() : undefined;
+    const cleanedName = updates.full_name !== undefined ? updates.full_name.trim() : undefined;
+
+    // Unbind duplicates from other profiles to maintain strict 1-to-1 integrity
+    const updatedProfiles = profiles.map((p) => {
+      if (p.id === currentUser.id) {
+        return {
+          ...p,
+          ...(cleanedName ? { full_name: cleanedName } : {}),
+          ...(cleanedMobile ? { mobile: cleanedMobile } : {}),
+          ...(cleanedEmail !== undefined ? { email: cleanedEmail } : {}),
+          ...(cleanedTgId !== undefined ? { telegram_id: cleanedTgId } : {}),
+          ...(cleanedChatId !== undefined ? { telegram_chat_id: cleanedChatId || undefined } : {}),
+          ...(updates.rpin ? { rpin: updates.rpin } : {}),
+          updated_at: new Date().toISOString(),
+        };
+      } else {
+        const modified = { ...p };
+        if (cleanedChatId && p.telegram_chat_id === cleanedChatId) {
+          delete modified.telegram_chat_id;
+        }
+        if (cleanedTgId && p.telegram_id && p.telegram_id.toLowerCase() === cleanedTgId.toLowerCase()) {
+          delete modified.telegram_id;
+        }
+        if (cleanedEmail && p.email && p.email.toLowerCase() === cleanedEmail) {
+          modified.email = '';
+        }
+        return modified;
+      }
+    });
+
+    setProfiles(updatedProfiles);
+
+    // Sync updated profiles to backend immediately
+    fetch('/api/v1/sync-state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profiles: updatedProfiles,
+        wallets,
+      }),
+    }).catch(() => null);
+
+    return { success: true, message: 'Profile updated and saved successfully!' };
+  };
+
   const updateTelegramChatId = (newChatId: string, otpCode: string) => {
     if (!newChatId || !newChatId.trim()) {
       return { success: false, message: 'Please enter a valid Telegram Chat ID or username.' };
@@ -2144,22 +2265,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const cleanTag = cleanInput.startsWith('@') ? cleanInput : `@${cleanInput}`;
     const targetIdentifier = cleanNumber || cleanTag;
 
-    // 1. Enforce strict 1-to-1 uniqueness: 1 Telegram Chat ID can only connect to 1 account
-    const existingOwner = profiles.find(
-      (p) =>
-        p.id !== currentUser.id &&
-        ((p.telegram_chat_id && (p.telegram_chat_id === cleanNumber || p.telegram_chat_id === cleanInput)) ||
-         (p.telegram_id && p.telegram_id.toLowerCase() === cleanTag.toLowerCase()))
-    );
-
-    if (existingOwner) {
-      return {
-        success: false,
-        message: `⚠️ This Telegram Chat ID is already connected to another account (${existingOwner.user_custom_id} • ${existingOwner.full_name}). One Telegram Chat ID can only be linked to 1 account.`,
-      };
-    }
-
-    // 2. Verify OTP for security
+    // Verify OTP for security
     if (!otpCode || otpCode.trim().length !== 6) {
       return { success: false, message: 'Please enter the 6-digit OTP received on this Telegram Chat ID.' };
     }
@@ -2171,24 +2277,50 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return { success: false, message: `❌ Invalid OTP Code. Check code sent by ${settings.otp_telegram_bot_username || '@PAYZYBOT'}.` };
     }
 
-    // 3. Update User Profile with new Telegram Chat ID
-    const updatedUser = {
-      ...currentUser,
-      telegram_chat_id: cleanNumber || targetIdentifier,
-      telegram_id: cleanTag,
-      updated_at: new Date().toISOString(),
-    };
+    // 1. Unbind this Telegram Chat ID from any OTHER profile in the system to prevent cross-account display
+    const updatedProfiles = profiles.map((p) => {
+      if (p.id === currentUser.id) {
+        return {
+          ...p,
+          telegram_chat_id: cleanNumber || targetIdentifier,
+          telegram_id: cleanTag,
+          updated_at: new Date().toISOString(),
+        };
+      } else {
+        const modified = { ...p };
+        if (cleanNumber && p.telegram_chat_id === cleanNumber) {
+          delete modified.telegram_chat_id;
+        }
+        if (p.telegram_chat_id === targetIdentifier) {
+          delete modified.telegram_chat_id;
+        }
+        if (p.telegram_id && p.telegram_id.toLowerCase() === cleanTag.toLowerCase()) {
+          delete modified.telegram_id;
+        }
+        return modified;
+      }
+    });
 
-    setProfiles((prev) =>
-      prev.map((p) => (p.id === currentUser.id ? updatedUser : p))
-    );
+    setProfiles(updatedProfiles);
 
-    // Sync updated profile to server backend immediately
+    // 2. Call dedicated telegram-link endpoint on server
+    fetch('/api/v1/auth/telegram-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: currentUser.user_custom_id || currentUser.id,
+        chat_id: cleanNumber || targetIdentifier,
+        telegram_id: cleanTag,
+        otp_code: cleanOtp,
+      }),
+    }).catch(() => null);
+
+    // 3. Sync entire state to backend
     fetch('/api/v1/sync-state', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        profiles: profiles.map((p) => (p.id === currentUser.id ? updatedUser : p)),
+        profiles: updatedProfiles,
         wallets,
       }),
     }).catch(() => null);
@@ -2536,72 +2668,99 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setActiveUserId('admin-001');
   };
 
+  const contextValue = useMemo(
+    () => ({
+      currentUser,
+      activeRole,
+      isAuthenticated,
+      switchUser,
+      toggleRoleMode,
+      allProfiles: profiles,
+      currentWallet,
+      allWallets: wallets,
+      settings,
+      updateSettings,
+      deposits,
+      submitDepositRequest,
+      approveDeposit,
+      rejectDeposit,
+      withdrawals,
+      submitWithdrawalRequest,
+      approveWithdrawal,
+      rejectWithdrawal,
+      markWithdrawalPaid,
+      transferBalance,
+      addBalanceByAdmin,
+      cutBalanceByAdmin,
+      resetAllUserBalances,
+      wipeAllUserData,
+      banUser,
+      unbanUser,
+      dailyBonusClaims,
+      claimDailyBonus,
+      referrals,
+      transactions,
+      auditLogs,
+      notifications,
+      markNotificationRead,
+      clearNotifications,
+      apiKeys,
+      createApiKey,
+      revokeApiKey,
+      webhookLogs,
+      formatINR,
+      resetDemoData,
+      registerUser,
+      loginUser,
+      logoutUser,
+      updateProfile,
+      sendTelegramOtp,
+      verifyTelegramOtp,
+      updateTelegramChatId,
+      lastGeneratedOtp,
+      lastGeneratedOtpTimestamp,
+      sendEmailOtp,
+      verifyEmailOtp,
+      lastEmailOtp,
+      lastEmailOtpTimestamp,
+      processMerchantApiPayment,
+      setUserRpin,
+      verifyUserRpin,
+      resetRpinWithOtp,
+      refreshFromBackend,
+      generateSRTxnId,
+      rpinModalConfig,
+      openRpinModal,
+      closeRpinModal,
+    }),
+    [
+      currentUser,
+      activeRole,
+      isAuthenticated,
+      profiles,
+      currentWallet,
+      wallets,
+      settings,
+      deposits,
+      withdrawals,
+      dailyBonusClaims,
+      referrals,
+      transactions,
+      auditLogs,
+      notifications,
+      apiKeys,
+      webhookLogs,
+      lastGeneratedOtp,
+      lastGeneratedOtpTimestamp,
+      lastEmailOtp,
+      lastEmailOtpTimestamp,
+      rpinModalConfig,
+      refreshFromBackend,
+    ]
+  );
+
   return (
-    <WalletContext.Provider
-      value={{
-        currentUser,
-        activeRole,
-        isAuthenticated,
-        switchUser,
-        toggleRoleMode,
-        allProfiles: profiles,
-        currentWallet,
-        allWallets: wallets,
-        settings,
-        updateSettings,
-        deposits,
-        submitDepositRequest,
-        approveDeposit,
-        rejectDeposit,
-        withdrawals,
-        submitWithdrawalRequest,
-        approveWithdrawal,
-        rejectWithdrawal,
-        markWithdrawalPaid,
-        transferBalance,
-        addBalanceByAdmin,
-        cutBalanceByAdmin,
-        resetAllUserBalances,
-        wipeAllUserData,
-        banUser,
-        unbanUser,
-        dailyBonusClaims,
-        claimDailyBonus,
-        referrals,
-        transactions,
-        auditLogs,
-        notifications,
-        markNotificationRead,
-        clearNotifications,
-        apiKeys,
-        createApiKey,
-        revokeApiKey,
-        webhookLogs,
-        formatINR,
-        resetDemoData,
-        registerUser,
-        loginUser,
-        logoutUser,
-        sendTelegramOtp,
-        verifyTelegramOtp,
-        updateTelegramChatId,
-        lastGeneratedOtp,
-        lastGeneratedOtpTimestamp,
-        sendEmailOtp,
-        verifyEmailOtp,
-        lastEmailOtp,
-        lastEmailOtpTimestamp,
-        processMerchantApiPayment,
-        setUserRpin,
-        verifyUserRpin,
-        resetRpinWithOtp,
-        refreshFromBackend,
-        generateSRTxnId,
-        rpinModalConfig,
-        openRpinModal,
-        closeRpinModal,
-      }}
-    >
+    <WalletContext.Provider value={contextValue}>
       {children}
     </WalletContext.Provider>
   );

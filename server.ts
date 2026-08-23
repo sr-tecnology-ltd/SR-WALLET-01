@@ -761,6 +761,45 @@ async function sendTelegramNotification(
 }
 
 
+// Helper: Cleanly Re-Index Users Dictionary by Unique Entities
+function reindexUsers() {
+  const uniqueUsers: any[] = [];
+  const seenIds = new Set<string>();
+  for (const u of Object.values(users)) {
+    if (u && (u.id || u.user_custom_id)) {
+      const key = u.id || u.user_custom_id;
+      if (!seenIds.has(key)) {
+        seenIds.add(key);
+        uniqueUsers.push(u);
+      }
+    }
+  }
+
+  // Clear stale alias keys in users
+  users = {};
+
+  for (const u of uniqueUsers) {
+    if (u.id) users[u.id] = u;
+    if (u.user_custom_id) users[u.user_custom_id] = u;
+    if (u.mobile) {
+      const p = normalizePhone(u.mobile);
+      if (p) users[p] = u;
+    }
+    if (u.email && u.email.trim()) {
+      users[u.email.trim().toLowerCase()] = u;
+    }
+    if (u.telegram_chat_id && u.telegram_chat_id.toString().trim()) {
+      users[u.telegram_chat_id.toString().trim()] = u;
+    }
+    if (u.telegram_id && u.telegram_id.toString().trim()) {
+      const rawTg = u.telegram_id.toString().trim();
+      const cleanTg = rawTg.replace(/^@/, '').toLowerCase();
+      users[cleanTg] = u;
+      users[`@${cleanTg}`] = u;
+    }
+  }
+}
+
 // Helper: Find Strictly Registered User in System (by Mobile, User Custom ID, Internal ID, Email, or Telegram)
 function findRegisteredUser(identifier: string | number | undefined | null): {
   found: boolean;
@@ -777,21 +816,7 @@ function findRegisteredUser(identifier: string | number | undefined | null): {
   const cleanTg = raw.replace(/^@/, '').toLowerCase();
   const lower = raw.toLowerCase();
 
-  // 1. Direct key match in users
-  if (users[raw]) {
-    const user = users[raw];
-    const userWallet = wallets[user.user_custom_id] || wallets[user.id] || wallets[raw] || {
-      id: `w-${user.user_custom_id || user.id}`,
-      user_id: user.user_custom_id || user.id,
-      available_balance: 0,
-      locked_balance: 0,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    return { found: true, user, wallet: userWallet };
-  }
-
-  // 2. Search all registered unique users
+  // Search all registered unique users to avoid stale key conflicts
   const uniqueUsers: any[] = [];
   const seenIds = new Set<string>();
   for (const u of Object.values(users)) {
@@ -866,26 +891,20 @@ function resolveTelegramUser(
   fromUsername?: string | null,
   fromId?: string | number | null
 ): { user: any; wallet: any; isLinked: boolean } {
+  const rawChatId = chatId ? chatId.toString().trim() : null;
+  const rawFromId = fromId ? fromId.toString().trim() : null;
+  const cleanUsername = fromUsername ? fromUsername.toString().replace(/^@/, '').trim().toLowerCase() : null;
+
   const candidates = [
-    chatId ? chatId.toString().trim() : null,
-    fromId ? fromId.toString().trim() : null,
-    fromUsername ? `@${fromUsername.toString().replace(/^@/, '').trim()}` : null,
-    fromUsername ? fromUsername.toString().replace(/^@/, '').trim() : null,
+    rawChatId,
+    rawFromId,
+    cleanUsername ? `@${cleanUsername}` : null,
+    cleanUsername,
   ].filter(Boolean) as string[];
 
   for (const cand of candidates) {
     const lookup = findRegisteredUser(cand);
     if (lookup.found && lookup.user && lookup.wallet) {
-      // Ensure telegram_chat_id is populated in the user object and users dictionary
-      if (chatId && !lookup.user.telegram_chat_id) {
-        lookup.user.telegram_chat_id = chatId.toString().trim();
-      }
-      if (chatId) {
-        users[chatId.toString().trim()] = lookup.user;
-      }
-      if (fromUsername && !lookup.user.telegram_id) {
-        lookup.user.telegram_id = `@${fromUsername.toString().replace(/^@/, '').trim()}`;
-      }
       return { user: lookup.user, wallet: lookup.wallet, isLinked: true };
     }
   }
@@ -3134,14 +3153,79 @@ const handleWipeAllUsers = (req: Request, res: Response) => {
 app.post('/api/v1/admin/wipe-users', handleWipeAllUsers);
 app.post('/api/v1/admin/wipe-all-users', handleWipeAllUsers);
 
+// Dedicated endpoint: Link Telegram Chat ID / Username to user account & strictly unbind from other accounts
+app.post('/api/v1/auth/telegram-link', (req: Request, res: Response) => {
+  const { user_id, chat_id, telegram_id, otp_code } = req.body || {};
+
+  if (!user_id || (!chat_id && !telegram_id)) {
+    return res.status(400).json({ status: 'error', code: 400, message: 'User ID and Telegram Chat ID or Username required.' });
+  }
+
+  const lookup = findRegisteredUser(user_id);
+  if (!lookup.found || !lookup.user) {
+    return res.status(404).json({ status: 'error', code: 404, message: `User account '${user_id}' not found.` });
+  }
+
+  const targetUser = lookup.user;
+  const cleanChatId = chat_id ? chat_id.toString().trim().replace(/[^0-9]/g, '') || chat_id.toString().trim() : '';
+  const cleanTgTag = telegram_id ? (telegram_id.startsWith('@') ? telegram_id : `@${telegram_id}`) : (cleanChatId ? `@chat_${cleanChatId}` : '');
+
+  // 1. Unbind this chat_id and telegram_id from ALL other accounts
+  const uniqueUsers: any[] = [];
+  const seenIds = new Set<string>();
+  for (const u of Object.values(users)) {
+    if (u && (u.id || u.user_custom_id)) {
+      const key = u.id || u.user_custom_id;
+      if (!seenIds.has(key)) {
+        seenIds.add(key);
+        uniqueUsers.push(u);
+      }
+    }
+  }
+
+  for (const u of uniqueUsers) {
+    if (u.id !== targetUser.id && u.user_custom_id !== targetUser.user_custom_id) {
+      if (cleanChatId && (u.telegram_chat_id === cleanChatId || u.telegram_chat_id === chat_id)) {
+        delete u.telegram_chat_id;
+      }
+      if (cleanTgTag && u.telegram_id && u.telegram_id.toLowerCase() === cleanTgTag.toLowerCase()) {
+        delete u.telegram_id;
+      }
+    }
+  }
+
+  // 2. Bind exclusively to targetUser
+  targetUser.telegram_chat_id = cleanChatId || undefined;
+  targetUser.telegram_id = cleanTgTag || undefined;
+  targetUser.updated_at = new Date().toISOString();
+
+  // 3. Rebuild index and persist to disk database
+  reindexUsers();
+  saveDatabase();
+
+  res.json({
+    status: 'success',
+    code: 200,
+    message: `Telegram Chat ID ${cleanChatId || cleanTgTag} successfully linked exclusively to account ${targetUser.user_custom_id} (${targetUser.full_name})`,
+    user: targetUser,
+  });
+});
+
 // Sync state endpoint for frontend synchronization
 app.get('/api/v1/sync-state', (req: Request, res: Response) => {
-  const uniqueProfiles = Array.from(new Set(Object.values(users))).filter((u: any) => u && u.id);
+  const profileMap = new Map<string, any>();
+  Object.values(users).forEach((u: any) => {
+    if (u && (u.id || u.user_custom_id)) {
+      profileMap.set(u.id || u.user_custom_id, u);
+    }
+  });
+  const dedupedProfiles = Array.from(profileMap.values());
+
   res.json({
     status: 'success',
     code: 200,
     settings: appSettings,
-    profiles: uniqueProfiles,
+    profiles: dedupedProfiles,
     wallets,
     deposits: depositRequests,
     withdrawals: withdrawalRequests,
@@ -3158,14 +3242,33 @@ app.post('/api/v1/sync-state', (req: Request, res: Response) => {
   }
 
   if (Array.isArray(profiles)) {
-    for (const p of profiles) {
-      if (p && p.id) {
-        users[p.id] = p;
-        if (p.user_custom_id) users[p.user_custom_id] = p;
-        if (p.mobile) {
-          const clean = normalizePhone(p.mobile);
-          if (clean) users[clean] = p;
-        }
+    const cleanUserMap = new Map<string, any>();
+    profiles.forEach((p: any) => {
+      if (p && (p.id || p.user_custom_id)) {
+        const primaryKey = p.id || p.user_custom_id;
+        cleanUserMap.set(primaryKey, p);
+      }
+    });
+
+    users = {};
+    for (const p of cleanUserMap.values()) {
+      if (p.id) users[p.id] = p;
+      if (p.user_custom_id) users[p.user_custom_id] = p;
+      if (p.mobile) {
+        const clean = normalizePhone(p.mobile);
+        if (clean) users[clean] = p;
+      }
+      if (p.email && p.email.trim()) {
+        users[p.email.trim().toLowerCase()] = p;
+      }
+      if (p.telegram_chat_id && p.telegram_chat_id.toString().trim()) {
+        users[p.telegram_chat_id.toString().trim()] = p;
+      }
+      if (p.telegram_id && p.telegram_id.toString().trim()) {
+        const rawTg = p.telegram_id.toString().trim();
+        const cleanTg = rawTg.replace(/^@/, '').toLowerCase();
+        users[cleanTg] = p;
+        users[`@${cleanTg}`] = p;
       }
     }
   }
@@ -3192,11 +3295,22 @@ app.post('/api/v1/sync-state', (req: Request, res: Response) => {
     apiKeys = incomingKeys;
   }
 
+  reindexUsers();
+  saveDatabase();
+
+  const profileMap = new Map<string, any>();
+  Object.values(users).forEach((u: any) => {
+    if (u && u.id) {
+      profileMap.set(u.id, u);
+    }
+  });
+
   res.json({
     status: 'success',
     code: 200,
-    message: 'System state synchronized successfully',
+    message: 'System state synchronized and persisted successfully',
     settings: appSettings,
+    profiles: Array.from(profileMap.values()),
   });
 });
 
@@ -3214,13 +3328,15 @@ app.post('/api/v1/admin/sync-users', (req: Request, res: Response) => {
         }
       }
     }
+    reindexUsers();
   }
   if (incomingWallets && typeof incomingWallets === 'object') {
     for (const [uid, w] of Object.entries(incomingWallets)) {
       wallets[uid] = w;
     }
   }
-  res.json({ status: 'success', code: 200, message: 'Server registry synchronized' });
+  saveDatabase();
+  res.json({ status: 'success', code: 200, message: 'Users synchronized successfully' });
 });
 
 // ==========================================
@@ -3500,166 +3616,6 @@ app.get('/api/payout', handlePhpApiRequest);
 app.post('/api/payout', handlePhpApiRequest);
 app.get('/api/v1/send', handlePhpApiRequest);
 app.post('/api/v1/send', handlePhpApiRequest);
-
-// Bi-directional State Sync Between Frontend and Backend
-app.post('/api/v1/sync-state', (req: Request, res: Response) => {
-  const {
-    profiles,
-    wallets: incomingWallets,
-    transactions: incomingTransactions,
-    deposits: incomingDeposits,
-    withdrawals: incomingWithdrawals,
-    apiKeys: incomingKeys,
-    settings: incomingSettings,
-  } = req.body;
-
-  if (Array.isArray(profiles)) {
-    profiles.forEach((p: any) => {
-      if (!p) return;
-      const existing = users[p.user_custom_id] || users[p.id] || {};
-      const merged = { ...existing, ...p };
-      if (p.user_custom_id) {
-        users[p.user_custom_id] = merged;
-      }
-      if (p.id) {
-        users[p.id] = merged;
-      }
-      if (p.mobile) {
-        const clean = normalizePhone(p.mobile);
-        if (clean) users[clean] = merged;
-      }
-      if (p.telegram_chat_id) {
-        const cid = p.telegram_chat_id.toString().trim();
-        users[cid] = merged;
-        const digits = cid.replace(/[^0-9]/g, '');
-        if (digits) users[digits] = merged;
-      }
-      if (p.telegram_id) {
-        const tid = p.telegram_id.toString().trim().replace(/^@/, '').toLowerCase();
-        users[tid] = merged;
-        users[`@${tid}`] = merged;
-      }
-      if (p.email) {
-        users[p.email.toLowerCase().trim()] = merged;
-      }
-    });
-  }
-
-  if (incomingWallets && typeof incomingWallets === 'object') {
-    Object.entries(incomingWallets).forEach(([k, w]: [string, any]) => {
-      if (w && typeof w === 'object') {
-        wallets[k] = {
-          ...(wallets[k] || {}),
-          ...w,
-          available_balance: typeof w.available_balance === 'number' ? w.available_balance : (wallets[k]?.available_balance ?? 0),
-          locked_balance: typeof w.locked_balance === 'number' ? w.locked_balance : (wallets[k]?.locked_balance ?? 0),
-          updated_at: new Date().toISOString(),
-        };
-      }
-    });
-  }
-
-  if (Array.isArray(incomingTransactions)) {
-    incomingTransactions.forEach((tx: any) => {
-      const existingIdx = transactions.findIndex((t) => t.id === tx.id);
-      if (existingIdx >= 0) {
-        transactions[existingIdx] = { ...transactions[existingIdx], ...tx };
-      } else {
-        transactions.unshift(tx);
-      }
-    });
-  }
-
-  if (Array.isArray(incomingDeposits)) {
-    incomingDeposits.forEach((dep: any) => {
-      const existingIdx = depositRequests.findIndex((d) => d.id === dep.id);
-      if (existingIdx >= 0) {
-        depositRequests[existingIdx] = { ...depositRequests[existingIdx], ...dep };
-      } else {
-        depositRequests.unshift(dep);
-      }
-    });
-  }
-
-  if (Array.isArray(incomingWithdrawals)) {
-    incomingWithdrawals.forEach((wd: any) => {
-      const existingIdx = withdrawalRequests.findIndex((w) => w.id === wd.id);
-      if (existingIdx >= 0) {
-        withdrawalRequests[existingIdx] = { ...withdrawalRequests[existingIdx], ...wd };
-      } else {
-        withdrawalRequests.unshift(wd);
-      }
-    });
-  }
-
-  if (Array.isArray(incomingKeys)) {
-    incomingKeys.forEach((k: any) => {
-      const existing = apiKeys.find((ek) => ek.id === k.id || ek.api_key_prefix === k.api_key_prefix);
-      if (!existing) {
-        apiKeys.push(k);
-      }
-    });
-  }
-
-  // Only allow admin to update system-wide app settings
-  if (incomingSettings && (req.body.isAdmin === true || req.body.role === 'ADMIN')) {
-    appSettings = { ...appSettings, ...incomingSettings };
-  }
-
-  // Save changes to persistent storage disk
-  saveDatabase();
-
-  // Extract deduped unique profiles
-  const profileMap = new Map<string, any>();
-  Object.values(users).forEach((u: any) => {
-    if (u && u.id) {
-      profileMap.set(u.id, u);
-    }
-  });
-  const dedupedProfiles = Array.from(profileMap.values());
-
-  res.json({
-    status: 'success',
-    code: 200,
-    message: 'Backend synchronized successfully',
-    profiles: dedupedProfiles,
-    wallets,
-    transactions: transactions.slice(0, 100),
-    deposits: depositRequests,
-    withdrawals: withdrawalRequests,
-    api_keys: apiKeys,
-    settings: appSettings,
-    users_count: dedupedProfiles.length,
-    wallets_count: Object.keys(wallets).length,
-    api_keys_count: apiKeys.length,
-    transactions_count: transactions.length,
-    timestamp: new Date().toISOString(),
-  });
-});
-
-app.get('/api/v1/sync-state', (req: Request, res: Response) => {
-  const profileMap = new Map<string, any>();
-  Object.values(users).forEach((u: any) => {
-    if (u && u.id) {
-      profileMap.set(u.id, u);
-    }
-  });
-  const dedupedProfiles = Array.from(profileMap.values());
-
-  res.json({
-    status: 'success',
-    code: 200,
-    profiles: dedupedProfiles,
-    wallets,
-    transactions: transactions.slice(0, 100),
-    deposits: depositRequests,
-    withdrawals: withdrawalRequests,
-    api_keys: apiKeys,
-    settings: appSettings,
-    users_count: dedupedProfiles.length,
-    timestamp: new Date().toISOString(),
-  });
-});
 
 // ==========================================
 // TELEGRAM BOT POLLING & WEBHOOK PROCESSOR

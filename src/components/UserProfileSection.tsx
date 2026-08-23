@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useWallet } from '../context/WalletContext';
 import {
   User,
@@ -18,38 +18,86 @@ import {
   Lock,
   Moon,
   Sun,
+  Mail,
 } from 'lucide-react';
 
 export const UserProfileSection: React.FC<{
   onOpenDeveloper?: () => void;
   onLogout?: () => void;
 }> = ({ onOpenDeveloper, onLogout }) => {
-  const { currentUser, currentWallet, transactions, formatINR, switchUser, allProfiles, openRpinModal, logoutUser } = useWallet();
+  const { currentUser, currentWallet, transactions, formatINR, openRpinModal, logoutUser, updateProfile } = useWallet();
 
   const [showFullPhone, setShowFullPhone] = useState(false);
   const [is2FAEnabled, setIs2FAEnabled] = useState(true);
   const [editingName, setEditingName] = useState(false);
-  const [userName, setUserName] = useState(currentUser.full_name || 'SK SAHIL');
+  const [userName, setUserName] = useState(currentUser.full_name || 'Account Holder');
+  const [editingPhone, setEditingPhone] = useState(false);
+  const [userPhone, setUserPhone] = useState(currentUser.mobile || '');
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [userEmail, setUserEmail] = useState(currentUser.email || '');
   const [editingTelegram, setEditingTelegram] = useState(false);
-  const [telegramNode, setTelegramNode] = useState('6561010416');
+  const [telegramNode, setTelegramNode] = useState(currentUser.telegram_chat_id || currentUser.telegram_id || '');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
   const [msg, setMsg] = useState<string | null>(null);
 
-  const myTransactions = transactions.filter((t) => t.user_id === currentUser.id);
+  // Sync state whenever currentUser fields change (only if not actively typing)
+  useEffect(() => {
+    if (!editingName) setUserName(currentUser.full_name || 'Account Holder');
+    if (!editingPhone) setUserPhone(currentUser.mobile || '');
+    if (!editingEmail) setUserEmail(currentUser.email || '');
+    if (!editingTelegram) setTelegramNode(currentUser.telegram_chat_id || currentUser.telegram_id || '');
+  }, [
+    currentUser.full_name,
+    currentUser.mobile,
+    currentUser.email,
+    currentUser.telegram_chat_id,
+    currentUser.telegram_id,
+    editingName,
+    editingPhone,
+    editingEmail,
+    editingTelegram,
+  ]);
+
+  const myTransactions = transactions.filter((t) => t.user_id === currentUser.id || t.user_id === currentUser.user_custom_id);
 
   const maskedPhone = showFullPhone
-    ? currentUser.mobile || '7478338867'
-    : `${(currentUser.mobile || '7478338867').slice(0, 3)}XXXX${(currentUser.mobile || '7478338867').slice(-3)}`;
+    ? userPhone || 'Not Set'
+    : userPhone && userPhone.length >= 6
+    ? `${userPhone.slice(0, 3)}XXXX${userPhone.slice(-3)}`
+    : userPhone || 'Not Set';
 
   const handleSaveName = () => {
+    if (!userName.trim()) return;
+    const res = updateProfile({ full_name: userName.trim() });
     setEditingName(false);
-    setMsg('Name updated successfully!');
+    setMsg(res.message || 'Name updated successfully!');
+    setTimeout(() => setMsg(null), 3000);
+  };
+
+  const handleSavePhone = () => {
+    if (!userPhone.trim()) return;
+    const res = updateProfile({ mobile: userPhone.trim() });
+    setEditingPhone(false);
+    setMsg(res.message || 'Mobile number updated successfully!');
+    setTimeout(() => setMsg(null), 3000);
+  };
+
+  const handleSaveEmail = () => {
+    const res = updateProfile({ email: userEmail.trim() });
+    setEditingEmail(false);
+    setMsg(res.message || 'Email updated successfully!');
     setTimeout(() => setMsg(null), 3000);
   };
 
   const handleSaveTelegram = () => {
+    const cleanTg = telegramNode.trim();
+    const isChatId = /^[0-9]+$/.test(cleanTg);
+    const res = updateProfile({
+      telegram_chat_id: isChatId ? cleanTg : undefined,
+      telegram_id: isChatId ? undefined : cleanTg.startsWith('@') ? cleanTg : cleanTg ? `@${cleanTg}` : undefined,
+    });
     setEditingTelegram(false);
-    setMsg('Telegram Node ID updated!');
+    setMsg(res.message || 'Telegram Node ID updated successfully!');
     setTimeout(() => setMsg(null), 3000);
   };
 
@@ -78,10 +126,10 @@ export const UserProfileSection: React.FC<{
     const rows = myTransactions
       .map(
         (t) =>
-          `"${t.id}","${t.type}",${t.amount},${t.fee},${t.net_amount},"${t.status}","${t.reference_id}","${t.description.replace(
+          `"${t.id}","${t.type}",${t.amount},${t.fee},${t.net_amount},"${t.status}","${t.reference_id}","${(t.description || '').replace(
             /"/g,
             '""'
-          )}",${t.balance_before},${t.balance_after},"${t.created_at}"`
+          )}",${t.balance_before || 0},${t.balance_after || 0},"${t.created_at}"`
       )
       .join('\n');
 
@@ -89,7 +137,7 @@ export const UserProfileSection: React.FC<{
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `SR_GATEWAY_Statement_${currentUser.mobile}_${Date.now()}.csv`;
+    a.download = `SR_GATEWAY_Statement_${currentUser.user_custom_id}_${Date.now()}.csv`;
     a.click();
     setMsg('Statement CSV downloaded successfully!');
     setTimeout(() => setMsg(null), 3000);
@@ -105,7 +153,7 @@ export const UserProfileSection: React.FC<{
           <div className="relative">
             <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-indigo-600 via-emerald-500 to-teal-400 p-1 shadow-xl shadow-indigo-600/30">
               <div className="w-full h-full rounded-full bg-slate-950 flex items-center justify-center text-white font-black text-3xl">
-                {userName.charAt(0)}
+                {(currentUser.full_name || 'U').charAt(0).toUpperCase()}
               </div>
             </div>
             <span className="absolute bottom-1 right-1 w-5 h-5 bg-emerald-500 border-2 border-slate-950 rounded-full flex items-center justify-center">
@@ -115,11 +163,10 @@ export const UserProfileSection: React.FC<{
 
           <div className="mt-3 space-y-1">
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center justify-center gap-2">
-              <span>USER</span>
-              <span className="text-emerald-400 underline underline-offset-4 decoration-emerald-500/50">PROFILE</span>
+              <span>{currentUser.full_name}</span>
             </h1>
             <p className="text-xs text-slate-400 font-mono">
-              Registered Mobile: <span className="text-emerald-400 font-bold">{currentUser.mobile}</span> • Status: <span className="text-indigo-300 font-bold uppercase">{currentUser.status}</span>
+              User ID: <span className="text-indigo-400 font-bold">{currentUser.user_custom_id}</span> • Status: <span className="text-emerald-400 font-bold uppercase">{currentUser.status}</span>
             </p>
           </div>
         </div>
@@ -134,12 +181,12 @@ export const UserProfileSection: React.FC<{
       {/* User Info Details Card */}
       <div className="rounded-[2rem] bg-slate-900 border border-slate-800 p-6 shadow-xl space-y-5">
         <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 border-b border-slate-800/80 pb-3">
-          PERSONAL IDENTITY (VERIFIED)
+          PERSONAL IDENTITY & CONTACT (VERIFIED)
         </h3>
 
         {/* Full Name */}
         <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
-          <div>
+          <div className="flex-1 mr-2">
             <div className="text-[10px] text-slate-500 font-mono uppercase">Full Legal Name</div>
             {editingName ? (
               <div className="flex items-center gap-2 mt-1">
@@ -147,23 +194,23 @@ export const UserProfileSection: React.FC<{
                   type="text"
                   value={userName}
                   onChange={(e) => setUserName(e.target.value)}
-                  className="bg-slate-900 border border-indigo-500 rounded-xl px-3 py-1 text-sm text-white font-bold focus:outline-none"
+                  className="bg-slate-900 border border-indigo-500 rounded-xl px-3 py-1 text-sm text-white font-bold focus:outline-none w-full max-w-xs"
                 />
                 <button
                   onClick={handleSaveName}
-                  className="p-1.5 bg-emerald-500 text-slate-950 rounded-xl font-bold text-xs"
+                  className="p-1.5 bg-emerald-500 text-slate-950 rounded-xl font-bold text-xs shrink-0 cursor-pointer"
                 >
                   <Check className="h-4 w-4" />
                 </button>
               </div>
             ) : (
-              <div className="text-base font-black text-white mt-0.5">{userName}</div>
+              <div className="text-base font-black text-white mt-0.5">{currentUser.full_name}</div>
             )}
           </div>
           {!editingName && (
             <button
               onClick={() => setEditingName(true)}
-              className="p-2 text-slate-400 hover:text-white bg-slate-900 rounded-xl border border-slate-800 transition"
+              className="p-2 text-slate-400 hover:text-white bg-slate-900 rounded-xl border border-slate-800 transition cursor-pointer"
             >
               <Pencil className="h-4 w-4" />
             </button>
@@ -172,28 +219,100 @@ export const UserProfileSection: React.FC<{
 
         {/* Phone Number */}
         <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-300">
+          <div className="flex items-center gap-3 flex-1 mr-2">
+            <div className="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-300 shrink-0">
               <Smartphone className="h-4 w-4" />
             </div>
-            <div>
+            <div className="flex-1">
               <div className="text-[10px] text-slate-500 font-mono uppercase">Registered Mobile Number (Wallet A/C)</div>
-              <div className="text-sm font-mono font-bold text-white mt-0.5">{maskedPhone}</div>
+              {editingPhone ? (
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="text"
+                    value={userPhone}
+                    onChange={(e) => setUserPhone(e.target.value)}
+                    className="bg-slate-900 border border-indigo-500 rounded-xl px-3 py-1 text-sm text-white font-mono font-bold focus:outline-none w-full max-w-xs"
+                  />
+                  <button
+                    onClick={handleSavePhone}
+                    className="p-1.5 bg-emerald-500 text-slate-950 rounded-xl font-bold text-xs shrink-0 cursor-pointer"
+                  >
+                    <Check className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="text-sm font-mono font-bold text-white mt-0.5">{maskedPhone}</div>
+              )}
             </div>
           </div>
-          <button
-            onClick={() => setShowFullPhone(!showFullPhone)}
-            className="p-2 text-slate-400 hover:text-white bg-slate-900 rounded-xl border border-slate-800 transition"
-          >
-            {showFullPhone ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
+          <div className="flex items-center gap-1.5">
+            {!editingPhone && (
+              <>
+                <button
+                  onClick={() => setShowFullPhone(!showFullPhone)}
+                  className="p-2 text-slate-400 hover:text-white bg-slate-900 rounded-xl border border-slate-800 transition cursor-pointer"
+                  title="Show/Hide Full Phone"
+                >
+                  {showFullPhone ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+                <button
+                  onClick={() => setEditingPhone(true)}
+                  className="p-2 text-slate-400 hover:text-white bg-slate-900 rounded-xl border border-slate-800 transition cursor-pointer"
+                  title="Edit Mobile Number"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Email Address (Gmail) */}
+        <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-3 flex-1 mr-2">
+            <div className="p-2.5 rounded-xl bg-purple-500/20 text-purple-300 shrink-0">
+              <Mail className="h-4 w-4" />
+            </div>
+            <div className="flex-1">
+              <div className="text-[10px] text-slate-500 font-mono uppercase">Registered Email (Gmail Alerts)</div>
+              {editingEmail ? (
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="email"
+                    value={userEmail}
+                    onChange={(e) => setUserEmail(e.target.value)}
+                    placeholder="yourname@gmail.com"
+                    className="bg-slate-900 border border-purple-500 rounded-xl px-3 py-1 text-sm text-white font-mono focus:outline-none w-full max-w-xs"
+                  />
+                  <button
+                    onClick={handleSaveEmail}
+                    className="p-1.5 bg-purple-500 text-white rounded-xl font-bold text-xs shrink-0 cursor-pointer"
+                  >
+                    <Check className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="text-sm font-mono font-bold text-purple-300 mt-0.5">
+                  {currentUser.email || 'No email registered'}
+                </div>
+              )}
+            </div>
+          </div>
+          {!editingEmail && (
+            <button
+              onClick={() => setEditingEmail(true)}
+              className="p-2 text-slate-400 hover:text-white bg-slate-900 rounded-xl border border-slate-800 transition cursor-pointer"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
 
       {/* Security & Theme Settings Card */}
       <div className="rounded-[2rem] bg-slate-900 border border-slate-800 p-6 shadow-xl space-y-4">
         <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 border-b border-slate-800/80 pb-3">
-          SECURITY & DISPLAY SETTINGS
+          SECURITY & TELEGRAM ALERT SETTINGS
         </h3>
 
         {/* Dark / Bright Mood Toggle */}
@@ -240,7 +359,7 @@ export const UserProfileSection: React.FC<{
             </div>
             <div>
               <div className="text-xs font-extrabold text-white">2FA VERIFICATION</div>
-              <div className="text-[10px] text-slate-400 font-mono">OTP via Telegram Bot Node</div>
+              <div className="text-[10px] text-slate-400 font-mono">OTP via Telegram Bot &amp; Email Node</div>
             </div>
           </div>
           <button
@@ -259,36 +378,39 @@ export const UserProfileSection: React.FC<{
 
         {/* Telegram Node ID */}
         <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-sky-500/20 text-sky-400">
+          <div className="flex items-center gap-3 flex-1 mr-2">
+            <div className="p-2.5 rounded-xl bg-sky-500/20 text-sky-400 shrink-0">
               <Send className="h-4 w-4" />
             </div>
-            <div>
-              <div className="text-[10px] text-slate-500 font-mono uppercase">TELEGRAM NODE ID</div>
+            <div className="flex-1">
+              <div className="text-[10px] text-slate-500 font-mono uppercase">TELEGRAM NODE / CHAT ID</div>
               {editingTelegram ? (
                 <div className="flex items-center gap-2 mt-1">
                   <input
                     type="text"
                     value={telegramNode}
                     onChange={(e) => setTelegramNode(e.target.value)}
-                    className="bg-slate-900 border border-sky-500 rounded-xl px-3 py-1 text-xs text-white font-mono font-bold"
+                    placeholder="Enter Telegram Chat ID or @username"
+                    className="bg-slate-900 border border-sky-500 rounded-xl px-3 py-1 text-xs text-white font-mono font-bold w-full max-w-xs focus:outline-none"
                   />
                   <button
                     onClick={handleSaveTelegram}
-                    className="p-1.5 bg-sky-500 text-slate-950 rounded-xl font-bold text-xs"
+                    className="p-1.5 bg-sky-500 text-slate-950 rounded-xl font-bold text-xs shrink-0 cursor-pointer"
                   >
                     <Check className="h-4 w-4" />
                   </button>
                 </div>
               ) : (
-                <div className="text-sm font-mono font-bold text-sky-400 mt-0.5">{telegramNode}</div>
+                <div className="text-sm font-mono font-bold text-sky-400 mt-0.5">
+                  {currentUser.telegram_chat_id || currentUser.telegram_id || 'Not connected'}
+                </div>
               )}
             </div>
           </div>
           {!editingTelegram && (
             <button
               onClick={() => setEditingTelegram(true)}
-              className="p-2 text-slate-400 hover:text-white bg-slate-900 rounded-xl border border-slate-800 transition"
+              className="p-2 text-slate-400 hover:text-white bg-slate-900 rounded-xl border border-slate-800 transition cursor-pointer"
             >
               <Pencil className="h-4 w-4" />
             </button>
@@ -308,14 +430,14 @@ export const UserProfileSection: React.FC<{
           </div>
           <button
             onClick={handleRPINRecovery}
-            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 rounded-xl font-mono text-xs font-bold transition"
+            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 rounded-xl font-mono text-xs font-bold transition cursor-pointer"
           >
             MODIFY
           </button>
         </div>
       </div>
 
-      {/* Account Statement Section (Shifted from Transactions tab as requested) */}
+      {/* Account Statement Section */}
       <div className="rounded-[2rem] bg-slate-900 border border-slate-800 p-6 shadow-xl space-y-4">
         <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
           <div className="flex items-center gap-2">
