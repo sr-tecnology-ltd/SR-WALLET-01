@@ -133,7 +133,7 @@ let appSettings: Record<string, any> = {
   telegram_channel_name: 'SR TECHNOLOGY LTD',
   telegram_channel_url: 'https://t.me/SRTECHNOLOGYLTD1',
   support_url: 'https://t.me/SRGatewaySupportBot',
-  app_url: process.env.APP_URL || 'https://srgateway.onrender.com',
+  app_url: process.env.APP_URL || 'https://srgateway-5jj4.onrender.com',
   otp_telegram_bot_username: process.env.TELEGRAM_BOT_USERNAME || '@SRGatewayBot',
   otp_telegram_bot_token: process.env.TELEGRAM_BOT_TOKEN || '',
   admin_upi_id: 'srgateway@icici',
@@ -142,6 +142,12 @@ let appSettings: Record<string, any> = {
   admin_bank_account_name: 'SR Gateway Payments',
   admin_bank_account_no: '50200088192031',
   admin_bank_ifsc: 'HDFC0001092',
+  // Maintenance Mode (System Upgrade Lock)
+  maintenance_mode_enabled: false,
+  maintenance_mode_title: '⚡ SYSTEM UNDER SCHEDULED UPGRADE',
+  maintenance_mode_message: 'Our engineers are currently upgrading SR Gateway payment nodes and core servers to deliver ultra-fast UPI processing and 100% uptime. Services will resume shortly.',
+  maintenance_channel_url: 'https://t.me/SRTECHNOLOGYLTD1',
+  maintenance_estimated_time: '15-30 Minutes',
   // Automated Email Alert Settings
   email_alerts_enabled: true,
   email_login_alert_enabled: true,
@@ -721,8 +727,24 @@ async function sendTelegramNotification(
     return { ok: false, error: 'MISSING_CHAT_ID', description: 'Target Telegram chat_id or username is empty.' };
   }
 
-  const raw = targetChat.toString().trim();
-  const formattedChat = /^-?\d+$/.test(raw) ? raw : (raw.startsWith('@') ? raw : `@${raw}`);
+  let raw = targetChat.toString().trim();
+
+  // 1. If chat id has prefix like @chat_ or starts with @ on pure numeric digits, strip the @
+  if (raw.startsWith('@chat_')) {
+    raw = raw.replace('@chat_', '');
+  } else if (raw.startsWith('@') && /^-?\d+$/.test(raw.slice(1))) {
+    raw = raw.slice(1);
+  }
+
+  // 2. Determine numeric chat ID vs channel/username
+  const isNumericChat = /^-?\d+$/.test(raw);
+  const formattedChat = isNumericChat ? raw : (raw.startsWith('@') ? raw : `@${raw}`);
+
+  // 3. Skip dummy seed placeholders
+  if (formattedChat === '@rahul_sr' || formattedChat === '@priya_patel' || formattedChat === '@amit_k' || formattedChat === '@test_user' || formattedChat === '@your_username') {
+    return { ok: false, error: 'DUMMY_SEED_USER', description: 'Skipped notification for dummy seed placeholder.' };
+  }
+
   const botToken = getTelegramBotToken(customToken);
 
   if (!isRealTelegramToken(botToken)) {
@@ -739,7 +761,7 @@ async function sendTelegramNotification(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: formattedChat,
+        chat_id: isNumericChat ? (Number(formattedChat) || formattedChat) : formattedChat,
         text: messageHtml,
         parse_mode: 'HTML',
       }),
@@ -751,7 +773,11 @@ async function sendTelegramNotification(
       return { ok: true, status: 'sent', message_id: data.result?.message_id };
     } else {
       const desc = data?.description || 'Telegram API rejected request';
-      console.warn(`[TELEGRAM NOTIFICATION REJECTED] To: ${formattedChat} | Error: ${desc}`);
+      if (desc.includes('chat not found') || desc.includes('bot was blocked') || desc.includes('user not found')) {
+        console.warn(`[TELEGRAM NOTIFICATION NOTICE] Cannot deliver to ${formattedChat} (${desc}). The recipient must start the bot (/start) or link their numeric chat ID in the web portal.`);
+      } else {
+        console.warn(`[TELEGRAM NOTIFICATION REJECTED] To: ${formattedChat} | Error: ${desc}`);
+      }
       return { ok: false, error: data?.error_code?.toString() || 'TELEGRAM_REJECTED', description: desc };
     }
   } catch (err: any) {
@@ -1153,9 +1179,10 @@ function executeUserToUserTransfer(
     console.log(`[TRANSFER COMPLETED] From: ${senderUser.user_custom_id} (${senderUser.full_name}) ₹${prevSenderBal} -> ₹${newSenderBal} | To: ${recipientUser.user_custom_id} (${recipientUser.full_name}) ₹${prevRecipientBal} -> ₹${newRecipientBal} | Amount: ₹${amount} | Sig: ${txnSignature.slice(0, 12)}...`);
 
     // 10. Telegram Notifications (if registered)
-    if (senderUser.telegram_id) {
+    const senderTg = senderUser.telegram_chat_id || senderUser.telegram_id;
+    if (senderTg) {
       sendTelegramNotification(
-        senderUser.telegram_id,
+        senderTg,
         `💸 <b>SR GATEWAY Payment Sent</b>\n\n` +
         `Sent Amount: <b>₹${amount.toFixed(2)}</b>\n` +
         `To: <b>${recipientUser.full_name}</b> (${recipientUser.mobile || recipientUser.user_custom_id})\n` +
@@ -1165,9 +1192,10 @@ function executeUserToUserTransfer(
       );
     }
 
-    if (recipientUser.telegram_id) {
+    const recipientTg = recipientUser.telegram_chat_id || recipientUser.telegram_id;
+    if (recipientTg) {
       sendTelegramNotification(
-        recipientUser.telegram_id,
+        recipientTg,
         `💰 <b>SR GATEWAY Payment Received!</b>\n\n` +
         `Received: <b>₹${amount.toFixed(2)}</b>\n` +
         `From: <b>${senderUser.full_name}</b> (${senderUser.mobile || senderUser.user_custom_id})\n` +
@@ -1176,6 +1204,8 @@ function executeUserToUserTransfer(
         `Note: ${cleanNote}`
       );
     }
+
+    saveDatabase();
 
     return {
       success: true,
@@ -1442,7 +1472,7 @@ app.get('/api/docs', (req: Request, res: Response) => {
 
 // 3. Auth Endpoints
 app.post('/api/v1/auth/register', async (req: Request, res: Response) => {
-  const { full_name, mobile, email, telegram_id, telegram_chat_id, user_custom_id, referral_code } = req.body;
+  const { full_name, mobile, email, telegram_id, telegram_chat_id, user_custom_id, referral_code, password } = req.body;
   const customId = user_custom_id || `SR-${Math.floor(10000 + Math.random() * 90000)}`;
   const cleanMobile = mobile ? mobile.trim() : '+91 90000 00000';
   const cleanEmail = email ? email.trim() : '';
@@ -1460,6 +1490,7 @@ app.post('/api/v1/auth/register', async (req: Request, res: Response) => {
     role: 'USER',
     status: 'ACTIVE',
     referral_code: referral_code || `REF-${customId}`,
+    password: password ? password.trim() : undefined,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -1482,6 +1513,9 @@ app.post('/api/v1/auth/register', async (req: Request, res: Response) => {
   };
   if (newUser.id) wallets[newUser.id] = wallets[customId];
   if (normPhone) wallets[normPhone] = wallets[customId];
+
+  reindexUsers();
+  saveDatabase();
 
   // 1. Dispatch Automated Registration Email Alert to User's provided email
   let emailDispatched = false;
@@ -1617,10 +1651,49 @@ app.post('/api/v1/auth/register-alert', async (req: Request, res: Response) => {
 });
 
 app.post('/api/v1/auth/login', async (req: Request, res: Response) => {
-  const { identifier, device_name, ip_address, location, email } = req.body; // mobile, custom_id, or email
-  const user = Object.values(users).find(
-    (u) => u.user_custom_id === identifier || u.mobile === identifier || u.email === identifier
-  ) || users['SR-10029'];
+  const { identifier, password, device_name, ip_address, location, email } = req.body; // mobile, custom_id, or email
+
+  if (!identifier) {
+    return res.status(400).json({ status: 'error', code: 400, message: 'Identifier is required' });
+  }
+
+  const cleanIdent = identifier.toString().trim().toLowerCase();
+  const cleanDigits = identifier.toString().trim().replace(/[^0-9]/g, '');
+
+  const user = Object.values(users).find((u) => {
+    const uMobileDigits = (u.mobile || '').replace(/[^0-9]/g, '');
+    return (
+      (u.user_custom_id && u.user_custom_id.toLowerCase() === cleanIdent) ||
+      (u.mobile && u.mobile.toLowerCase() === cleanIdent) ||
+      (cleanDigits.length >= 10 && uMobileDigits.endsWith(cleanDigits.slice(-10))) ||
+      (u.email && u.email.toLowerCase() === cleanIdent) ||
+      (u.telegram_id && u.telegram_id.toLowerCase() === cleanIdent) ||
+      (u.telegram_chat_id && u.telegram_chat_id.toString().trim() === cleanIdent)
+    );
+  });
+
+  if (!user) {
+    return res.status(404).json({ status: 'error', code: 404, message: 'Account not found. Please check your credentials.' });
+  }
+
+  if (user.status === 'BANNED') {
+    return res.status(403).json({ status: 'error', code: 403, message: 'Account is suspended.' });
+  }
+
+  // Strict Password Verification
+  if (password !== undefined) {
+    const enteredPass = password.toString().trim();
+    if (user.password) {
+      if (user.password !== enteredPass) {
+        return res.status(401).json({ status: 'error', code: 401, message: 'Invalid password. Please enter correct password.' });
+      }
+    } else {
+      const validPass = user.role === 'ADMIN' ? 'admin' : user.rpin;
+      if (!validPass || enteredPass !== validPass) {
+        return res.status(401).json({ status: 'error', code: 401, message: 'Invalid password. Please enter correct password.' });
+      }
+    }
+  }
 
   const clientIp = ip_address || (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '103.212.144.20';
   const clientDevice = device_name || req.headers['user-agent'] || 'Web Browser (Chrome)';
@@ -1628,7 +1701,7 @@ app.post('/api/v1/auth/login', async (req: Request, res: Response) => {
   const loginTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
 
   // 1. Dispatch Telegram Login Alert if user has connected Telegram
-  const tgTarget = user.telegram_id || user.telegram_chat_id;
+  const tgTarget = user.telegram_chat_id || user.telegram_id;
   if (tgTarget) {
     sendTelegramNotification(
       tgTarget,
@@ -2664,6 +2737,7 @@ app.post('/api/v1/deposit/request', validateApiKey, async (req: Request, res: Re
   };
 
   depositRequests.unshift(depObj);
+  saveDatabase();
 
   // Dispatch Automated Deposit Alert Email to User's registered Gmail
   const userEmail = email || user.email;
@@ -2839,6 +2913,7 @@ app.post('/api/v1/withdraw/request', validateApiKey, async (req: Request, res: R
   };
 
   withdrawalRequests.unshift(wdrObj);
+  saveDatabase();
 
   // Dispatch Automated Withdrawal Alert Email to User's registered Gmail with full payout details
   const userEmail = email || user.email;
@@ -3045,6 +3120,7 @@ app.get('/api/v1/admin/settings', (req: Request, res: Response) => {
 const handleUpdateAdminSettings = (req: Request, res: Response) => {
   const incoming = req.body || {};
   appSettings = { ...appSettings, ...incoming };
+  saveDatabase();
   res.json({
     status: 'success',
     code: 200,
@@ -3069,6 +3145,8 @@ const handleResetAllBalances = (req: Request, res: Response) => {
       count++;
     }
   }
+
+  saveDatabase();
 
   res.json({
     status: 'success',
@@ -3235,9 +3313,10 @@ app.get('/api/v1/sync-state', (req: Request, res: Response) => {
 });
 
 app.post('/api/v1/sync-state', (req: Request, res: Response) => {
-  const { profiles, wallets: incomingWallets, settings: incomingSettings, deposits, withdrawals, transactions: incomingTxns, apiKeys: incomingKeys } = req.body || {};
+  const { profiles, wallets: incomingWallets, settings: incomingSettings, deposits, withdrawals, transactions: incomingTxns, apiKeys: incomingKeys, isAdmin } = req.body || {};
 
-  if (incomingSettings && typeof incomingSettings === 'object') {
+  // Strictly enforce that only admin actions can update global appSettings to prevent accidental reset by regular user state
+  if (isAdmin && incomingSettings && typeof incomingSettings === 'object') {
     appSettings = { ...appSettings, ...incomingSettings };
   }
 
@@ -3691,7 +3770,7 @@ async function processTelegramMessageUpdate(update: any) {
         `• /balance - Check live wallet balance\n` +
         `• /pay &lt;number&gt; &lt;amount&gt; [note] - Instant User-to-User Transfer\n` +
         `• /history - View recent wallet transactions\n\n` +
-        `🌐 <b>Official Web Portal:</b> ${appSettings.app_url || 'https://srgateway.onrender.com'}\n` +
+        `🌐 <b>Official Web Portal:</b> ${appSettings.app_url || 'https://srgateway-5jj4.onrender.com'}\n` +
         `⚡ Need help? Contact 24/7 support on our gateway portal.`;
 
       await replyTelegram(welcomeMsg);
@@ -3705,7 +3784,7 @@ async function processTelegramMessageUpdate(update: any) {
           `⚠️ <b>Telegram Account Not Linked</b>\n\n` +
           `Your Telegram account is not linked to any SR Gateway wallet yet.\n\n` +
           `🆔 <b>Your Chat ID:</b> <code>${chatId}</code>\n\n` +
-          `👉 <b>How to link:</b> Open SR Gateway Web Portal (${appSettings.app_url || 'https://srgateway.onrender.com'}), navigate to <b>Telegram Bot OTP & Alerts</b>, and enter your Chat ID.`
+          `👉 <b>How to link:</b> Open SR Gateway Web Portal (${appSettings.app_url || 'https://srgateway-5jj4.onrender.com'}), navigate to <b>Telegram Bot OTP & Alerts</b>, and enter your Chat ID.`
         );
         return;
       }
@@ -3860,7 +3939,7 @@ async function startTelegramPollingWorker() {
   const allowDevPolling = process.env.ENABLE_DEV_TELEGRAM_POLLING === 'true';
 
   if (isAisDev && !isRender && !allowDevPolling) {
-    console.log('[TELEGRAM POLLING] Running in AI Studio preview sandbox. Polling delegated to primary live deployment on Render (https://srgateway.onrender.com) to avoid duplicate bot responses.');
+    console.log('[TELEGRAM POLLING] Running in AI Studio preview sandbox. Polling delegated to primary live deployment on Render (https://srgateway-5jj4.onrender.com) to avoid duplicate bot responses.');
     return;
   }
 
@@ -3971,7 +4050,7 @@ app.post('/api/v1/telegram-bot/simulate-command', async (req: Request, res: Resp
       `• /balance - Check live wallet balance\n` +
       `• /pay <number> <amount> [note] - Instant User-to-User Transfer\n` +
       `• /history - View recent wallet transactions\n\n` +
-      `🌐 Official Web Portal: ${appSettings.app_url || 'https://srgateway.onrender.com'}\n` +
+      `🌐 Official Web Portal: ${appSettings.app_url || 'https://srgateway-5jj4.onrender.com'}\n` +
       `⚡ Need help? Contact 24/7 support on our gateway portal.`;
 
     return res.json({
@@ -4238,7 +4317,26 @@ app.post('/api/v1/admin/approve-deposit', async (req: Request, res: Response) =>
     }).catch((e) => console.error('Deposit approved email alert error:', e));
   }
 
+  saveDatabase();
+
   res.json({ status: 'success', code: 200, message: 'Deposit approved & user balance updated', deposit: dep });
+});
+
+app.post('/api/v1/admin/reject-deposit', async (req: Request, res: Response) => {
+  const { deposit_id, reason = 'Invalid UTR' } = req.body;
+  const dep = depositRequests.find((d) => d.id === deposit_id);
+
+  if (!dep) {
+    return res.status(404).json({ status: 'error', code: 404, message: 'Deposit request not found' });
+  }
+
+  dep.status = 'REJECTED';
+  dep.rejection_reason = reason;
+  dep.reviewed_at = new Date().toISOString();
+
+  saveDatabase();
+
+  res.json({ status: 'success', code: 200, message: 'Deposit request rejected', deposit: dep });
 });
 
 app.post('/api/v1/admin/approve-withdraw', async (req: Request, res: Response) => {
@@ -4307,7 +4405,31 @@ app.post('/api/v1/admin/approve-withdraw', async (req: Request, res: Response) =
     }).catch((e) => console.error('Withdrawal approved email alert error:', e));
   }
 
+  saveDatabase();
+
   res.json({ status: 'success', code: 200, message: 'Withdrawal marked as paid & confirmed', withdrawal: wd });
+});
+
+app.post('/api/v1/admin/reject-withdraw', async (req: Request, res: Response) => {
+  const { withdraw_id, reason = 'Declined by Admin' } = req.body;
+  const wd = withdrawalRequests.find((w) => w.id === withdraw_id);
+
+  if (!wd) {
+    return res.status(404).json({ status: 'error', code: 404, message: 'Withdrawal request not found' });
+  }
+
+  wd.status = 'REJECTED';
+  wd.rejection_reason = reason;
+  wd.updated_at = new Date().toISOString();
+
+  // Restore balance
+  const wallet = wallets[wd.user_id] || wallets['SR-10029'];
+  wallet.locked_balance = Math.max(0, wallet.locked_balance - wd.amount);
+  wallet.available_balance += wd.amount;
+
+  saveDatabase();
+
+  res.json({ status: 'success', code: 200, message: 'Withdrawal request rejected and balance restored', withdrawal: wd });
 });
 
 app.post('/api/v1/admin/credit-debit', (req: Request, res: Response) => {
@@ -4335,6 +4457,8 @@ app.post('/api/v1/admin/credit-debit', (req: Request, res: Response) => {
     balance_after: wallet.available_balance,
     created_at: new Date().toISOString(),
   });
+
+  saveDatabase();
 
   res.json({ status: 'success', code: 200, message: `Wallet ${type} of ₹${numAmt} processed successfully` });
 });

@@ -33,6 +33,7 @@ import {
   Send,
   Inbox,
   Trash2,
+  Wrench,
 } from 'lucide-react';
 import { UserProfile, DepositRequest, WithdrawalRequest, Wallet, AppSettings } from '../types';
 
@@ -110,14 +111,12 @@ export const AdminPortal: React.FC = () => {
   const [settingsForm, setSettingsForm] = useState<AppSettings>(settings);
   const [isSettingsDirty, setIsSettingsDirty] = useState<boolean>(false);
   const [isSavingSettings, setIsSavingSettings] = useState<boolean>(false);
-  const hasInitializedSettings = useRef(false);
 
   useEffect(() => {
-    if (!hasInitializedSettings.current) {
+    if (!isSettingsDirty) {
       setSettingsForm(settings);
-      hasInitializedSettings.current = true;
     }
-  }, [settings]);
+  }, [settings, isSettingsDirty]);
 
   const handleSettingChange = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     setIsSettingsDirty(true);
@@ -125,6 +124,36 @@ export const AdminPortal: React.FC = () => {
       ...prev,
       [key]: value,
     }));
+  };
+
+  const toggleMaintenanceMode = async (enabled: boolean) => {
+    const updated: AppSettings = {
+      ...settingsForm,
+      maintenance_mode_enabled: enabled,
+    };
+    setSettingsForm(updated);
+    setIsSettingsDirty(false);
+    updateSettings(updated);
+
+    try {
+      await fetch('/api/v1/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated),
+      });
+      await fetch('/api/v1/sync-state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: updated, isAdmin: true }),
+      });
+      showAlert(
+        enabled
+          ? '🔴 Maintenance Mode Activated! User panel is now locked for normal users.'
+          : '🟢 Maintenance Mode Disabled! User panel is now fully accessible to users.'
+      );
+    } catch {
+      showAlert('Maintenance Mode state updated locally.');
+    }
   };
 
   // Email Test & Logs State
@@ -576,6 +605,36 @@ export const AdminPortal: React.FC = () => {
           })}
         </div>
       </div>
+
+      {/* Sticky Maintenance Mode Warning Banner */}
+      {settingsForm.maintenance_mode_enabled && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-red-500/20 border-2 border-amber-500/60 text-amber-200 shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-amber-500/30 text-amber-300 shrink-0 animate-pulse">
+              <Wrench className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="font-extrabold text-sm text-white flex items-center gap-2">
+                <span>⚠️ MAINTENANCE MODE IS ACTIVE (मेन्टेनेंस मोड चालू है)</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/30 text-red-300 font-mono font-bold border border-red-500/40 animate-pulse">
+                  USER ACCESS BLOCKED
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-0.5">
+                The User Panel is locked. Normal users see the maintenance screen with your custom message and Telegram channel link.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => toggleMaintenanceMode(false)}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold font-mono transition shrink-0 shadow-lg flex items-center gap-1.5"
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            <span>Turn OFF Maintenance Mode</span>
+          </button>
+        </div>
+      )}
 
       {adminAlertMsg && (
         <div className="p-4 rounded-2xl bg-indigo-600 text-white font-mono font-bold text-xs shadow-xl animate-bounce">
@@ -1134,6 +1193,125 @@ export const AdminPortal: React.FC = () => {
               )}
             </div>
 
+            {/* MAINTENANCE MODE CONTROLS (USER PANEL LOCK) */}
+            <div className={`p-6 rounded-3xl border-2 transition-all space-y-4 ${
+              settingsForm.maintenance_mode_enabled
+                ? 'bg-amber-950/30 border-amber-500/60 shadow-xl shadow-amber-500/10'
+                : 'bg-slate-950 border-slate-800'
+            }`}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className={`p-3 rounded-2xl ${
+                    settingsForm.maintenance_mode_enabled
+                      ? 'bg-amber-500/30 text-amber-300 animate-pulse'
+                      : 'bg-slate-900 text-slate-400'
+                  }`}>
+                    <Wrench className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-white text-sm flex items-center gap-2">
+                      <span>Maintenance Mode (मेन्टेनेंस मोड)</span>
+                      {settingsForm.maintenance_mode_enabled ? (
+                        <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/40 font-bold animate-pulse">
+                          🔴 LIVE LOCK ACTIVE
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+                          🟢 NORMAL ACTIVE
+                        </span>
+                      )}
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      When turned ON, all user dashboard, deposits, withdrawals and transfers are completely locked with the Maintenance Screen.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 self-end sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => toggleMaintenanceMode(!settingsForm.maintenance_mode_enabled)}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold font-mono transition shadow-lg flex items-center gap-2 ${
+                      settingsForm.maintenance_mode_enabled
+                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                        : 'bg-amber-600 hover:bg-amber-500 text-white'
+                    }`}
+                  >
+                    <Wrench className="h-3.5 w-3.5" />
+                    <span>
+                      {settingsForm.maintenance_mode_enabled
+                        ? 'Disable Maintenance Mode'
+                        : 'Enable Maintenance Mode'}
+                    </span>
+                  </button>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(settingsForm.maintenance_mode_enabled)}
+                      onChange={(e) => handleSettingChange('maintenance_mode_enabled', e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Maintenance Screen Content Fields */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-mono text-xs pt-2">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Maintenance Screen Title (शीर्षक)
+                  </label>
+                  <input
+                    type="text"
+                    value={settingsForm.maintenance_mode_title || ''}
+                    onChange={(e) => handleSettingChange('maintenance_mode_title', e.target.value)}
+                    placeholder="⚡ SYSTEM UNDER SCHEDULED UPGRADE"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Estimated Time (अनुमानित समय)
+                  </label>
+                  <input
+                    type="text"
+                    value={settingsForm.maintenance_estimated_time || ''}
+                    onChange={(e) => handleSettingChange('maintenance_estimated_time', e.target.value)}
+                    placeholder="15-30 Minutes"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Official Telegram Channel Link (लाइव अपडेट लिंक)
+                  </label>
+                  <input
+                    type="text"
+                    value={settingsForm.maintenance_channel_url || settingsForm.telegram_channel_url || ''}
+                    onChange={(e) => handleSettingChange('maintenance_channel_url', e.target.value)}
+                    placeholder="https://t.me/SRTECHNOLOGYLTD1"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Maintenance Message for Users (उपयोगकर्ता संदेश)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={settingsForm.maintenance_mode_message || ''}
+                    onChange={(e) => handleSettingChange('maintenance_mode_message', e.target.value)}
+                    placeholder="Our engineers are currently upgrading SR Gateway payment nodes and core servers to deliver ultra-fast UPI processing and 100% uptime. Services will resume shortly."
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-sans text-xs focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* Deposit & Withdraw ON/OFF Toggles */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
@@ -1642,8 +1820,8 @@ export const AdminPortal: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    placeholder="https://srgateway.onrender.com"
-                    value={settingsForm.app_url || 'https://srgateway.onrender.com'}
+                    placeholder="https://srgateway-5jj4.onrender.com"
+                    value={settingsForm.app_url || 'https://srgateway-5jj4.onrender.com'}
                     onChange={(e) => handleSettingChange('app_url', e.target.value)}
                     className="w-full bg-slate-900 border border-emerald-500/40 rounded-xl px-3 py-2 text-emerald-300 font-mono font-bold focus:border-emerald-500 focus:outline-none"
                   />

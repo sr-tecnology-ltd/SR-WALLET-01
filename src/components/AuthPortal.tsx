@@ -100,6 +100,11 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
       return;
     }
 
+    if (!loginPassword || !loginPassword.trim()) {
+      setErrorMsg('Please enter your account password.');
+      return;
+    }
+
     setIsLoading(true);
     try {
       const res = loginUser(loginIdentifier, loginPassword);

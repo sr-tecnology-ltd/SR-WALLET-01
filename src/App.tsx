@@ -17,6 +17,7 @@ import { UserProfileSection } from './components/UserProfileSection';
 import { RpinModal } from './components/RpinModal';
 import { AuthPortal } from './components/AuthPortal';
 import { AppLockModal } from './components/AppLockModal';
+import { MaintenanceScreen } from './components/MaintenanceScreen';
 import {
   Wallet,
   PlusCircle,
@@ -29,7 +30,7 @@ import {
 } from 'lucide-react';
 
 function WalletAppContent() {
-  const { isAuthenticated, activeRole, toggleRoleMode, switchUser, rpinModalConfig, closeRpinModal } = useWallet();
+  const { isAuthenticated, activeRole, toggleRoleMode, switchUser, rpinModalConfig, closeRpinModal, settings } = useWallet();
 
   const [activeTab, setActiveTab] = useState<
     'home' | 'deposit' | 'withdraw' | 'transfer' | 'transactions' | 'developer' | 'support' | 'profile'
@@ -65,15 +66,21 @@ function WalletAppContent() {
   const [telegramOtpOpen, setTelegramOtpOpen] = useState(false);
   const [upiApiGatewayOpen, setUpiApiGatewayOpen] = useState(false);
 
-  // App Open RPIN Security Lock state
-  const [isAppUnlocked, setIsAppUnlocked] = useState<boolean>(() => {
-    return sessionStorage.getItem('sr_app_unlocked') === 'true';
-  });
+  // App Open RPIN Security Lock state - always require RPIN on app launch/open
+  const [isAppUnlocked, setIsAppUnlocked] = useState<boolean>(false);
 
   const handleAppUnlock = () => {
-    sessionStorage.setItem('sr_app_unlocked', 'true');
     setIsAppUnlocked(true);
   };
+
+  const handleLockApp = () => {
+    setIsAppUnlocked(false);
+  };
+
+  // If Maintenance Mode is enabled and user is not ADMIN, immediately render MaintenanceScreen
+  if (settings.maintenance_mode_enabled && activeRole !== 'ADMIN') {
+    return <MaintenanceScreen />;
+  }
 
   // If user is not authenticated (logged out), render AuthPortal (Login, Register & Telegram OTP)
   if (!isAuthenticated) {
@@ -228,6 +235,7 @@ function WalletAppContent() {
         onOpenUpiApiGateway={() => setUpiApiGatewayOpen(true)}
         onOpenDeveloper={() => setActiveTab('developer')}
         onOpenSupport={() => setActiveTab('support')}
+        onLockApp={handleLockApp}
       />
 
       <RpinModal

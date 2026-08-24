@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Send,
   ExternalLink,
+  Lock,
 } from 'lucide-react';
 
 interface ThreeDotsMenuProps {
@@ -18,6 +19,7 @@ interface ThreeDotsMenuProps {
   onOpenUpiApiGateway?: () => void;
   onOpenDeveloper?: () => void;
   onOpenSupport: () => void;
+  onLockApp?: () => void;
 }
 
 export const ThreeDotsMenuModal: React.FC<ThreeDotsMenuProps> = ({
@@ -27,6 +29,7 @@ export const ThreeDotsMenuModal: React.FC<ThreeDotsMenuProps> = ({
   onOpenUpiApiGateway,
   onOpenDeveloper,
   onOpenSupport,
+  onLockApp,
 }) => {
   const {
     currentUser,
@@ -131,6 +134,30 @@ export const ThreeDotsMenuModal: React.FC<ThreeDotsMenuProps> = ({
             </div>
             <ChevronRight className="h-4 w-4 text-slate-600 group-hover:text-white transition" />
           </button>
+
+          {/* Lock App with RPIN */}
+          {onLockApp && (
+            <button
+              onClick={() => {
+                onClose();
+                onLockApp();
+              }}
+              className="w-full p-3.5 bg-slate-950 hover:bg-slate-800 border border-indigo-500/20 hover:border-indigo-500/40 rounded-2xl text-left transition flex items-center justify-between group cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                  <Lock className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-xs text-white">Lock App (Security RPIN)</div>
+                  <div className="text-[10px] text-slate-400">
+                    Lock wallet interface until 4-digit RPIN is entered
+                  </div>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-slate-600 group-hover:text-white transition" />
+            </button>
+          )}
 
           {/* Developer REST API */}
           <button

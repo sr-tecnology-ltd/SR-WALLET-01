@@ -109,8 +109,8 @@ export const DeveloperApiSection: React.FC = () => {
   ]);
   const [isBotRunning, setIsBotRunning] = useState(false);
 
-  // Permanent Gateway Production URL (Always fixed to https://srgateway.onrender.com)
-  const permanentAppUrl = settings.app_url || 'https://srgateway.onrender.com';
+  // Permanent Gateway Production URL (Always fixed to https://srgateway-5jj4.onrender.com)
+  const permanentAppUrl = settings.app_url || 'https://srgateway-5jj4.onrender.com';
   const currentOrigin = permanentAppUrl;
 
   const requestedApiUrl = `${permanentAppUrl}/Api/api.php?token=${activeApiKey}&paytm=${defaultRecipientNumber}&amount=100&comment=Payment_Transfer`;

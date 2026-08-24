@@ -41,13 +41,18 @@ export const INITIAL_SETTINGS: AppSettings = {
   otp_telegram_bot_username: '@SRGatewayBot',
   support_telegram_bot_username: '@SRGateway_Support_Bot',
   support_url: 'https://t.me/SRGateway_Support_Bot',
-  app_url: 'https://srgateway.onrender.com',
+  app_url: 'https://srgateway-5jj4.onrender.com',
   admin_upi_id: 'srgateway@icici',
   admin_qr_url: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&q=80',
   admin_bank_name: 'HDFC Bank Ltd',
   admin_bank_account_name: 'SR Gateway Payments',
   admin_bank_account_no: '50200088192031',
   admin_bank_ifsc: 'HDFC0001092',
+  maintenance_mode_enabled: false,
+  maintenance_mode_title: '⚡ SYSTEM UNDER SCHEDULED UPGRADE',
+  maintenance_mode_message: 'Our engineers are currently upgrading SR Gateway payment nodes and core servers to deliver ultra-fast UPI processing and 100% uptime. Services will resume shortly.',
+  maintenance_channel_url: 'https://t.me/SRTECHNOLOGYLTD1',
+  maintenance_estimated_time: '15-30 Minutes',
 };
 
 export const INITIAL_PROFILES: UserProfile[] = [
@@ -62,6 +67,7 @@ export const INITIAL_PROFILES: UserProfile[] = [
     status: 'ACTIVE',
     referral_code: 'ADMIN001',
     rpin: '9999',
+    password: 'admin',
     created_at: '2026-07-01T00:00:00Z',
     updated_at: '2026-08-12T10:00:00Z',
   },

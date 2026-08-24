@@ -14,6 +14,7 @@ export interface UserProfile {
   referral_code: string;
   referred_by?: string;
   rpin?: string; // 4-digit security RPIN
+  password?: string; // Account password
   theme?: 'DARK' | 'LIGHT';
   is_demo?: boolean;
   welcome_bonus_status?: 'PENDING' | 'CLAIMED' | 'EXPIRED' | 'NONE';
@@ -149,6 +150,7 @@ export type AuditActionType =
   | 'API_KEY_CREATED'
   | 'API_KEY_REVOKED'
   | 'TELEGRAM_CHAT_ID_UPDATED'
+  | 'MAINTENANCE_MODE_TOGGLED'
   | 'USER_LOGIN';
 
 export interface AuditLog {
@@ -203,6 +205,12 @@ export interface AppSettings {
   admin_bank_account_name?: string;
   admin_bank_account_no?: string;
   admin_bank_ifsc?: string;
+  // Maintenance Mode (System Upgrade Lock for Users)
+  maintenance_mode_enabled?: boolean;
+  maintenance_mode_title?: string;
+  maintenance_mode_message?: string;
+  maintenance_channel_url?: string;
+  maintenance_estimated_time?: string;
   // Automated Email Notification System
   email_alerts_enabled?: boolean;
   email_login_alert_enabled?: boolean;

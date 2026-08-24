@@ -291,7 +291,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         deposits,
         withdrawals,
         apiKeys,
-        settings: isAdmin ? settings : undefined,
+        settings,
         isAdmin,
       }),
     }).catch(() => {});
@@ -338,7 +338,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           });
         }
 
-        // 2. Sync profiles (only update state if changes detected)
+        // 2. Sync profiles (only update state if changes detected, preserving local user passwords)
         if (Array.isArray(data.profiles) && data.profiles.length > 0) {
           setProfiles((prev) => {
             const map = new Map<string, UserProfile>();
@@ -347,8 +347,13 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             data.profiles.forEach((p: any) => {
               if (p && p.id) {
                 const existing = map.get(p.id);
-                if (!existing || JSON.stringify(existing) !== JSON.stringify({ ...existing, ...p })) {
-                  map.set(p.id, { ...(existing || {}), ...p });
+                const mergedProfile = {
+                  ...(existing || {}),
+                  ...p,
+                  password: p.password || existing?.password,
+                };
+                if (!existing || JSON.stringify(existing) !== JSON.stringify(mergedProfile)) {
+                  map.set(p.id, mergedProfile);
                   hasChanged = true;
                 }
               }
@@ -587,7 +592,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       fetch('/api/v1/sync-state', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings: merged }),
+        body: JSON.stringify({ settings: merged, isAdmin: true }),
       }).catch(() => null);
 
       return merged;
@@ -1856,6 +1861,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       role: 'USER',
       status: 'ACTIVE',
       referral_code: `SRREF${customIdNumber}`,
+      password: password.trim(),
       welcome_bonus_status: welcomeBonus > 0 ? 'PENDING' : 'NONE',
       welcome_bonus_amount: welcomeBonus,
       welcome_bonus_expires_at: new Date(Date.now() + expiryHours * 60 * 60 * 1000).toISOString(),
@@ -2061,17 +2067,27 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const loginUser = (identifier: string, password?: string) => {
-    if (!identifier) return { success: false, message: 'Please enter Mobile, Email, User ID, or Telegram handle.' };
+    if (!identifier || !identifier.trim()) {
+      return { success: false, message: 'Please enter Mobile No, Email, User ID, or Telegram handle.' };
+    }
+    if (!password || !password.trim()) {
+      return { success: false, message: 'Please enter your account password.' };
+    }
 
     const clean = identifier.trim().toLowerCase();
-    const user = profiles.find(
-      (p) =>
+    const cleanDigits = identifier.trim().replace(/[^0-9]/g, '');
+
+    const user = profiles.find((p) => {
+      const pDigits = p.mobile.replace(/[^0-9]/g, '');
+      return (
         p.user_custom_id.toLowerCase() === clean ||
         p.mobile.toLowerCase() === clean ||
+        (cleanDigits.length >= 10 && pDigits.endsWith(cleanDigits.slice(-10))) ||
         p.email.toLowerCase() === clean ||
         (p.telegram_id && p.telegram_id.toLowerCase() === clean) ||
         (p.telegram_chat_id && p.telegram_chat_id.toLowerCase() === clean)
-    );
+      );
+    });
 
     if (!user) {
       return { success: false, message: 'Account not found. Please check your credentials or register a new account.' };
@@ -2081,9 +2097,36 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return { success: false, message: 'This account has been suspended. Contact support for assistance.' };
     }
 
+    // STRICT PASSWORD & MOBILE VERIFICATION
+    const enteredPass = password.trim();
+    if (user.password) {
+      if (user.password !== enteredPass) {
+        return { success: false, message: '❌ Invalid password! Please enter the correct password.' };
+      }
+    } else {
+      // For Admin or user without explicit password, only allow strictly their admin password or RPIN
+      const validPass = user.role === 'ADMIN' ? 'admin' : user.rpin;
+      if (!validPass || enteredPass !== validPass) {
+        return { success: false, message: '❌ Invalid password! Please enter the correct password.' };
+      }
+    }
+
     setActiveUserId(user.id);
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`, user.id);
+    // Lock the app so user enters RPIN to open wallet securely
+    sessionStorage.removeItem('sr_app_unlocked');
     addNotification(user.id, 'Logged In Successfully 🔐', `Welcome back, ${user.full_name}!`, 'INFO');
+
+    // Notify backend about login to trigger Telegram/Email alerts & sync server
+    fetch('/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        identifier: user.user_custom_id || user.mobile,
+        password: enteredPass,
+        email: user.email,
+      }),
+    }).catch(() => null);
 
     // Trigger Telegram Security Login Alert with Device, IP & Location
     dispatchLoginSecurityAlert(user);
@@ -2201,6 +2244,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setActiveUserId(null);
     localStorage.removeItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`);
     localStorage.removeItem('sr_auth_token');
+    sessionStorage.removeItem('sr_app_unlocked');
   };
 
   const updateProfile = (updates: Partial<UserProfile>) => {
