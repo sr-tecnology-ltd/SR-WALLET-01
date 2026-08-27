@@ -576,28 +576,40 @@ async function sendEmailNotification(params: {
   // Use authentic SMTP user address to pass SPF/DKIM verification and prevent spam flags
   const senderAddress = smtpUser || (appSettings.smtp_from_email || process.env.SMTP_FROM_EMAIL || 'sr.notify.hub@gmail.com').trim();
 
-  // If real SMTP credentials are provided, attempt real nodemailer dispatch with strict timeout
+  // If real SMTP credentials are provided, attempt real nodemailer dispatch with robust service/host configuration
   if (smtpUser && smtpPass) {
     try {
-      const isGmail = smtpHost.includes('gmail.com');
-      const transporter = nodemailer.createTransport({
-        host: isGmail ? 'smtp.gmail.com' : smtpHost,
-        port: isGmail ? 465 : smtpPort,
-        secure: isGmail ? true : smtpPort === 465,
-        auth: {
-          user: smtpUser,
-          pass: smtpPass,
-        },
-        connectionTimeout: 4000,
-        greetingTimeout: 3000,
-        socketTimeout: 5000,
-        tls: {
-          rejectUnauthorized: false,
-        },
-      });
+      const isGmail = smtpHost.includes('gmail.com') || smtpUser.toLowerCase().includes('@gmail.com');
+      
+      const transporter = isGmail
+        ? nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+              user: smtpUser,
+              pass: smtpPass,
+            },
+            tls: {
+              rejectUnauthorized: false,
+            },
+          })
+        : nodemailer.createTransport({
+            host: smtpHost,
+            port: smtpPort,
+            secure: smtpPort === 465,
+            auth: {
+              user: smtpUser,
+              pass: smtpPass,
+            },
+            connectionTimeout: 15000,
+            greetingTimeout: 10000,
+            socketTimeout: 15000,
+            tls: {
+              rejectUnauthorized: false,
+            },
+          });
 
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('SMTP connection timed out (4500ms)')), 4500)
+        setTimeout(() => reject(new Error('SMTP connection timed out (15000ms)')), 15000)
       );
 
       const info: any = await Promise.race([
@@ -1205,6 +1217,66 @@ function executeUserToUserTransfer(
       );
     }
 
+    // 11. Automated Email Notifications to Sender & Recipient
+    if (appSettings.email_alerts_enabled) {
+      const timeStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+      if (senderUser.email && senderUser.email.includes('@') && !senderUser.email.includes('@srgateway.in')) {
+        const senderHtml = buildAlertEmailHtml({
+          title: '💸 Payment Sent Successfully',
+          badgeText: 'DEBITED',
+          badgeBgColor: '#6366f1',
+          recipientName: senderUser.full_name,
+          recipientId: senderUser.user_custom_id,
+          summaryText: `Your transfer of <strong>₹${amount.toFixed(2)}</strong> to <strong>${recipientUser.full_name}</strong> (${recipientUser.mobile || recipientUser.user_custom_id}) has been completed.`,
+          details: [
+            { label: 'Transaction ID', value: txnId, isBold: true },
+            { label: 'Amount Sent', value: `₹${amount.toFixed(2)}`, isBold: true, isHighlight: true },
+            { label: 'Recipient', value: `${recipientUser.full_name} (${recipientUser.mobile || recipientUser.user_custom_id})` },
+            { label: 'Remaining Balance', value: `₹${newSenderBal.toFixed(2)}`, isBold: true },
+            { label: 'Timestamp', value: `${timeStr} IST` },
+          ],
+          instructions: 'If you did not authorize this payment, please secure your account immediately.',
+        });
+        sendEmailNotification({
+          to: senderUser.email,
+          subject: `💸 Debited: ₹${amount.toFixed(2)} sent to ${recipientUser.full_name} (${txnId})`,
+          html: senderHtml,
+          text: `Payment of ₹${amount.toFixed(2)} sent to ${recipientUser.full_name}. Txn ID: ${txnId}. New Balance: ₹${newSenderBal.toFixed(2)}`,
+          type: 'TRANSACTION_ALERT',
+          user_id: senderUser.user_custom_id,
+          user_name: senderUser.full_name,
+        }).catch((e) => console.error('Transfer sender email error:', e));
+      }
+
+      if (recipientUser.email && recipientUser.email.includes('@') && !recipientUser.email.includes('@srgateway.in')) {
+        const receiverHtml = buildAlertEmailHtml({
+          title: '💰 Payment Received in Wallet',
+          badgeText: 'CREDITED',
+          badgeBgColor: '#10b981',
+          recipientName: recipientUser.full_name,
+          recipientId: recipientUser.user_custom_id,
+          summaryText: `You have received <strong>₹${amount.toFixed(2)}</strong> from <strong>${senderUser.full_name}</strong> (${senderUser.mobile || senderUser.user_custom_id}) into your SR Gateway wallet.`,
+          details: [
+            { label: 'Transaction ID', value: txnId, isBold: true },
+            { label: 'Amount Received', value: `₹${amount.toFixed(2)}`, isBold: true, isHighlight: true },
+            { label: 'Sender', value: `${senderUser.full_name} (${senderUser.mobile || senderUser.user_custom_id})` },
+            { label: 'New Wallet Balance', value: `₹${newRecipientBal.toFixed(2)}`, isBold: true },
+            { label: 'Timestamp', value: `${timeStr} IST` },
+          ],
+          instructions: 'You can instantly transfer or withdraw these funds anytime.',
+        });
+        sendEmailNotification({
+          to: recipientUser.email,
+          subject: `💰 Credited: ₹${amount.toFixed(2)} received from ${senderUser.full_name} (${txnId})`,
+          html: receiverHtml,
+          text: `Payment of ₹${amount.toFixed(2)} received from ${senderUser.full_name}. Txn ID: ${txnId}. New Balance: ₹${newRecipientBal.toFixed(2)}`,
+          type: 'TRANSACTION_ALERT',
+          user_id: recipientUser.user_custom_id,
+          user_name: recipientUser.full_name,
+        }).catch((e) => console.error('Transfer receiver email error:', e));
+      }
+    }
+
     saveDatabase();
 
     return {
@@ -1438,6 +1510,34 @@ app.get('/api/health', (req: Request, res: Response) => {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
   });
+});
+
+// Proxy Image Download Endpoint (Bypasses browser CORS & forces direct attachment download)
+app.get('/api/download-image', async (req: Request, res: Response) => {
+  const imageUrl = (req.query.url as string) || appSettings.admin_qr_url || 'https://cdn.phototourl.com/free/2026-08-27-63157f0f-6206-4166-a6c1-150d1d4bb343.png';
+  const fileName = (req.query.name as string) || 'SR_Gateway_Payment_QR.png';
+
+  if (!imageUrl) {
+    return res.status(400).send('Image URL is required');
+  }
+
+  try {
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+      return res.status(response.status).send('Failed to fetch image');
+    }
+    const contentType = response.headers.get('content-type') || 'image/png';
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Content-Length', buffer.length.toString());
+    return res.send(buffer);
+  } catch (err: any) {
+    console.error('Image proxy download error:', err.message);
+    return res.redirect(imageUrl);
+  }
 });
 
 // 2. OpenAPI / Docs Specification

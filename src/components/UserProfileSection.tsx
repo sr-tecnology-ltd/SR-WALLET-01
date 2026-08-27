@@ -31,10 +31,6 @@ export const UserProfileSection: React.FC<{
   const [is2FAEnabled, setIs2FAEnabled] = useState(true);
   const [editingName, setEditingName] = useState(false);
   const [userName, setUserName] = useState(currentUser.full_name || 'Account Holder');
-  const [editingPhone, setEditingPhone] = useState(false);
-  const [userPhone, setUserPhone] = useState(currentUser.mobile || '');
-  const [editingEmail, setEditingEmail] = useState(false);
-  const [userEmail, setUserEmail] = useState(currentUser.email || '');
   const [editingTelegram, setEditingTelegram] = useState(false);
   const [telegramNode, setTelegramNode] = useState(currentUser.telegram_chat_id || currentUser.telegram_id || '');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
@@ -43,49 +39,28 @@ export const UserProfileSection: React.FC<{
   // Sync state whenever currentUser fields change (only if not actively typing)
   useEffect(() => {
     if (!editingName) setUserName(currentUser.full_name || 'Account Holder');
-    if (!editingPhone) setUserPhone(currentUser.mobile || '');
-    if (!editingEmail) setUserEmail(currentUser.email || '');
     if (!editingTelegram) setTelegramNode(currentUser.telegram_chat_id || currentUser.telegram_id || '');
   }, [
     currentUser.full_name,
-    currentUser.mobile,
-    currentUser.email,
     currentUser.telegram_chat_id,
     currentUser.telegram_id,
     editingName,
-    editingPhone,
-    editingEmail,
     editingTelegram,
   ]);
 
   const myTransactions = transactions.filter((t) => t.user_id === currentUser.id || t.user_id === currentUser.user_custom_id);
 
   const maskedPhone = showFullPhone
-    ? userPhone || 'Not Set'
-    : userPhone && userPhone.length >= 6
-    ? `${userPhone.slice(0, 3)}XXXX${userPhone.slice(-3)}`
-    : userPhone || 'Not Set';
+    ? currentUser.mobile || 'Not Set'
+    : currentUser.mobile && currentUser.mobile.length >= 6
+    ? `${currentUser.mobile.slice(0, 3)}XXXX${currentUser.mobile.slice(-3)}`
+    : currentUser.mobile || 'Not Set';
 
   const handleSaveName = () => {
     if (!userName.trim()) return;
     const res = updateProfile({ full_name: userName.trim() });
     setEditingName(false);
     setMsg(res.message || 'Name updated successfully!');
-    setTimeout(() => setMsg(null), 3000);
-  };
-
-  const handleSavePhone = () => {
-    if (!userPhone.trim()) return;
-    const res = updateProfile({ mobile: userPhone.trim() });
-    setEditingPhone(false);
-    setMsg(res.message || 'Mobile number updated successfully!');
-    setTimeout(() => setMsg(null), 3000);
-  };
-
-  const handleSaveEmail = () => {
-    const res = updateProfile({ email: userEmail.trim() });
-    setEditingEmail(false);
-    setMsg(res.message || 'Email updated successfully!');
     setTimeout(() => setMsg(null), 3000);
   };
 
@@ -224,46 +199,23 @@ export const UserProfileSection: React.FC<{
               <Smartphone className="h-4 w-4" />
             </div>
             <div className="flex-1">
-              <div className="text-[10px] text-slate-500 font-mono uppercase">Registered Mobile Number (Wallet A/C)</div>
-              {editingPhone ? (
-                <div className="flex items-center gap-2 mt-1">
-                  <input
-                    type="text"
-                    value={userPhone}
-                    onChange={(e) => setUserPhone(e.target.value)}
-                    className="bg-slate-900 border border-indigo-500 rounded-xl px-3 py-1 text-sm text-white font-mono font-bold focus:outline-none w-full max-w-xs"
-                  />
-                  <button
-                    onClick={handleSavePhone}
-                    className="p-1.5 bg-emerald-500 text-slate-950 rounded-xl font-bold text-xs shrink-0 cursor-pointer"
-                  >
-                    <Check className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : (
-                <div className="text-sm font-mono font-bold text-white mt-0.5">{maskedPhone}</div>
-              )}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-slate-500 font-mono uppercase">Registered Mobile Number (Wallet A/C)</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
+                  🔒 Fixed on Register
+                </span>
+              </div>
+              <div className="text-sm font-mono font-bold text-white mt-0.5">{maskedPhone}</div>
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            {!editingPhone && (
-              <>
-                <button
-                  onClick={() => setShowFullPhone(!showFullPhone)}
-                  className="p-2 text-slate-400 hover:text-white bg-slate-900 rounded-xl border border-slate-800 transition cursor-pointer"
-                  title="Show/Hide Full Phone"
-                >
-                  {showFullPhone ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-                <button
-                  onClick={() => setEditingPhone(true)}
-                  className="p-2 text-slate-400 hover:text-white bg-slate-900 rounded-xl border border-slate-800 transition cursor-pointer"
-                  title="Edit Mobile Number"
-                >
-                  <Pencil className="h-4 w-4" />
-                </button>
-              </>
-            )}
+            <button
+              onClick={() => setShowFullPhone(!showFullPhone)}
+              className="p-2 text-slate-400 hover:text-white bg-slate-900 rounded-xl border border-slate-800 transition cursor-pointer"
+              title="Show/Hide Full Phone"
+            >
+              {showFullPhone ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
           </div>
         </div>
 
@@ -274,38 +226,20 @@ export const UserProfileSection: React.FC<{
               <Mail className="h-4 w-4" />
             </div>
             <div className="flex-1">
-              <div className="text-[10px] text-slate-500 font-mono uppercase">Registered Email (Gmail Alerts)</div>
-              {editingEmail ? (
-                <div className="flex items-center gap-2 mt-1">
-                  <input
-                    type="email"
-                    value={userEmail}
-                    onChange={(e) => setUserEmail(e.target.value)}
-                    placeholder="yourname@gmail.com"
-                    className="bg-slate-900 border border-purple-500 rounded-xl px-3 py-1 text-sm text-white font-mono focus:outline-none w-full max-w-xs"
-                  />
-                  <button
-                    onClick={handleSaveEmail}
-                    className="p-1.5 bg-purple-500 text-white rounded-xl font-bold text-xs shrink-0 cursor-pointer"
-                  >
-                    <Check className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : (
-                <div className="text-sm font-mono font-bold text-purple-300 mt-0.5">
-                  {currentUser.email || 'No email registered'}
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-slate-500 font-mono uppercase">Registered Email (Gmail Alerts)</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-bold">
+                  🔒 Fixed on Register
+                </span>
+              </div>
+              <div className="text-sm font-mono font-bold text-purple-300 mt-0.5">
+                {currentUser.email || 'No email registered'}
+              </div>
             </div>
           </div>
-          {!editingEmail && (
-            <button
-              onClick={() => setEditingEmail(true)}
-              className="p-2 text-slate-400 hover:text-white bg-slate-900 rounded-xl border border-slate-800 transition cursor-pointer"
-            >
-              <Pencil className="h-4 w-4" />
-            </button>
-          )}
+          <div className="px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-800 text-[11px] text-slate-400 font-mono">
+            Verified
+          </div>
         </div>
       </div>
 

@@ -72,12 +72,53 @@ export const DepositSection: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
-  const handleDownloadQr = () => {
+  const handleDownloadQr = async () => {
+    const qrUrl = settings.admin_qr_url || 'https://cdn.phototourl.com/free/2026-08-27-63157f0f-6206-4166-a6c1-150d1d4bb343.png';
+    try {
+      // 1. First attempt download via server-side attachment proxy (100% reliable across all browsers & iframes)
+      const proxyUrl = `/api/download-image?url=${encodeURIComponent(qrUrl)}&name=SR_Gateway_Payment_QR.png`;
+      const response = await fetch(proxyUrl);
+      if (response.ok) {
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = 'SR_Gateway_Payment_QR.png';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
+        return;
+      }
+    } catch (err) {
+      console.warn('Proxy download failed, trying direct blob:', err);
+    }
+
+    // 2. Direct blob fallback
+    try {
+      const response = await fetch(qrUrl, { mode: 'cors' });
+      if (response.ok) {
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = 'SR_Gateway_Payment_QR.png';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
+        return;
+      }
+    } catch (err) {
+      console.warn('Direct fetch failed, falling back to window open:', err);
+    }
+
+    // 3. Fallback: Open in new tab for manual long-press / save
     const link = document.createElement('a');
-    link.href = settings.admin_qr_url || 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=600&q=80';
-    link.download = 'SR_Gateway_Admin_Payment_QR.png';
+    link.href = qrUrl;
+    link.download = 'SR_Gateway_Payment_QR.png';
     link.target = '_blank';
-    link.rel = 'noreferrer';
+    link.rel = 'noopener noreferrer';
     link.click();
   };
 
