@@ -199,7 +199,7 @@ export const DeveloperApiSection: React.FC = () => {
       let body: any = null;
 
       if (activeEndpoint.includes('GET /Api/api.php (Token + Paytm Query URL)')) {
-        endpoint = `/Api/api.php?token=${encodeURIComponent(customApiKey)}&paytm=${encodeURIComponent(customNumber)}&amount=${encodeURIComponent(customAmount)}&comment=${encodeURIComponent(customComment)}`;
+        endpoint = `/Api/api.php?token=${encodeURIComponent(customApiKey)}&paytm=${encodeURIComponent(customNumber)}&amount=${encodeURIComponent(customAmount)}&comment=${encodeURIComponent(customComment)}&test=1`;
         method = 'GET';
       } else if (activeEndpoint.includes('POST /api.php (JSON Transfer)')) {
         endpoint = '/Api/api.php';
@@ -210,6 +210,7 @@ export const DeveloperApiSection: React.FC = () => {
           amount: parseFloat(customAmount) || 100,
           comment: customComment || 'API_Payment_Test',
           sender_id: currentUser.user_custom_id,
+          is_test: true,
         });
       } else if (activeEndpoint.includes('Receiver User Check') || activeEndpoint.includes('check_user')) {
         endpoint = `/Api/api.php?token=${encodeURIComponent(customApiKey)}&action=check_user&number=${encodeURIComponent(customNumber)}`;
@@ -238,6 +239,7 @@ export const DeveloperApiSection: React.FC = () => {
           recipient_id: customNumber || '9876543210',
           amount: parseFloat(customAmount) || 100,
           note: customComment || 'Developer API Test Transfer',
+          is_test: true,
         });
       }
 
@@ -262,9 +264,7 @@ export const DeveloperApiSection: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    executeApiTest();
-  }, [activeEndpoint]);
+  // No automated execution on open - API tests are only run when user clicks the Execute button
 
   return (
     <div className="space-y-6 text-slate-100">

@@ -109,11 +109,11 @@ app.use((req: Request, res: Response, next: any) => {
 let appSettings: Record<string, any> = {
   deposit_enabled: true,
   withdraw_enabled: true,
-  minimum_deposit: 100,
-  minimum_withdraw: 200,
+  minimum_deposit: 10,
+  minimum_withdraw: 20,
   maximum_withdraw: 100000,
-  deposit_charge_percent: 0,
-  withdraw_charge_percent: 1.5,
+  deposit_charge_percent: 7,
+  withdraw_charge_percent: 10,
   signup_bonus_enabled: true,
   signup_bonus_amount: 5,
   welcome_bonus_min_txn: 1,
@@ -136,12 +136,12 @@ let appSettings: Record<string, any> = {
   app_url: process.env.APP_URL || 'https://srgateway-5jj4.onrender.com',
   otp_telegram_bot_username: process.env.TELEGRAM_BOT_USERNAME || '@SRGatewayBot',
   otp_telegram_bot_token: process.env.TELEGRAM_BOT_TOKEN || '',
-  admin_upi_id: 'srgateway@icici',
-  admin_qr_url: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&q=80',
-  admin_bank_name: 'HDFC Bank Ltd',
-  admin_bank_account_name: 'SR Gateway Payments',
-  admin_bank_account_no: '50200088192031',
-  admin_bank_ifsc: 'HDFC0001092',
+  admin_upi_id: 'sk190rihan@mvhdfc',
+  admin_qr_url: 'https://cdn.phototourl.com/free/2026-08-27-63157f0f-6206-4166-a6c1-150d1d4bb343.png',
+  admin_bank_name: 'AIRTEL PAYMENT BANK',
+  admin_bank_account_name: 'SK SAHIL',
+  admin_bank_account_no: '7477661867',
+  admin_bank_ifsc: 'AIRP0000001',
   // Maintenance Mode (System Upgrade Lock)
   maintenance_mode_enabled: false,
   maintenance_mode_title: '⚡ SYSTEM UNDER SCHEDULED UPGRADE',
@@ -2655,7 +2655,7 @@ app.get('/api/v1/balance', validateApiKey, (req: Request, res: Response) => {
 
 // 5. Internal Transfer API (User-to-User)
 app.post('/api/v1/transfer', validateApiKey, (req: Request, res: Response) => {
-  const { sender_id, from, recipient_id, number, to, phone, amount, note, comment } = req.body;
+  const { sender_id, from, recipient_id, number, to, phone, amount, note, comment, is_test, test, sandbox } = req.body;
   const numAmt = parseFloat(amount);
   const sender = sender_id || from;
   const recipient = recipient_id || number || to || phone;
@@ -2663,6 +2663,30 @@ app.post('/api/v1/transfer', validateApiKey, (req: Request, res: Response) => {
 
   if (!sender) {
     return res.status(400).json({ status: 'error', code: 400, message: 'Sender ID is required' });
+  }
+
+  // Sandbox Test Mode Check - Simulates API response without deducting wallet balance
+  const isTestMode = is_test === true || is_test === 'true' || test === '1' || test === 'true' || sandbox === '1' || sandbox === 'true' || req.query.test === '1' || req.query.is_test === 'true';
+  if (isTestMode) {
+    const simTxnId = `SR-SIM-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    return res.json({
+      status: 'success',
+      code: 200,
+      test_mode: true,
+      mode: 'SANDBOX_SIMULATION',
+      message: 'API Test Transaction Successful (Simulation Mode - No wallet balance deducted)',
+      transaction_id: simTxnId,
+      transfer_details: {
+        sender,
+        recipient: recipient || 'TEST_RECIPIENT',
+        amount: isNaN(numAmt) ? 100 : numAmt,
+        currency: 'INR',
+        comment: noteMsg,
+        status: 'SUCCESS',
+        wallet_balance_preserved: true,
+      },
+      timestamp: new Date().toISOString(),
+    });
   }
 
   const result = executeUserToUserTransfer(sender, recipient, numAmt, noteMsg, 'REST API');
@@ -3606,6 +3630,42 @@ const handlePhpApiRequest = (req: Request, res: Response) => {
       code: 400,
       error_code: 'INVALID_AMOUNT',
       message: 'Transfer failed: Amount must be a valid positive number greater than 0',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Sandbox Test Mode Check - Validates credentials & payload and returns full live simulation without deducting balance
+  const isTestMode =
+    params.is_test === 'true' ||
+    params.is_test === true ||
+    params.test === '1' ||
+    params.test === 'true' ||
+    params.sandbox === '1' ||
+    params.sandbox === 'true';
+
+  if (isTestMode) {
+    const simTxnId = `SR-SIM-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    return res.json({
+      status: 'success',
+      code: 200,
+      test_mode: true,
+      mode: 'SANDBOX_SIMULATION',
+      message: `API Test Simulation Successful: API connection is active and operational. (No real wallet balance deducted).`,
+      transaction_id: simTxnId,
+      txnid: simTxnId,
+      reference_id: simTxnId,
+      sender: {
+        user_id: senderUser.user_custom_id,
+        name: senderUser.full_name,
+        mobile: senderUser.mobile,
+      },
+      recipient: targetRecipient,
+      amount: numAmt,
+      fee: 0,
+      tax: '0%',
+      net_amount: numAmt,
+      comment: noteMsg,
+      wallet_balance_preserved: senderWallet.available_balance,
       timestamp: new Date().toISOString(),
     });
   }

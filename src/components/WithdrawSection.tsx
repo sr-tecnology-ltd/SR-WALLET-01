@@ -16,7 +16,7 @@ import {
 export const WithdrawSection: React.FC = () => {
   const { currentUser, currentWallet, withdrawals, submitWithdrawalRequest, settings, formatINR, openRpinModal } = useWallet();
 
-  const [amount, setAmount] = useState<number>(1000);
+  const [amount, setAmount] = useState<number>(settings.minimum_withdraw || 20);
   const [paymentIdentifier, setPaymentIdentifier] = useState<string>('');
   const [note, setNote] = useState<string>('');
   const [statusMsg, setStatusMsg] = useState<{ type: 'error' | 'success'; text: string } | null>(null);

@@ -22,7 +22,7 @@ import {
 export const DepositSection: React.FC = () => {
   const { currentUser, deposits, submitDepositRequest, settings, formatINR } = useWallet();
 
-  const [amount, setAmount] = useState<number>(1000);
+  const [amount, setAmount] = useState<number>(settings.minimum_deposit || 10);
   const [utr, setUtr] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'BANK_TRANSFER' | 'QR_CODE' | 'WALLET_GW'>('UPI');
   const [note, setNote] = useState<string>('');
@@ -179,10 +179,10 @@ export const DepositSection: React.FC = () => {
             {/* UPI ID Card */}
             <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-2">
               <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                Official Admin UPI VPA
+                Payment UPI ID
               </div>
               <div className="flex items-center justify-between font-mono font-black text-base text-emerald-400 bg-slate-900 px-3 py-2 rounded-xl border border-slate-800">
-                <span>{settings.admin_upi_id}</span>
+                <span>{settings.admin_upi_id || 'sk190rihan@mvhdfc'}</span>
                 <button
                   onClick={copyUpi}
                   className="p-1.5 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 rounded-lg transition"
@@ -196,7 +196,7 @@ export const DepositSection: React.FC = () => {
             {/* QR Code Preview with Download Button */}
             <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-center space-y-3">
               <div className="flex items-center justify-between text-xs font-bold text-slate-300 px-1">
-                <span>Scan Admin QR Code</span>
+                <span>Scan Payment QR Code</span>
                 <button
                   type="button"
                   onClick={handleDownloadQr}
@@ -206,15 +206,18 @@ export const DepositSection: React.FC = () => {
                   <span>Download QR</span>
                 </button>
               </div>
-              <div className="w-44 h-44 bg-white p-2 rounded-2xl mx-auto shadow-lg flex items-center justify-center border border-slate-700">
+              
+              {/* Official UPI Payment QR Photo */}
+              <div className="w-60 max-w-full bg-white p-2 rounded-2xl mx-auto shadow-2xl border border-slate-200 text-slate-900 overflow-hidden">
                 <img
-                  src={settings.admin_qr_url || 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&q=80'}
-                  alt="Admin Payment QR"
-                  className="w-full h-full object-contain rounded-xl"
+                  src={settings.admin_qr_url || 'https://cdn.phototourl.com/free/2026-08-27-63157f0f-6206-4166-a6c1-150d1d4bb343.png'}
+                  alt="Official Payment QR Code"
+                  className="w-full h-auto object-contain rounded-xl"
                   referrerPolicy="no-referrer"
                 />
               </div>
-              <p className="text-[10px] text-slate-400">Accepts GPay, PhonePe, Paytm, BHIM & All UPI Apps</p>
+
+              <p className="text-[10px] text-slate-400">Accepts PhonePe, GPay, Paytm, BHIM & All UPI Apps</p>
             </div>
 
             {/* Dynamic Bank Transfer Details with Copy Button */}
@@ -231,10 +234,10 @@ export const DepositSection: React.FC = () => {
                 </button>
               </div>
               <div className="space-y-1 bg-slate-900/90 p-3 rounded-xl border border-slate-800/80 text-[11px]">
-                <div><span className="text-slate-500 font-sans">Bank:</span> <strong className="text-white">{settings.admin_bank_name || 'HDFC Bank Ltd'}</strong></div>
-                <div><span className="text-slate-500 font-sans">Account Name:</span> <strong className="text-white">{settings.admin_bank_account_name || 'SR Gateway Payments'}</strong></div>
-                <div><span className="text-slate-500 font-sans">Account No:</span> <strong className="text-emerald-400 font-bold">{settings.admin_bank_account_no || '50200088192031'}</strong></div>
-                <div><span className="text-slate-500 font-sans">IFSC Code:</span> <strong className="text-amber-300">{settings.admin_bank_ifsc || 'HDFC0001092'}</strong></div>
+                <div><span className="text-slate-500 font-sans">Bank:</span> <strong className="text-white">{settings.admin_bank_name || 'AIRTEL PAYMENT BANK'}</strong></div>
+                <div><span className="text-slate-500 font-sans">Account Name:</span> <strong className="text-white">{settings.admin_bank_account_name || 'SK SAHIL'}</strong></div>
+                <div><span className="text-slate-500 font-sans">Account No:</span> <strong className="text-emerald-400 font-bold">{settings.admin_bank_account_no || '7477661867'}</strong></div>
+                <div><span className="text-slate-500 font-sans">IFSC Code:</span> <strong className="text-amber-300">{settings.admin_bank_ifsc || 'AIRP0000001'}</strong></div>
               </div>
             </div>
           </div>

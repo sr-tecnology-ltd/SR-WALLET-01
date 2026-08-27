@@ -39,8 +39,7 @@ export const TransactionsSection: React.FC = () => {
       (t) =>
         t.user_id === currentUser.id ||
         t.user_id === currentUser.user_custom_id ||
-        t.user_custom_id === currentUser.user_custom_id ||
-        (currentUser.mobile && t.description?.includes(currentUser.mobile.replace(/[^0-9]/g, '').slice(-10)))
+        t.user_custom_id === currentUser.user_custom_id
     );
   }, [transactions, currentUser]);
 

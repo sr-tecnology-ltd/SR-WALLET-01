@@ -19,7 +19,7 @@ export const InternalTransferSection: React.FC = () => {
   const { currentUser, currentWallet, allProfiles, transferBalance, formatINR, transactions, openRpinModal } = useWallet();
 
   const [recipientQuery, setRecipientQuery] = useState<string>('');
-  const [amount, setAmount] = useState<number>(500);
+  const [amount, setAmount] = useState<number>(1);
   const [note, setNote] = useState<string>('');
   const [statusMsg, setStatusMsg] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
 

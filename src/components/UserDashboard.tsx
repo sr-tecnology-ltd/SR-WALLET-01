@@ -88,15 +88,13 @@ export const UserDashboard: React.FC<{
   );
 
   const myTransactions = useMemo(() => {
-    const userCleanPhone = currentUser.mobile ? currentUser.mobile.replace(/[^0-9]/g, '').slice(-10) : '';
     return transactions.filter(
       (t) =>
         t.user_id === currentUser.id ||
         t.user_id === currentUser.user_custom_id ||
-        t.user_custom_id === currentUser.user_custom_id ||
-        (userCleanPhone && t.description?.includes(userCleanPhone))
+        t.user_custom_id === currentUser.user_custom_id
     );
-  }, [transactions, currentUser.id, currentUser.user_custom_id, currentUser.mobile]);
+  }, [transactions, currentUser.id, currentUser.user_custom_id]);
 
   // System Services Grid Configuration (Cleaned & Updated as requested)
   const systemServices = [
