@@ -114,8 +114,8 @@ let appSettings: Record<string, any> = {
   maximum_withdraw: 100000,
   deposit_charge_percent: 7,
   withdraw_charge_percent: 10,
-  signup_bonus_enabled: true,
-  signup_bonus_amount: 5,
+  signup_bonus_enabled: false,
+  signup_bonus_amount: 0,
   welcome_bonus_min_txn: 1,
   welcome_bonus_expiry_hours: 24,
   referral_enabled: true,
@@ -1601,7 +1601,7 @@ app.post('/api/v1/auth/register', async (req: Request, res: Response) => {
   if (normPhone) users[normPhone] = newUser;
   if (cleanEmail) users[cleanEmail] = newUser;
 
-  const welcomeBonus = appSettings.signup_bonus_enabled ? Number(appSettings.signup_bonus_amount || 50) : 50;
+  const welcomeBonus = appSettings.signup_bonus_enabled ? Number(appSettings.signup_bonus_amount || 0) : 0;
 
   wallets[customId] = {
     id: `w-${Date.now()}`,

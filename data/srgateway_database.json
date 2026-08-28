@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "last_saved": "2026-08-27T09:10:37.931Z",
+  "last_saved": "2026-08-28T06:43:02.911Z",
   "appSettings": {
     "deposit_enabled": true,
     "withdraw_enabled": true,
@@ -9,8 +9,8 @@
     "maximum_withdraw": 100000,
     "deposit_charge_percent": 7,
     "withdraw_charge_percent": 10,
-    "signup_bonus_enabled": true,
-    "signup_bonus_amount": 50,
+    "signup_bonus_enabled": false,
+    "signup_bonus_amount": 0,
     "welcome_bonus_min_txn": 1,
     "welcome_bonus_expiry_hours": 24,
     "referral_enabled": true,

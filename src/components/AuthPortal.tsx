@@ -224,10 +224,11 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
       );
 
       if (res.success && res.user) {
+        const bonusVal = (settings.signup_bonus_enabled && (settings.signup_bonus_amount ?? 0) > 0) ? (settings.signup_bonus_amount ?? 0) : 0;
         setRegisteredUserPopup({
           user: res.user,
           message: res.message,
-          welcomeBonus: settings.signup_bonus_amount !== undefined ? settings.signup_bonus_amount : 5,
+          welcomeBonus: bonusVal,
         });
         setSuccessMsg('🎉 Registration completed successfully!');
       } else if (!res.success) {
@@ -346,14 +347,16 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
                   <span className="text-emerald-400">✅</span>
                 </span>
               </div>
-              <div className="flex items-center justify-between pt-1 pb-1 border-b border-slate-800/80">
-                <span className="text-amber-400 font-bold flex items-center gap-1">
-                  <Gift className="h-4 w-4" /> Welcome Bonus:
-                </span>
-                <span className="text-amber-300 font-black text-sm">
-                  ₹{registeredUserPopup.welcomeBonus}.00
-                </span>
-              </div>
+              {registeredUserPopup.welcomeBonus > 0 && (
+                <div className="flex items-center justify-between pt-1 pb-1 border-b border-slate-800/80">
+                  <span className="text-amber-400 font-bold flex items-center gap-1">
+                    <Gift className="h-4 w-4" /> Welcome Bonus:
+                  </span>
+                  <span className="text-amber-300 font-black text-sm">
+                    ₹{registeredUserPopup.welcomeBonus}.00
+                  </span>
+                </div>
+              )}
               <div className="p-2 rounded-xl bg-slate-900 border border-emerald-500/20 text-[10px] text-emerald-300/90 font-mono">
                 🔔 <strong>Alerts Configured:</strong> P2P transfers, deposits, withdrawals &amp; login alerts are now active on your Telegram Bot &amp; Gmail!
               </div>

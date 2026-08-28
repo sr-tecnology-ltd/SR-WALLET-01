@@ -179,13 +179,12 @@ export const UserDashboard: React.FC<{
   const bonusAmount =
     currentUser.welcome_bonus_amount !== undefined
       ? currentUser.welcome_bonus_amount
-      : (settings.signup_bonus_amount !== undefined ? settings.signup_bonus_amount : 5);
+      : (settings.signup_bonus_amount !== undefined ? settings.signup_bonus_amount : 0);
   const isBonusPending =
-    currentUser.welcome_bonus_status === 'PENDING' ||
-    (currentUser.welcome_bonus_status === undefined &&
-      settings.signup_bonus_enabled &&
-      bonusAmount > 0 &&
-      !currentUser.has_made_first_transaction);
+    Boolean(settings.signup_bonus_enabled) &&
+    bonusAmount > 0 &&
+    (currentUser.welcome_bonus_status === 'PENDING' ||
+      (currentUser.welcome_bonus_status === undefined && !currentUser.has_made_first_transaction));
 
   const [timeLeftStr, setTimeLeftStr] = useState<string>('');
   const [isBonusExpiredState, setIsBonusExpiredState] = useState(false);
