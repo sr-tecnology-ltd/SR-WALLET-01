@@ -25,29 +25,109 @@ app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 // 1. In-Memory Concurrency Mutex (Zero Double-Spending & Race Conditions)
 const walletLocks = new Set<string>();
 
-// 2. Sliding Window Rate Limiter (Anti-DDoS, Anti-Brute-Force & Bot Spam Prevention)
+// 2. Sliding Window Rate Limiter & DDoS WAF Shield (Anti-DDoS, Anti-Brute-Force & Bot Spam Prevention)
 interface RateLimitRecord {
   count: number;
   resetTime: number;
+  violations?: number;
+  isBannedUntil?: number;
 }
 const ipRateLimits = new Map<string, RateLimitRecord>();
 const otpAttemptTracker = new Map<string, { attempts: number; lockedUntil?: number }>();
 
-const rateLimiter = (maxRequests = 120, windowMs = 60000) => {
+const ddosStats = {
+  total_blocked_attacks: 0,
+  rate_limited_requests: 0,
+  bot_probes_blocked: 0,
+  active_banned_ips: 0,
+  shield_status: 'ACTIVE_SHIELD_V3',
+};
+
+const rateLimiter = (defaultMax = 120, windowMs = 60000) => {
   return (req: Request, res: Response, next: any) => {
-    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown-ip';
+    // Skip static assets
+    if (!req.path.startsWith('/api/')) return next();
+
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
+    const userAgent = (req.headers['user-agent'] || '').toLowerCase();
     const now = Date.now();
+
+    // 1. Anti-Bot Scanner & Exploit Header WAF Filter
+    if (appSettings.ddos_bot_protection !== false) {
+      const suspiciousAgents = ['sqlmap', 'nikto', 'havij', 'masscan', 'zgrab', 'nmap', 'python-requests-flood', 'acunetix'];
+      const isMaliciousBot = suspiciousAgents.some(bot => userAgent.includes(bot));
+      const suspiciousUri = /(\.\.|\/etc\/passwd|select\s+.*\s+from|<script>|union\s+all\s+select|\/wp-admin|\.env|\.git)/i.test(req.originalUrl);
+
+      if (isMaliciousBot || suspiciousUri) {
+        ddosStats.bot_probes_blocked++;
+        ddosStats.total_blocked_attacks++;
+        console.warn(`🛡️ [DDoS Shield] Blocked suspicious probe from IP: ${clientIp} | URI: ${req.originalUrl}`);
+        return res.status(403).json({
+          status: 'blocked',
+          code: 403,
+          shield: 'SR-GATEWAY-DDoS-SHIELD-V3',
+          error: 'Forbidden: Request blocked by WAF security filters for suspicious activity.',
+          ip: clientIp,
+        });
+      }
+    }
+
+    if (appSettings.ddos_shield_enabled === false) {
+      return next();
+    }
+
+    // Dynamic thresholds based on mode
+    let maxRequests = appSettings.ddos_rate_limit_per_minute || defaultMax;
+    let banDurationMs = 5 * 60 * 1000;
+
+    if (appSettings.ddos_shield_mode === 'HIGH_SECURITY') {
+      maxRequests = 60;
+      banDurationMs = 15 * 60 * 1000;
+    } else if (appSettings.ddos_shield_mode === 'UNDER_ATTACK') {
+      maxRequests = 30;
+      banDurationMs = 60 * 60 * 1000;
+    }
+
+    if (req.path.includes('/auth/') || req.path.includes('/otp/')) {
+      maxRequests = Math.min(maxRequests, 20);
+    }
+
     const existing = ipRateLimits.get(clientIp);
 
+    if (existing && existing.isBannedUntil && existing.isBannedUntil > now) {
+      const remainingSec = Math.ceil((existing.isBannedUntil - now) / 1000);
+      ddosStats.total_blocked_attacks++;
+      res.setHeader('Retry-After', remainingSec);
+      return res.status(429).json({
+        status: 'error',
+        code: 429,
+        shield: 'SR-GATEWAY-DDoS-SHIELD-V3',
+        error_code: 'IP_TEMPORARILY_BANNED',
+        message: `⛔ IP temporarily throttled by DDoS Shield. Retry in ${remainingSec}s.`,
+        retry_after_seconds: remainingSec,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     if (!existing || now > existing.resetTime) {
-      ipRateLimits.set(clientIp, { count: 1, resetTime: now + windowMs });
+      ipRateLimits.set(clientIp, { count: 1, resetTime: now + windowMs, violations: 0 });
       return next();
     }
 
     if (existing.count >= maxRequests) {
+      existing.violations = (existing.violations || 0) + 1;
+      ddosStats.rate_limited_requests++;
+      ddosStats.total_blocked_attacks++;
+
+      if (existing.violations >= 3 || existing.count >= (appSettings.ddos_auto_ban_threshold || 300)) {
+        existing.isBannedUntil = now + banDurationMs;
+        ddosStats.active_banned_ips++;
+      }
+
       return res.status(429).json({
         status: 'error',
         code: 429,
+        shield: 'SR-GATEWAY-DDoS-SHIELD-V3',
         error_code: 'RATE_LIMIT_EXCEEDED',
         message: 'Too many requests. Please slow down and try again in a few moments.',
         retry_after_seconds: Math.ceil((existing.resetTime - now) / 1000),
@@ -60,7 +140,7 @@ const rateLimiter = (maxRequests = 120, windowMs = 60000) => {
   };
 };
 
-app.use(rateLimiter(180, 60000));
+app.use(rateLimiter(120, 60000));
 
 // 3. Security Sanitizer Helpers
 function sanitizeInput(str: any, maxLen = 200): string {

@@ -53,6 +53,11 @@ export const INITIAL_SETTINGS: AppSettings = {
   maintenance_mode_message: 'Our engineers are currently upgrading SR Gateway payment nodes and core servers to deliver ultra-fast UPI processing and 100% uptime. Services will resume shortly.',
   maintenance_channel_url: 'https://t.me/SRTECHNOLOGYLTD1',
   maintenance_estimated_time: '15-30 Minutes',
+  ddos_shield_enabled: true,
+  ddos_shield_mode: 'NORMAL',
+  ddos_rate_limit_per_minute: 120,
+  ddos_auto_ban_threshold: 300,
+  ddos_bot_protection: true,
 };
 
 export const INITIAL_PROFILES: UserProfile[] = [

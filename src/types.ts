@@ -222,6 +222,12 @@ export interface AppSettings {
   smtp_pass?: string;
   smtp_from_name?: string;
   smtp_from_email?: string;
+  // DDoS Shield & WAF Protection
+  ddos_shield_enabled?: boolean;
+  ddos_shield_mode?: 'NORMAL' | 'HIGH_SECURITY' | 'UNDER_ATTACK';
+  ddos_rate_limit_per_minute?: number;
+  ddos_auto_ban_threshold?: number;
+  ddos_bot_protection?: boolean;
 }
 
 export interface EmailLog {

@@ -1384,6 +1384,70 @@ export const AdminPortal: React.FC = () => {
               </div>
             </div>
 
+            {/* 🛡️ Advanced DDoS Shield & WAF Security */}
+            <div className="bg-slate-950 border border-emerald-500/30 rounded-2xl p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">
+                    <ShieldCheck className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-white text-xs flex items-center gap-2">
+                      <span>🛡️ Enterprise DDoS Shield &amp; WAF Protection</span>
+                      {settingsForm.ddos_shield_enabled !== false ? (
+                        <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+                          SHIELD ACTIVE ({settingsForm.ddos_shield_mode || 'NORMAL'})
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold">
+                          SHIELD DISABLED
+                        </span>
+                      )}
+                    </h4>
+                    <p className="text-[10px] text-slate-400 font-mono">
+                      Real-time sliding-window rate limiting, anti-bot scanner inspection (SQLi / path traversal) and automated temporary IP bans for high frequency traffic.
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={settingsForm.ddos_shield_enabled !== false}
+                  onChange={(e) => handleSettingChange('ddos_shield_enabled', e.target.checked)}
+                  className="w-5 h-5 accent-emerald-500 cursor-pointer"
+                />
+              </div>
+
+              {settingsForm.ddos_shield_enabled !== false && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-mono text-xs pt-2">
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">Protection Profile</label>
+                    <select
+                      value={settingsForm.ddos_shield_mode || 'NORMAL'}
+                      onChange={(e) => handleSettingChange('ddos_shield_mode', e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
+                    >
+                      <option value="NORMAL">Standard Mode (120 req/min limit)</option>
+                      <option value="HIGH_SECURITY">High Security (60 req/min limit)</option>
+                      <option value="UNDER_ATTACK">Under Attack (30 req/min + Strict Auto-Ban)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">Anti-Bot &amp; Exploit Filter</label>
+                    <div className="flex items-center gap-2 mt-2">
+                      <input
+                        type="checkbox"
+                        checked={settingsForm.ddos_bot_protection !== false}
+                        onChange={(e) => handleSettingChange('ddos_bot_protection', e.target.checked)}
+                        className="w-4 h-4 accent-emerald-500 cursor-pointer"
+                      />
+                      <span className="text-emerald-400 text-xs">Block SQLi, scanner probes &amp; malicious user-agents</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Signup Welcome Bonus Configuration (Admin Controlled) */}
             <div className="bg-slate-950 border border-purple-500/30 rounded-2xl p-5 space-y-4">
               <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
