@@ -34,6 +34,7 @@ import {
   Inbox,
   Trash2,
   Wrench,
+  Gauge,
 } from 'lucide-react';
 import { UserProfile, DepositRequest, WithdrawalRequest, Wallet, AppSettings } from '../types';
 
@@ -56,6 +57,8 @@ export const AdminPortal: React.FC = () => {
     wipeAllUserData,
     banUser,
     unbanUser,
+    updateUserRequestLimit,
+    resetUserDailyRequestCount,
     settings,
     updateSettings,
     auditLogs,
@@ -69,9 +72,10 @@ export const AdminPortal: React.FC = () => {
   // Search & Filter state
   const [userSearch, setUserSearch] = useState<string>('');
   const [selectedUserForModal, setSelectedUserForModal] = useState<UserProfile | null>(null);
-  const [adminActionModal, setAdminActionModal] = useState<'ADD_BAL' | 'CUT_BAL' | 'BAN' | null>(null);
+  const [adminActionModal, setAdminActionModal] = useState<'ADD_BAL' | 'CUT_BAL' | 'BAN' | 'SET_LIMIT' | 'RESET_QUOTA' | null>(null);
   const [modalAmount, setModalAmount] = useState<number>(1000);
   const [modalReason, setModalReason] = useState<string>('');
+  const [userQuotaLimitInput, setUserQuotaLimitInput] = useState<number>(10);
 
   // Fixed Master Admin Security Password Protection (7477661867Ss)
   const MASTER_ADMIN_PASS = '7477661867Ss';
@@ -398,6 +402,29 @@ export const AdminPortal: React.FC = () => {
       showAlert(res.message);
       setAdminActionModal(null);
       setModalReason('');
+    } else {
+      showAlert(res.message);
+    }
+  };
+
+  const handleAdminUpdateQuota = () => {
+    if (!selectedUserForModal) return;
+    const res = updateUserRequestLimit(selectedUserForModal.id, userQuotaLimitInput);
+    if (res.success) {
+      showAlert(res.message);
+      setAdminActionModal(null);
+    } else {
+      showAlert(res.message);
+    }
+  };
+
+  const handleAdminResetQuotaCount = (targetUser?: UserProfile) => {
+    const u = targetUser || selectedUserForModal;
+    if (!u) return;
+    const res = resetUserDailyRequestCount(u.id);
+    if (res.success) {
+      showAlert(res.message);
+      setAdminActionModal(null);
     } else {
       showAlert(res.message);
     }
@@ -858,6 +885,25 @@ export const AdminPortal: React.FC = () => {
                       <div className="text-[11px] text-slate-400">
                         Mobile: {user.mobile} • Email: {user.email} {user.telegram_id ? `• TG: ${user.telegram_id}` : ''}
                       </div>
+                      {/* Daily HTTPS API Request Quota Indicator */}
+                      <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
+                        <span className="text-slate-400 font-bold flex items-center gap-1">
+                          <Gauge className="h-3 w-3 text-indigo-400" />
+                          <span>Daily HTTPS Quota:</span>
+                        </span>
+                        <span className="font-mono font-bold text-indigo-300 bg-indigo-950/60 border border-indigo-500/30 px-2 py-0.5 rounded-md">
+                          {user.daily_api_requests_count || 0}/{user.daily_api_requests_limit || 10} Requests Used Today
+                        </span>
+                        {(user.daily_api_requests_count || 0) >= (user.daily_api_requests_limit || 10) ? (
+                          <span className="text-[10px] font-bold text-amber-300 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded-md">
+                            ⏳ 24h Auto-Unlock Active (Account Safe & Active)
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 rounded-md">
+                            ⚡ {Math.max(0, (user.daily_api_requests_limit || 10) - (user.daily_api_requests_count || 0))} Requests Remaining
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-4">
@@ -868,7 +914,7 @@ export const AdminPortal: React.FC = () => {
                         )}
                       </div>
 
-                      <div className="flex items-center gap-1.5 shrink-0">
+                      <div className="flex items-center gap-1.5 shrink-0 flex-wrap sm:flex-nowrap">
                         <button
                           onClick={() => {
                             setSelectedUserForModal(user);
@@ -891,11 +937,35 @@ export const AdminPortal: React.FC = () => {
                           <span>Cut</span>
                         </button>
 
+                        {/* Set Daily HTTPS Request Limit */}
+                        <button
+                          onClick={() => {
+                            setSelectedUserForModal(user);
+                            setUserQuotaLimitInput(user.daily_api_requests_limit || 10);
+                            setAdminActionModal('SET_LIMIT');
+                          }}
+                          className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs flex items-center gap-1 transition active:scale-95 shadow-md"
+                          title="Change Daily HTTPS Request Limit"
+                        >
+                          <Gauge className="h-3.5 w-3.5" />
+                          <span>Limit ({user.daily_api_requests_limit || 10})</span>
+                        </button>
+
+                        {/* Instant Quota Reset / Unlock */}
+                        <button
+                          onClick={() => handleAdminResetQuotaCount(user)}
+                          className="px-2 py-1.5 bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-300 border border-cyan-500/40 font-bold rounded-xl text-xs flex items-center gap-1 transition active:scale-95"
+                          title="Reset Today's Request Counter to 0 (Instant Unlock)"
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                          <span>Reset</span>
+                        </button>
+
                         {user.status === 'ACTIVE' ? (
                           <button
                             onClick={() => banUser(user.id, 'Admin manual account restriction')}
                             className="p-1.5 bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 rounded-xl transition border border-rose-500/30"
-                            title="Ban User"
+                            title="Ban User Account"
                           >
                             <Ban className="h-4 w-4" />
                           </button>
@@ -903,7 +973,7 @@ export const AdminPortal: React.FC = () => {
                           <button
                             onClick={() => unbanUser(user.id)}
                             className="p-1.5 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 rounded-xl transition border border-emerald-500/30"
-                            title="Unban User"
+                            title="Unban User Account"
                           >
                             <RotateCcw className="h-4 w-4" />
                           </button>
@@ -2216,7 +2286,7 @@ export const AdminPortal: React.FC = () => {
       )}
 
       {/* MODAL: ADD / CUT BALANCE */}
-      {adminActionModal && selectedUserForModal && (
+      {(adminActionModal === 'ADD_BAL' || adminActionModal === 'CUT_BAL') && selectedUserForModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl font-mono">
             <h3 className="text-base font-extrabold text-white font-sans">
@@ -2267,6 +2337,83 @@ export const AdminPortal: React.FC = () => {
                 }`}
               >
                 Confirm {adminActionModal === 'ADD_BAL' ? 'Credit' : 'Deduction'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: SET DAILY HTTPS REQUEST LIMIT */}
+      {adminActionModal === 'SET_LIMIT' && selectedUserForModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-indigo-500/40 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl font-mono text-xs">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-indigo-500/20 text-indigo-400 rounded-xl border border-indigo-500/30">
+                <Gauge className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-white font-sans">Set Daily HTTPS Request Limit</h3>
+                <p className="text-[11px] text-slate-400 font-sans">Adjust quota for this specific user wallet</p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 text-xs space-y-1">
+              <div className="font-bold text-white font-sans">{selectedUserForModal.full_name}</div>
+              <div className="text-[10px] text-slate-400">ID: {selectedUserForModal.user_custom_id} • Mobile: {selectedUserForModal.mobile}</div>
+              <div className="text-[11px] text-indigo-300 pt-1">
+                Current Usage Today: <strong>{selectedUserForModal.daily_api_requests_count || 0} / {selectedUserForModal.daily_api_requests_limit || 10} Requests</strong>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-slate-300 font-bold mb-1.5 font-sans">Daily HTTPS Requests Limit (Per 24h Cycle)</label>
+              <input
+                type="number"
+                min={1}
+                max={1000000}
+                value={userQuotaLimitInput}
+                onChange={(e) => setUserQuotaLimitInput(Math.max(1, Number(e.target.value)))}
+                className="w-full bg-slate-950 border border-indigo-500/50 rounded-xl px-3.5 py-2.5 text-white font-mono font-black text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            {/* Quick Presets */}
+            <div>
+              <label className="block text-[11px] text-slate-400 font-bold mb-1.5 font-sans">Quick Presets:</label>
+              <div className="grid grid-cols-4 gap-1.5">
+                {[10, 50, 100, 500, 1000, 5000, 10000, 50000].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setUserQuotaLimitInput(preset)}
+                    className={`py-1.5 px-2 rounded-lg font-mono font-bold text-xs transition border ${
+                      userQuotaLimitInput === preset
+                        ? 'bg-indigo-600 text-white border-indigo-400'
+                        : 'bg-slate-950 text-slate-300 border-slate-800 hover:bg-slate-800'
+                    }`}
+                  >
+                    {preset >= 1000 ? `${preset / 1000}k` : preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-2.5 bg-indigo-950/30 border border-indigo-500/20 rounded-xl text-[11px] text-slate-300 font-sans leading-relaxed">
+              💡 <strong>Non-Destructive Quota:</strong> If the user hits their limit, their HTTPS request sending is temporarily suspended until the daily 24h reset. Their account is <strong>NOT banned</strong> and stays active.
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setAdminActionModal(null)}
+                className="px-4 py-2 text-xs font-semibold bg-slate-800 text-slate-300 rounded-xl hover:bg-slate-700 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAdminUpdateQuota}
+                className="px-5 py-2 text-xs font-black rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white shadow-lg transition active:scale-95"
+              >
+                Save Daily Limit
               </button>
             </div>
           </div>

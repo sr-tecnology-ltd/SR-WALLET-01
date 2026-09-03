@@ -76,20 +76,20 @@ const rateLimiter = (defaultMax = 120, windowMs = 60000) => {
       return next();
     }
 
-    // Dynamic thresholds based on mode
-    let maxRequests = appSettings.ddos_rate_limit_per_minute || defaultMax;
-    let banDurationMs = 5 * 60 * 1000;
+    // Dynamic thresholds based on mode (Default: 20 req/min)
+    let maxRequests = appSettings.ddos_rate_limit_per_minute || defaultMax || 20;
+    let banDurationMs = 15 * 60 * 1000; // 15 minutes auto IP ban on 3 violations
 
     if (appSettings.ddos_shield_mode === 'HIGH_SECURITY') {
-      maxRequests = 60;
-      banDurationMs = 15 * 60 * 1000;
+      maxRequests = 15;
+      banDurationMs = 30 * 60 * 1000;
     } else if (appSettings.ddos_shield_mode === 'UNDER_ATTACK') {
-      maxRequests = 30;
+      maxRequests = 10;
       banDurationMs = 60 * 60 * 1000;
     }
 
     if (req.path.includes('/auth/') || req.path.includes('/otp/')) {
-      maxRequests = Math.min(maxRequests, 20);
+      maxRequests = Math.min(maxRequests, 10);
     }
 
     const existing = ipRateLimits.get(clientIp);
@@ -102,15 +102,15 @@ const rateLimiter = (defaultMax = 120, windowMs = 60000) => {
         status: 'error',
         code: 429,
         shield: 'SR-GATEWAY-DDoS-SHIELD-V3',
-        error_code: 'IP_TEMPORARILY_BANNED',
-        message: `⛔ IP temporarily throttled by DDoS Shield. Retry in ${remainingSec}s.`,
+        error_code: 'IP_AUTO_BANNED',
+        message: `⛔ IP Auto-Banned by DDoS Shield (3 violations exceeded). Ban expires in ${remainingSec}s.`,
         retry_after_seconds: remainingSec,
         timestamp: new Date().toISOString(),
       });
     }
 
     if (!existing || now > existing.resetTime) {
-      ipRateLimits.set(clientIp, { count: 1, resetTime: now + windowMs, violations: 0 });
+      ipRateLimits.set(clientIp, { count: 1, resetTime: now + windowMs, violations: existing?.violations || 0 });
       return next();
     }
 
@@ -119,17 +119,24 @@ const rateLimiter = (defaultMax = 120, windowMs = 60000) => {
       ddosStats.rate_limited_requests++;
       ddosStats.total_blocked_attacks++;
 
-      if (existing.violations >= 3 || existing.count >= (appSettings.ddos_auto_ban_threshold || 300)) {
+      const isBanned = existing.violations >= 3 || existing.count >= (appSettings.ddos_auto_ban_threshold || 60);
+      if (isBanned) {
         existing.isBannedUntil = now + banDurationMs;
         ddosStats.active_banned_ips++;
+        console.warn(`🚨 [DDoS Shield] Auto-banned IP ${clientIp} for ${Math.round(banDurationMs / 60000)} minutes due to 3 rate limit violations.`);
       }
 
       return res.status(429).json({
         status: 'error',
         code: 429,
         shield: 'SR-GATEWAY-DDoS-SHIELD-V3',
-        error_code: 'RATE_LIMIT_EXCEEDED',
-        message: 'Too many requests. Please slow down and try again in a few moments.',
+        error_code: isBanned ? 'IP_AUTO_BANNED_3_VIOLATIONS' : 'RATE_LIMIT_EXCEEDED',
+        message: isBanned
+          ? `⛔ IP Auto-Banned! 3 consecutive rate limit violations detected. Banned for ${Math.round(banDurationMs / 60000)} minutes.`
+          : `⚠️ Rate limit exceeded (Max 20 req/min). Violation ${existing.violations}/3 (3 violations will trigger an automatic IP ban).`,
+        violations: existing.violations,
+        max_violations_allowed: 3,
+        rate_limit_per_minute: maxRequests,
         retry_after_seconds: Math.ceil((existing.resetTime - now) / 1000),
         timestamp: new Date().toISOString(),
       });
@@ -140,7 +147,7 @@ const rateLimiter = (defaultMax = 120, windowMs = 60000) => {
   };
 };
 
-app.use(rateLimiter(120, 60000));
+app.use(rateLimiter(20, 60000));
 
 // 3. Security Sanitizer Helpers
 function sanitizeInput(str: any, maxLen = 200): string {
@@ -239,6 +246,9 @@ let appSettings: Record<string, any> = {
   smtp_pass: process.env.SMTP_PASS || '',
   smtp_from_name: process.env.SMTP_FROM_NAME || 'SR GATEWAY Alerts',
   smtp_from_email: process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'sr.notify.hub@gmail.com',
+  // User Daily HTTPS/API Request Limits (Default: 10/day)
+  default_daily_api_limit: 10,
+  auto_suspend_on_limit_exceeded: true,
 };
 
 let users: Record<string, any> = {
@@ -1493,7 +1503,100 @@ function resolveApiKeyRecord(rawKeyInput: string | undefined | null): {
   };
 }
 
-// Helper Middleware: API Key Authorization
+// User Daily HTTPS/API Request Quota & Auto-Suspension Engine
+interface QuotaCheckResult {
+  allowed: boolean;
+  error?: string;
+  status_code?: number;
+  error_code?: string;
+  user?: any;
+  daily_limit: number;
+  used_today: number;
+  remaining: number;
+  is_suspended: boolean;
+  suspension_reason?: string;
+}
+
+function checkAndDeductUserDailyQuota(userObj: any): QuotaCheckResult {
+  if (!userObj) {
+    return { allowed: true, daily_limit: 999999, used_today: 0, remaining: 999999, is_suspended: false };
+  }
+
+  // Admin accounts have unlimited quota and are never auto-suspended
+  if (userObj.role === 'ADMIN' || userObj.user_custom_id === 'SR-ADMIN-01' || userObj.id === 'admin-001') {
+    return { allowed: true, daily_limit: 999999, used_today: 0, remaining: 999999, is_suspended: false };
+  }
+
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  // Auto-clean any legacy limit-based ban so account is ACTIVE
+  if (userObj.status === 'BANNED' && (userObj.suspension_reason || '').toLowerCase().includes('daily limit')) {
+    userObj.status = 'ACTIVE';
+    userObj.suspension_reason = undefined;
+  }
+
+  // Daily 24-hour cycle reset check (resets count to 0 if next day)
+  if (userObj.last_api_request_date !== todayStr) {
+    userObj.daily_api_requests_count = 0;
+    userObj.last_api_request_date = todayStr;
+    saveDatabase();
+  }
+
+  const dailyLimit = typeof userObj.daily_api_requests_limit === 'number' && userObj.daily_api_requests_limit > 0
+    ? userObj.daily_api_requests_limit
+    : (appSettings.default_daily_api_limit || 10);
+
+  const usedToday = Number(userObj.daily_api_requests_count || 0);
+
+  // Check if user is manually banned by Admin for fraud/rule violations (not daily limit)
+  if (userObj.status === 'BANNED') {
+    return {
+      allowed: false,
+      status_code: 403,
+      error_code: 'ACCOUNT_BANNED',
+      error: `🚫 Account Suspended by Admin: Your account is restricted. Reason: ${userObj.suspension_reason || 'Administrative restriction'}. Contact Admin on Telegram (@SRTECHNOLOGYLTD1 / ${appSettings.support_url || 'https://t.me/SRTECHNOLOGYLTD1'}).`,
+      user: userObj,
+      daily_limit: dailyLimit,
+      used_today: usedToday,
+      remaining: 0,
+      is_suspended: true,
+      suspension_reason: userObj.suspension_reason,
+    };
+  }
+
+  // Check if user has exhausted their free daily limit (e.g., 10/10)
+  if (usedToday >= dailyLimit) {
+    // Non-destructive temporary pause: Account remains ACTIVE, only today's HTTPS API request sending is paused until next 24h reset
+    return {
+      allowed: false,
+      status_code: 429,
+      error_code: 'DAILY_HTTPS_LIMIT_EXHAUSTED',
+      error: `⏳ Daily HTTPS Request Limit Exhausted (${usedToday}/${dailyLimit} Used Today): Your HTTPS API request sending is temporarily paused for today. It will AUTOMATICALLY UNLOCK in the next 24 hours (at 00:00 UTC) with your new ${dailyLimit} free daily requests. Note: Your account is ACTIVE (NOT banned). To increase your daily limit immediately without waiting, contact Admin on Telegram (@SRTECHNOLOGYLTD1 / ${appSettings.support_url || 'https://t.me/SRTECHNOLOGYLTD1'}).`,
+      user: userObj,
+      daily_limit: dailyLimit,
+      used_today: usedToday,
+      remaining: 0,
+      is_suspended: true,
+      suspension_reason: `Daily HTTPS limit of ${dailyLimit} requests reached for today. Automatically unlocks next day.`,
+    };
+  }
+
+  // Increment usage count
+  userObj.daily_api_requests_count = usedToday + 1;
+  userObj.last_api_request_date = todayStr;
+  saveDatabase();
+
+  return {
+    allowed: true,
+    user: userObj,
+    daily_limit: dailyLimit,
+    used_today: userObj.daily_api_requests_count,
+    remaining: Math.max(0, dailyLimit - userObj.daily_api_requests_count),
+    is_suspended: false,
+  };
+}
+
+// Helper Middleware: API Key Authorization & Daily Quota Enforcement
 const validateApiKey = (req: Request, res: Response, next: any) => {
   const extractedKey = (
     (req.headers['x-api-key'] as string) ||
@@ -1525,6 +1628,32 @@ const validateApiKey = (req: Request, res: Response, next: any) => {
       provided_key: extractedKey,
       timestamp: new Date().toISOString(),
     });
+  }
+
+  // Enforce User Daily Request Limit & Auto-Suspension
+  const user = keyResult.user;
+  if (user && user.role !== 'ADMIN' && user.user_custom_id !== 'SR-ADMIN-01') {
+    const quotaCheck = checkAndDeductUserDailyQuota(user);
+    if (!quotaCheck.allowed) {
+      return res.status(quotaCheck.status_code || 429).json({
+        status: 'error',
+        code: quotaCheck.status_code || 429,
+        error_code: quotaCheck.error_code || 'DAILY_HTTPS_LIMIT_EXHAUSTED',
+        message: quotaCheck.error,
+        support_url: appSettings.support_url || 'https://t.me/SRTECHNOLOGYLTD1',
+        daily_limit: quotaCheck.daily_limit,
+        used_today: quotaCheck.used_today,
+        remaining: 0,
+        account_status: user.status || 'ACTIVE',
+        https_requests_status: 'PAUSED_FOR_TODAY',
+        auto_unlocks_at: 'Next 24-hour cycle (00:00 UTC)',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    res.setHeader('X-Daily-Quota-Limit', quotaCheck.daily_limit);
+    res.setHeader('X-Daily-Quota-Used', quotaCheck.used_today);
+    res.setHeader('X-Daily-Quota-Remaining', quotaCheck.remaining);
   }
 
   (req as any).apiKeyRecord = keyResult.keyRecord;
@@ -3622,6 +3751,171 @@ app.post('/api/v1/admin/sync-users', (req: Request, res: Response) => {
   res.json({ status: 'success', code: 200, message: 'Users synchronized successfully' });
 });
 
+// Admin: Set User Daily Request Limit
+app.post('/api/v1/admin/user/set-limit', (req: Request, res: Response) => {
+  const { user_id, limit, admin_key } = req.body || {};
+  const targetId = (user_id || '').toString().trim();
+  const newLimit = parseInt(limit, 10);
+
+  if (!targetId || isNaN(newLimit) || newLimit < 1) {
+    return res.status(400).json({ status: 'error', code: 400, message: 'Invalid user_id or limit (must be >= 1)' });
+  }
+
+  const resolved = resolveUserAndWallet(targetId);
+  if (!resolved.user) {
+    return res.status(404).json({ status: 'error', code: 404, message: `User '${targetId}' not found.` });
+  }
+
+  const user = resolved.user;
+  user.daily_api_requests_limit = newLimit;
+
+  // If user was suspended due to limit and new limit is greater than used count, reactivate account
+  if (user.status === 'BANNED' && (user.suspension_reason || '').includes('Exceeded daily limit') && (user.daily_api_requests_count || 0) < newLimit) {
+    user.status = 'ACTIVE';
+    delete user.suspension_reason;
+  }
+
+  saveDatabase();
+
+  res.json({
+    status: 'success',
+    code: 200,
+    message: `Updated daily request limit for ${user.full_name} (${user.user_custom_id}) to ${newLimit} requests/day.`,
+    user: {
+      id: user.id,
+      user_custom_id: user.user_custom_id,
+      full_name: user.full_name,
+      daily_api_requests_limit: user.daily_api_requests_limit,
+      daily_api_requests_count: user.daily_api_requests_count || 0,
+      status: user.status,
+    },
+  });
+});
+
+// Admin: Reset User Daily Request Count
+app.post('/api/v1/admin/user/reset-count', (req: Request, res: Response) => {
+  const { user_id } = req.body || {};
+  const targetId = (user_id || '').toString().trim();
+
+  if (!targetId) {
+    return res.status(400).json({ status: 'error', code: 400, message: 'user_id is required' });
+  }
+
+  const resolved = resolveUserAndWallet(targetId);
+  if (!resolved.user) {
+    return res.status(404).json({ status: 'error', code: 404, message: `User '${targetId}' not found.` });
+  }
+
+  const user = resolved.user;
+  user.daily_api_requests_count = 0;
+  user.last_api_request_date = new Date().toISOString().split('T')[0];
+
+  // If account was suspended for limit exceeded, restore status to ACTIVE
+  if (user.status === 'BANNED' && (user.suspension_reason || '').includes('Exceeded daily limit')) {
+    user.status = 'ACTIVE';
+    delete user.suspension_reason;
+  }
+
+  saveDatabase();
+
+  res.json({
+    status: 'success',
+    code: 200,
+    message: `Reset daily request count to 0 for ${user.full_name} (${user.user_custom_id}).`,
+    user: {
+      id: user.id,
+      user_custom_id: user.user_custom_id,
+      full_name: user.full_name,
+      daily_api_requests_limit: user.daily_api_requests_limit || 10,
+      daily_api_requests_count: 0,
+      status: user.status,
+    },
+  });
+});
+
+// Admin: Toggle User Account Status (Suspend / Unsuspend)
+app.post('/api/v1/admin/user/toggle-status', (req: Request, res: Response) => {
+  const { user_id, status, reason } = req.body || {};
+  const targetId = (user_id || '').toString().trim();
+  const targetStatus = (status || '').toString().toUpperCase();
+
+  if (!targetId || !['ACTIVE', 'BANNED'].includes(targetStatus)) {
+    return res.status(400).json({ status: 'error', code: 400, message: 'user_id and valid status (ACTIVE or BANNED) are required' });
+  }
+
+  const resolved = resolveUserAndWallet(targetId);
+  if (!resolved.user) {
+    return res.status(404).json({ status: 'error', code: 404, message: `User '${targetId}' not found.` });
+  }
+
+  const user = resolved.user;
+  user.status = targetStatus;
+  if (targetStatus === 'BANNED') {
+    user.suspension_reason = reason || 'Account suspended by Administrator';
+  } else {
+    delete user.suspension_reason;
+  }
+
+  saveDatabase();
+
+  res.json({
+    status: 'success',
+    code: 200,
+    message: `Account status for ${user.full_name} (${user.user_custom_id}) changed to ${targetStatus}.`,
+    user: {
+      id: user.id,
+      user_custom_id: user.user_custom_id,
+      full_name: user.full_name,
+      status: user.status,
+      suspension_reason: user.suspension_reason,
+    },
+  });
+});
+
+// User / Client Query: Current Daily Request Quota
+app.get('/api/v1/user/quota', (req: Request, res: Response) => {
+  const targetId = (req.query.user_id || req.query.sender_id || req.query.id || '').toString().trim();
+  if (!targetId) {
+    return res.status(400).json({ status: 'error', code: 400, message: 'user_id is required' });
+  }
+
+  const resolved = resolveUserAndWallet(targetId);
+  if (!resolved.user) {
+    return res.status(404).json({ status: 'error', code: 404, message: `User '${targetId}' not found.` });
+  }
+
+  const user = resolved.user;
+  const todayStr = new Date().toISOString().split('T')[0];
+  if (user.last_api_request_date !== todayStr) {
+    user.daily_api_requests_count = 0;
+    user.last_api_request_date = todayStr;
+  }
+
+  const dailyLimit = typeof user.daily_api_requests_limit === 'number' && user.daily_api_requests_limit > 0
+    ? user.daily_api_requests_limit
+    : (appSettings.default_daily_api_limit || 10);
+
+  const usedToday = Number(user.daily_api_requests_count || 0);
+  const remaining = Math.max(0, dailyLimit - usedToday);
+
+  res.json({
+    status: 'success',
+    code: 200,
+    data: {
+      user_id: user.user_custom_id,
+      full_name: user.full_name,
+      status: user.status,
+      is_suspended: user.status === 'BANNED',
+      suspension_reason: user.suspension_reason || null,
+      daily_limit: dailyLimit,
+      used_today: usedToday,
+      remaining: remaining,
+      reset_at_midnight: '00:00:00 UTC',
+      support_telegram: appSettings.support_url || 'https://t.me/SRTECHNOLOGYLTD1',
+    },
+  });
+});
+
 // ==========================================
 // PHP-STYLE DIRECT GATEWAY API: /api.php
 // Supports: /api.php?api_key={KEY}&number={wallet/phone}&amount={amount}&comment={comment}&sender_id={sender/chat_id}
@@ -3679,6 +3973,31 @@ const handlePhpApiRequest = (req: Request, res: Response) => {
         timestamp: new Date().toISOString(),
       });
     }
+  }
+
+  // Enforce User Daily Request Quota & Auto-Suspension for PHP API
+  if (senderUser && senderUser.role !== 'ADMIN' && senderUser.user_custom_id !== 'SR-ADMIN-01') {
+    const quotaCheck = checkAndDeductUserDailyQuota(senderUser);
+    if (!quotaCheck.allowed) {
+      return res.status(quotaCheck.status_code || 429).json({
+        status: 'error',
+        code: quotaCheck.status_code || 429,
+        error_code: quotaCheck.error_code || 'DAILY_HTTPS_LIMIT_EXHAUSTED',
+        message: quotaCheck.error,
+        support_url: appSettings.support_url || 'https://t.me/SRTECHNOLOGYLTD1',
+        daily_limit: quotaCheck.daily_limit,
+        used_today: quotaCheck.used_today,
+        remaining: 0,
+        account_status: senderUser.status || 'ACTIVE',
+        https_requests_status: 'PAUSED_FOR_TODAY',
+        auto_unlocks_at: 'Next 24-hour cycle (00:00 UTC)',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    res.setHeader('X-Daily-Quota-Limit', quotaCheck.daily_limit);
+    res.setHeader('X-Daily-Quota-Used', quotaCheck.used_today);
+    res.setHeader('X-Daily-Quota-Remaining', quotaCheck.remaining);
   }
 
   const targetRecipient = (
@@ -4701,6 +5020,129 @@ app.post('/api/v1/admin/credit-debit', (req: Request, res: Response) => {
   saveDatabase();
 
   res.json({ status: 'success', code: 200, message: `Wallet ${type} of ₹${numAmt} processed successfully` });
+});
+
+// Admin Action: Update User Daily HTTPS Request Limit
+app.post('/api/v1/admin/update-user-quota', (req: Request, res: Response) => {
+  const { user_id, user_custom_id, daily_limit } = req.body;
+  const newLimit = Math.max(1, parseInt(daily_limit, 10) || 10);
+
+  const targetUser = users[user_id] || users[user_custom_id] || Object.values(users).find(
+    (u) => u.id === user_id || u.user_custom_id === user_id || u.user_custom_id === user_custom_id
+  );
+
+  if (!targetUser) {
+    return res.status(404).json({ status: 'error', code: 404, message: 'User account not found' });
+  }
+
+  targetUser.daily_api_requests_limit = newLimit;
+  // If user was previously marked banned for limit, restore to ACTIVE
+  if (targetUser.status === 'BANNED' && (targetUser.suspension_reason || '').toLowerCase().includes('daily limit')) {
+    targetUser.status = 'ACTIVE';
+    targetUser.suspension_reason = undefined;
+  }
+
+  saveDatabase();
+
+  res.json({
+    status: 'success',
+    code: 200,
+    message: `✅ Daily HTTPS request limit updated to ${newLimit} requests/day for ${targetUser.full_name} (${targetUser.user_custom_id}).`,
+    user: {
+      id: targetUser.id,
+      user_custom_id: targetUser.user_custom_id,
+      full_name: targetUser.full_name,
+      daily_api_requests_limit: targetUser.daily_api_requests_limit,
+      daily_api_requests_count: targetUser.daily_api_requests_count || 0,
+      status: targetUser.status,
+    },
+  });
+});
+
+// Admin Action: Reset User Today's HTTPS Request Counter to 0 (Instant Unlock)
+app.post('/api/v1/admin/reset-user-quota-count', (req: Request, res: Response) => {
+  const { user_id, user_custom_id } = req.body;
+
+  const targetUser = users[user_id] || users[user_custom_id] || Object.values(users).find(
+    (u) => u.id === user_id || u.user_custom_id === user_id || u.user_custom_id === user_custom_id
+  );
+
+  if (!targetUser) {
+    return res.status(404).json({ status: 'error', code: 404, message: 'User account not found' });
+  }
+
+  targetUser.daily_api_requests_count = 0;
+  targetUser.last_api_request_date = new Date().toISOString().split('T')[0];
+  if (targetUser.status === 'BANNED' && (targetUser.suspension_reason || '').toLowerCase().includes('daily limit')) {
+    targetUser.status = 'ACTIVE';
+    targetUser.suspension_reason = undefined;
+  }
+
+  saveDatabase();
+
+  res.json({
+    status: 'success',
+    code: 200,
+    message: `✅ Today's HTTPS request counter reset to 0 for ${targetUser.full_name} (${targetUser.user_custom_id}). Requests immediately unlocked!`,
+    user: {
+      id: targetUser.id,
+      user_custom_id: targetUser.user_custom_id,
+      full_name: targetUser.full_name,
+      daily_api_requests_limit: targetUser.daily_api_requests_limit || 10,
+      daily_api_requests_count: 0,
+      status: targetUser.status,
+    },
+  });
+});
+
+// User API Quota & Status Inspection Endpoint
+app.get('/api/v1/user/quota', (req: Request, res: Response) => {
+  const queryUser = (req.query.user_id as string) || (req.query.user_custom_id as string) || (req.query.mobile as string);
+  const targetUser = queryUser
+    ? (users[queryUser] || Object.values(users).find((u) => u.id === queryUser || u.user_custom_id === queryUser || u.mobile === queryUser))
+    : null;
+
+  if (!targetUser) {
+    return res.json({
+      status: 'success',
+      daily_limit: 10,
+      used_today: 0,
+      remaining: 10,
+      https_requests_status: 'ACTIVE',
+      account_status: 'ACTIVE',
+      auto_unlocks_at: 'Next 24-hour cycle (00:00 UTC)',
+      message: '10 daily free HTTPS requests active.',
+    });
+  }
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  if (targetUser.last_api_request_date !== todayStr) {
+    targetUser.daily_api_requests_count = 0;
+    targetUser.last_api_request_date = todayStr;
+  }
+
+  const dailyLimit = typeof targetUser.daily_api_requests_limit === 'number' && targetUser.daily_api_requests_limit > 0
+    ? targetUser.daily_api_requests_limit
+    : (appSettings.default_daily_api_limit || 10);
+
+  const usedToday = Number(targetUser.daily_api_requests_count || 0);
+  const isExhausted = usedToday >= dailyLimit;
+
+  res.json({
+    status: 'success',
+    user_id: targetUser.id,
+    user_custom_id: targetUser.user_custom_id,
+    daily_limit: dailyLimit,
+    used_today: usedToday,
+    remaining: Math.max(0, dailyLimit - usedToday),
+    https_requests_status: isExhausted ? 'PAUSED_FOR_TODAY' : 'ACTIVE',
+    account_status: targetUser.status || 'ACTIVE',
+    auto_unlocks_at: 'Next 24-hour cycle (00:00 UTC)',
+    support_url: appSettings.support_url || 'https://t.me/SRTECHNOLOGYLTD1',
+    message: isExhausted
+      ? `Daily ${dailyLimit} request limit reached. HTTPS requests temporarily paused for today. Automatically unlocks in next 24 hours!`
+      : `${Math.max(0, dailyLimit - usedToday)} of ${dailyLimit} daily free HTTPS requests available today.`,
+  });
 });
 
 // Admin Action: Reset All Users' Balances to ₹0.00

@@ -58,6 +58,8 @@ export const INITIAL_SETTINGS: AppSettings = {
   ddos_rate_limit_per_minute: 120,
   ddos_auto_ban_threshold: 300,
   ddos_bot_protection: true,
+  default_daily_api_limit: 10,
+  auto_suspend_on_limit_exceeded: true,
 };
 
 export const INITIAL_PROFILES: UserProfile[] = [

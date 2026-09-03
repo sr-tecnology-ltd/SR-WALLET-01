@@ -68,6 +68,8 @@ interface WalletContextType {
   wipeAllUserData: () => Promise<{ success: boolean; message: string; usersCleared?: number }>;
   banUser: (targetUserId: string, reason: string) => void;
   unbanUser: (targetUserId: string) => void;
+  updateUserRequestLimit: (targetUserId: string, newLimit: number) => { success: boolean; message: string };
+  resetUserDailyRequestCount: (targetUserId: string) => { success: boolean; message: string };
 
   // Bonuses
   dailyBonusClaims: DailyBonusClaim[];
@@ -1657,9 +1659,80 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const unbanUser = (targetUserId: string) => {
     const targetUser = profiles.find((p) => p.id === targetUserId);
-    setProfiles((prev) => prev.map((p) => (p.id === targetUserId ? { ...p, status: 'ACTIVE' } : p)));
+    setProfiles((prev) => prev.map((p) => (p.id === targetUserId ? { ...p, status: 'ACTIVE', suspension_reason: undefined } : p)));
     addAuditLog('USER_UNBANNED', 'Restored user account access', targetUser);
     addNotification(targetUserId, 'Account Restored', 'Your account access has been restored.', 'SUCCESS');
+  };
+
+  const updateUserRequestLimit = (targetUserId: string, newLimit: number) => {
+    const targetUser = profiles.find((p) => p.id === targetUserId || p.user_custom_id === targetUserId);
+    if (!targetUser) return { success: false, message: 'User not found.' };
+    const validLimit = Math.max(1, Number(newLimit) || 10);
+
+    const updatedProfiles = profiles.map((p) =>
+      (p.id === targetUser.id || p.user_custom_id === targetUser.user_custom_id)
+        ? {
+            ...p,
+            daily_api_requests_limit: validLimit,
+            status: p.status === 'BANNED' && (p.suspension_reason || '').toLowerCase().includes('daily limit') ? 'ACTIVE' : p.status,
+            suspension_reason: (p.suspension_reason || '').toLowerCase().includes('daily limit') ? undefined : p.suspension_reason,
+          }
+        : p
+    );
+
+    setProfiles(updatedProfiles);
+    localStorage.setItem(`${LOCAL_STORAGE_KEY}_PROFILES`, JSON.stringify(updatedProfiles));
+
+    // Sync with backend API
+    fetch('/api/v1/admin/update-user-quota', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: targetUser.id,
+        user_custom_id: targetUser.user_custom_id,
+        daily_limit: validLimit,
+      }),
+    }).catch(() => null);
+
+    addAuditLog('USER_QUOTA_UPDATED', `Admin updated daily HTTPS API request limit to ${validLimit}/day for ${targetUser.full_name} (${targetUser.user_custom_id})`, targetUser);
+    addNotification(targetUser.id, 'Daily HTTPS Request Limit Updated 🚀', `Your daily HTTPS request limit has been updated to ${validLimit} requests/day by Admin.`, 'SUCCESS');
+
+    return { success: true, message: `✅ Daily HTTPS request limit for ${targetUser.full_name} updated to ${validLimit} requests/day.` };
+  };
+
+  const resetUserDailyRequestCount = (targetUserId: string) => {
+    const targetUser = profiles.find((p) => p.id === targetUserId || p.user_custom_id === targetUserId);
+    if (!targetUser) return { success: false, message: 'User not found.' };
+
+    const updatedProfiles = profiles.map((p) =>
+      (p.id === targetUser.id || p.user_custom_id === targetUser.user_custom_id)
+        ? {
+            ...p,
+            daily_api_requests_count: 0,
+            last_api_request_date: new Date().toISOString().split('T')[0],
+            status: p.status === 'BANNED' && (p.suspension_reason || '').toLowerCase().includes('daily limit') ? 'ACTIVE' : p.status,
+            suspension_reason: (p.suspension_reason || '').toLowerCase().includes('daily limit') ? undefined : p.suspension_reason,
+          }
+        : p
+    );
+
+    setProfiles(updatedProfiles);
+    localStorage.setItem(`${LOCAL_STORAGE_KEY}_PROFILES`, JSON.stringify(updatedProfiles));
+
+    // Sync with backend API
+    fetch('/api/v1/admin/reset-user-quota-count', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: targetUser.id,
+        user_custom_id: targetUser.user_custom_id,
+      }),
+    }).catch(() => null);
+
+    addAuditLog('USER_QUOTA_RESET', `Admin reset today's HTTPS request counter to 0 for ${targetUser.full_name} (${targetUser.user_custom_id})`, targetUser);
+    addNotification(targetUser.id, 'HTTPS Requests Unlocked 🔓', `Your daily HTTPS request counter has been reset to 0 by Admin. You can now send requests immediately.`, 'SUCCESS');
+
+    return { success: true, message: `✅ Today's HTTPS request counter for ${targetUser.full_name} reset to 0/${targetUser.daily_api_requests_limit || 10}. Requests unlocked!` };
   };
 
   // Daily Bonus Claim
@@ -2740,6 +2813,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       wipeAllUserData,
       banUser,
       unbanUser,
+      updateUserRequestLimit,
+      resetUserDailyRequestCount,
       dailyBonusClaims,
       claimDailyBonus,
       referrals,

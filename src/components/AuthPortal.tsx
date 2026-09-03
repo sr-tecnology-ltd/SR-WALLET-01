@@ -18,6 +18,10 @@ import {
   KeyRound,
   ExternalLink,
   Gift,
+  RotateCcw,
+  Volume2,
+  Cpu,
+  Fingerprint,
 } from 'lucide-react';
 
 interface AuthPortalProps {
@@ -64,12 +68,54 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
   const [otpSent, setOtpSent] = useState(false);
   const [otpTimer, setOtpTimer] = useState(0);
 
+  // Anti-Bot Smart Captcha Verification States
+  const [captchaCode, setCaptchaCode] = useState('');
+  const [captchaInput, setCaptchaInput] = useState('');
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutTimer, setLockoutTimer] = useState(0);
+
+  // Generate dynamic 5-character Anti-Bot Captcha (no confusing chars like 0/O, 1/I)
+  const generateCaptcha = () => {
+    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+    let code = '';
+    for (let i = 0; i < 5; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setCaptchaCode(code);
+    setCaptchaInput('');
+  };
+
+  useEffect(() => {
+    generateCaptcha();
+  }, [mode]);
+
+  // Audio Speech Reader for Captcha (Accessibility & Bot Deterrent)
+  const speakCaptcha = () => {
+    try {
+      if ('speechSynthesis' in window) {
+        const text = captchaCode.split('').join(' ');
+        const utterance = new SpeechSynthesisUtterance(`Security Code: ${text}`);
+        utterance.rate = 0.8;
+        window.speechSynthesis.speak(utterance);
+      }
+    } catch {
+      // Audio speech ignored if blocked
+    }
+  };
+
   // UI Feedback States
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
   // Countdown timers
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (lockoutTimer > 0) {
+      interval = setInterval(() => setLockoutTimer((prev) => prev - 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [lockoutTimer]);
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (otpTimer > 0) {
@@ -95,6 +141,11 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
     e.preventDefault();
     clearFeedback();
 
+    if (lockoutTimer > 0) {
+      setErrorMsg(`⛔ Too many failed attempts. Security lock active for ${lockoutTimer}s.`);
+      return;
+    }
+
     if (!loginIdentifier.trim()) {
       setErrorMsg('Please enter your Mobile No, User ID, Email, or Telegram ID.');
       return;
@@ -105,15 +156,39 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
       return;
     }
 
+    // Captcha Validation
+    if (!captchaInput.trim() || captchaInput.trim().toUpperCase() !== captchaCode.toUpperCase()) {
+      const nextFails = failedAttempts + 1;
+      setFailedAttempts(nextFails);
+      generateCaptcha();
+      if (nextFails >= 5) {
+        setLockoutTimer(30);
+        setErrorMsg('⛔ Anti-Bot Security Triggered: 5 failed attempts. Please wait 30 seconds.');
+      } else {
+        setErrorMsg('❌ Invalid Anti-Bot Captcha Code. Please enter the characters shown.');
+      }
+      return;
+    }
+
     setIsLoading(true);
     try {
       const res = loginUser(loginIdentifier, loginPassword);
       if (res.success) {
         setSuccessMsg(res.message);
+        setFailedAttempts(0);
       } else {
-        setErrorMsg(res.message);
+        const nextFails = failedAttempts + 1;
+        setFailedAttempts(nextFails);
+        generateCaptcha();
+        if (nextFails >= 5) {
+          setLockoutTimer(30);
+          setErrorMsg('⛔ Security Alert: Multiple failed login attempts. Temporarily locked for 30s.');
+        } else {
+          setErrorMsg(res.message);
+        }
       }
     } catch (err: any) {
+      generateCaptcha();
       setErrorMsg(err?.message || 'Login failed. Please try again.');
     } finally {
       setIsLoading(false);
@@ -146,6 +221,13 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
     }
     if (!regTelegramChatId.trim()) {
       setErrorMsg('Please enter your Telegram Chat ID. Click the bot link above to get your Chat ID.');
+      return;
+    }
+
+    // Anti-Bot Captcha Check
+    if (!captchaInput.trim() || captchaInput.trim().toUpperCase() !== captchaCode.toUpperCase()) {
+      generateCaptcha();
+      setErrorMsg('❌ Invalid Anti-Bot Captcha Code. Please enter the characters shown below before requesting OTP.');
       return;
     }
 
@@ -245,6 +327,12 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
     clearFeedback();
     if (!otpIdentifier.trim()) {
       setErrorMsg('Please enter your Telegram Chat ID or Registered Mobile number.');
+      return;
+    }
+
+    if (!captchaInput.trim() || captchaInput.trim().toUpperCase() !== captchaCode.toUpperCase()) {
+      generateCaptcha();
+      setErrorMsg('❌ Invalid Anti-Bot Captcha Code. Please enter the characters shown below.');
       return;
     }
 
@@ -548,6 +636,55 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
                   </div>
                 </div>
 
+                {/* Smart Anti-Bot Captcha Verification */}
+                <div className="p-3 bg-slate-950/90 border border-indigo-500/30 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-mono text-slate-300 font-bold flex items-center gap-1.5">
+                      <Fingerprint className="h-3.5 w-3.5 text-indigo-400" />
+                      <span>ANTI-BOT CAPTCHA VERIFICATION</span>
+                    </label>
+                    <span className="text-[9px] text-emerald-400 font-mono font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                      SHIELD ACTIVE
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="relative bg-gradient-to-r from-slate-950 via-indigo-950/60 to-slate-950 border border-indigo-500/40 rounded-xl px-2.5 py-2 flex items-center justify-between overflow-hidden select-none">
+                      <div className="relative font-mono font-black text-base tracking-[0.25em] text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 via-sky-200 to-emerald-300 italic">
+                        {captchaCode}
+                      </div>
+                      <div className="flex items-center gap-0.5 z-10">
+                        <button
+                          type="button"
+                          onClick={speakCaptcha}
+                          className="p-1 text-slate-400 hover:text-sky-300 hover:bg-slate-800 rounded-lg transition"
+                          title="Audio Captcha (Listen)"
+                        >
+                          <Volume2 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={generateCaptcha}
+                          className="p-1 text-slate-400 hover:text-emerald-300 hover:bg-slate-800 rounded-lg transition"
+                          title="Refresh Captcha Code"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <input
+                      type="text"
+                      maxLength={5}
+                      value={captchaInput}
+                      onChange={(e) => setCaptchaInput(e.target.value.toUpperCase().trim())}
+                      placeholder="ENTER CODE"
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-700 focus:border-indigo-500 rounded-xl text-center text-xs font-mono font-black tracking-widest text-white uppercase placeholder:text-slate-600 focus:outline-none transition"
+                      required
+                    />
+                  </div>
+                </div>
+
                 {/* Security Alert Note */}
                 <div className="p-3 bg-slate-950/80 border border-slate-800/80 rounded-2xl text-[11px] text-slate-400 flex items-center gap-2">
                   <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0" />
@@ -723,6 +860,55 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
                     </div>
                   </div>
 
+                  {/* Anti-Bot Captcha for Registration */}
+                  <div className="p-3 bg-slate-950/90 border border-sky-500/30 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-mono text-slate-300 font-bold flex items-center gap-1.5">
+                        <Fingerprint className="h-3.5 w-3.5 text-sky-400" />
+                        <span>ANTI-BOT CAPTCHA VERIFICATION</span>
+                      </label>
+                      <span className="text-[9px] text-emerald-400 font-mono font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                        PROTECTION ON
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="relative bg-gradient-to-r from-slate-950 via-sky-950/60 to-slate-950 border border-sky-500/40 rounded-xl px-2.5 py-2 flex items-center justify-between overflow-hidden select-none">
+                        <div className="relative font-mono font-black text-base tracking-[0.25em] text-transparent bg-clip-text bg-gradient-to-r from-sky-300 via-indigo-200 to-emerald-300 italic">
+                          {captchaCode}
+                        </div>
+                        <div className="flex items-center gap-0.5 z-10">
+                          <button
+                            type="button"
+                            onClick={speakCaptcha}
+                            className="p-1 text-slate-400 hover:text-sky-300 hover:bg-slate-800 rounded-lg transition"
+                            title="Audio Captcha (Listen)"
+                          >
+                            <Volume2 className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={generateCaptcha}
+                            className="p-1 text-slate-400 hover:text-emerald-300 hover:bg-slate-800 rounded-lg transition"
+                            title="Refresh Captcha Code"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <input
+                        type="text"
+                        maxLength={5}
+                        value={captchaInput}
+                        onChange={(e) => setCaptchaInput(e.target.value.toUpperCase().trim())}
+                        placeholder="ENTER CODE"
+                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 focus:border-sky-500 rounded-xl text-center text-xs font-mono font-black tracking-widest text-white uppercase placeholder:text-slate-600 focus:outline-none transition"
+                        required
+                      />
+                    </div>
+                  </div>
+
                   {/* Telegram Chat ID Input with Attached GET OTP Button */}
                   <div>
                     <label className="block text-[10px] font-mono text-slate-300 mb-1 font-bold">
@@ -847,6 +1033,55 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
                           onChange={(e) => setOtpIdentifier(e.target.value)}
                           placeholder="Telegram Chat ID, @username, or Mobile"
                           className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-2xl text-sm text-white font-mono placeholder:text-slate-600 focus:outline-none focus:border-sky-500 transition"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {/* Anti-Bot Captcha for Telegram OTP */}
+                    <div className="p-3 bg-slate-950/90 border border-sky-500/30 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-mono text-slate-300 font-bold flex items-center gap-1.5">
+                          <Fingerprint className="h-3.5 w-3.5 text-sky-400" />
+                          <span>ANTI-BOT CAPTCHA VERIFICATION</span>
+                        </label>
+                        <span className="text-[9px] text-emerald-400 font-mono font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                          PROTECTION ON
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="relative bg-gradient-to-r from-slate-950 via-sky-950/60 to-slate-950 border border-sky-500/40 rounded-xl px-2.5 py-2 flex items-center justify-between overflow-hidden select-none">
+                          <div className="relative font-mono font-black text-base tracking-[0.25em] text-transparent bg-clip-text bg-gradient-to-r from-sky-300 via-indigo-200 to-emerald-300 italic">
+                            {captchaCode}
+                          </div>
+                          <div className="flex items-center gap-0.5 z-10">
+                            <button
+                              type="button"
+                              onClick={speakCaptcha}
+                              className="p-1 text-slate-400 hover:text-sky-300 hover:bg-slate-800 rounded-lg transition"
+                              title="Audio Captcha (Listen)"
+                            >
+                              <Volume2 className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={generateCaptcha}
+                              className="p-1 text-slate-400 hover:text-emerald-300 hover:bg-slate-800 rounded-lg transition"
+                              title="Refresh Captcha Code"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <input
+                          type="text"
+                          maxLength={5}
+                          value={captchaInput}
+                          onChange={(e) => setCaptchaInput(e.target.value.toUpperCase().trim())}
+                          placeholder="ENTER CODE"
+                          className="w-full px-3 py-2 bg-slate-950 border border-slate-700 focus:border-sky-500 rounded-xl text-center text-xs font-mono font-black tracking-widest text-white uppercase placeholder:text-slate-600 focus:outline-none transition"
                           required
                         />
                       </div>

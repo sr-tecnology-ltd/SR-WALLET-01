@@ -22,6 +22,11 @@ export interface UserProfile {
   welcome_bonus_expires_at?: string; // ISO timestamp 24h from registration
   welcome_bonus_claimed_at?: string;
   has_made_first_transaction?: boolean;
+  // HTTPS / API Request Limiter & Quota (10 requests/day default)
+  daily_api_requests_count?: number;
+  daily_api_requests_limit?: number;
+  last_api_request_date?: string;
+  suspension_reason?: string;
   created_at: string;
   updated_at: string;
 }
@@ -146,6 +151,8 @@ export type AuditActionType =
   | 'WITHDRAWAL_MARKED_PAID'
   | 'USER_BANNED'
   | 'USER_UNBANNED'
+  | 'USER_QUOTA_UPDATED'
+  | 'USER_QUOTA_RESET'
   | 'SETTINGS_UPDATED'
   | 'API_KEY_CREATED'
   | 'API_KEY_REVOKED'
@@ -228,6 +235,9 @@ export interface AppSettings {
   ddos_rate_limit_per_minute?: number;
   ddos_auto_ban_threshold?: number;
   ddos_bot_protection?: boolean;
+  // User Daily Request Quota & Auto-Suspend
+  default_daily_api_limit?: number; // default: 10
+  auto_suspend_on_limit_exceeded?: boolean; // default: true
 }
 
 export interface EmailLog {
