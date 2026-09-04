@@ -35,6 +35,13 @@ import {
   Trash2,
   Wrench,
   Gauge,
+  Database,
+  Download,
+  Upload,
+  Copy,
+  Key,
+  EyeOff,
+  Edit3,
 } from 'lucide-react';
 import { UserProfile, DepositRequest, WithdrawalRequest, Wallet, AppSettings } from '../types';
 
@@ -59,6 +66,8 @@ export const AdminPortal: React.FC = () => {
     unbanUser,
     updateUserRequestLimit,
     resetUserDailyRequestCount,
+    adminUpdateUserCredentials,
+    restoreFullDatabase,
     settings,
     updateSettings,
     auditLogs,
@@ -66,16 +75,59 @@ export const AdminPortal: React.FC = () => {
   } = useWallet();
 
   const [activeAdminTab, setActiveAdminTab] = useState<
-    'DASHBOARD' | 'USERS' | 'DEPOSITS' | 'WITHDRAWALS' | 'TRANSACTIONS' | 'SETTINGS' | 'AUDIT_LOGS'
+    'DASHBOARD' | 'USERS' | 'DEPOSITS' | 'WITHDRAWALS' | 'TRANSACTIONS' | 'SETTINGS' | 'BACKUP' | 'AUDIT_LOGS'
   >('DASHBOARD');
 
   // Search & Filter state
   const [userSearch, setUserSearch] = useState<string>('');
   const [selectedUserForModal, setSelectedUserForModal] = useState<UserProfile | null>(null);
-  const [adminActionModal, setAdminActionModal] = useState<'ADD_BAL' | 'CUT_BAL' | 'BAN' | 'SET_LIMIT' | 'RESET_QUOTA' | null>(null);
+  const [adminActionModal, setAdminActionModal] = useState<'ADD_BAL' | 'CUT_BAL' | 'BAN' | 'SET_LIMIT' | 'RESET_QUOTA' | 'EDIT_CREDS' | null>(null);
   const [modalAmount, setModalAmount] = useState<number>(1000);
   const [modalReason, setModalReason] = useState<string>('');
   const [userQuotaLimitInput, setUserQuotaLimitInput] = useState<number>(10);
+
+  // User Credentials Visibility & Editing State
+  const [showUserPasswords, setShowUserPasswords] = useState<Record<string, boolean>>({});
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [credsForm, setCredsForm] = useState<{
+    full_name: string;
+    password: string;
+    rpin: string;
+    telegram_chat_id: string;
+    telegram_id: string;
+    mobile: string;
+    email: string;
+    status: 'ACTIVE' | 'BANNED';
+  }>({
+    full_name: '',
+    password: '',
+    rpin: '1234',
+    telegram_chat_id: '',
+    telegram_id: '',
+    mobile: '',
+    email: '',
+    status: 'ACTIVE',
+  });
+  const [isSavingCreds, setIsSavingCreds] = useState(false);
+
+  // Full Database Backup & Migration State
+  const [isExportingDb, setIsExportingDb] = useState(false);
+  const [isImportingDb, setIsImportingDb] = useState(false);
+  const [importJsonText, setImportJsonText] = useState('');
+  const [importFeedback, setImportFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const toggleShowPassword = (userId: string) => {
+    setShowUserPasswords((prev) => ({ ...prev, [userId]: !prev[userId] }));
+  };
+
+  const copyToClipboard = (text: string, fieldId: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedField(fieldId);
+      setTimeout(() => setCopiedField(null), 2000);
+    });
+  };
 
   // Fixed Master Admin Security Password Protection (7477661867Ss)
   const MASTER_ADMIN_PASS = '7477661867Ss';
@@ -503,6 +555,119 @@ export const AdminPortal: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
+  // Handle Save User Credentials (Password, RPIN, Chat ID, Phone, Email)
+  const handleSaveUserCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUserForModal) return;
+    setIsSavingCreds(true);
+    try {
+      const res = await adminUpdateUserCredentials(selectedUserForModal.id, credsForm);
+      if (res.success) {
+        showAlert(res.message || 'Credentials updated successfully!');
+        setAdminActionModal(null);
+      } else {
+        alert('Failed: ' + res.message);
+      }
+    } catch (e: any) {
+      alert('Error updating credentials: ' + e?.message);
+    } finally {
+      setIsSavingCreds(false);
+    }
+  };
+
+  // Handle Export Database (Download .json file)
+  const handleExportDatabase = async () => {
+    try {
+      setIsExportingDb(true);
+      const res = await fetch('/api/v1/admin/export-database');
+      if (!res.ok) throw new Error('Server error exporting database');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `srgateway_database_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      showAlert('📦 Full Database JSON backup downloaded! Keep this file safe for migration.');
+    } catch (e: any) {
+      alert('Database export failed: ' + e?.message);
+    } finally {
+      setIsExportingDb(false);
+    }
+  };
+
+  // Handle Copy Raw Database JSON to Clipboard
+  const handleCopyRawDatabaseJson = async () => {
+    try {
+      const res = await fetch('/api/v1/admin/export-database');
+      if (!res.ok) throw new Error('Failed to fetch database export');
+      const data = await res.json();
+      await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+      copyToClipboard('copied', 'RAW_DB_JSON');
+      showAlert('📋 Full Database JSON copied to clipboard! You can paste it into Koyeb or any new server.');
+    } catch (e: any) {
+      alert('Failed to copy database: ' + e?.message);
+    }
+  };
+
+  // Handle Restore Full Database from JSON
+  const handleRestoreDatabase = async (jsonString: string) => {
+    if (!jsonString || jsonString.trim() === '') {
+      setImportFeedback({ type: 'error', message: 'Please provide valid JSON content to restore.' });
+      return;
+    }
+    try {
+      setIsImportingDb(true);
+      setImportFeedback(null);
+      const parsed = JSON.parse(jsonString.trim());
+      const userCount = Array.isArray(parsed.users) ? parsed.users.length : 0;
+      const walletCount = parsed.wallets ? Object.keys(parsed.wallets).length : 0;
+
+      const confirmed = window.confirm(
+        `Are you sure you want to restore this database backup?\n\n` +
+        `• Users to load: ${userCount}\n` +
+        `• Wallets: ${walletCount}\n` +
+        `• Settings, Transactions & Ledgers included\n\n` +
+        `This will instantly sync with the server disk (/data/srgateway_database.json) and update all balances!`
+      );
+
+      if (!confirmed) {
+        setIsImportingDb(false);
+        return;
+      }
+
+      const res = await restoreFullDatabase(parsed);
+      if (res.success) {
+        setImportFeedback({ type: 'success', message: res.message || `Loaded ${userCount} users & wallets successfully!` });
+        showAlert(`✅ Database Restored! ${userCount} users & all balances synced!`);
+        setImportJsonText('');
+      } else {
+        setImportFeedback({ type: 'error', message: res.message || 'Database restore failed on server.' });
+      }
+    } catch (e: any) {
+      setImportFeedback({ type: 'error', message: 'Invalid JSON format: ' + e?.message });
+    } finally {
+      setIsImportingDb(false);
+    }
+  };
+
+  // Handle file picker selection for database restore
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (content) {
+        setImportJsonText(content);
+        handleRestoreDatabase(content);
+      }
+    };
+    reader.readAsText(file);
+  };
+
   // If not authenticated with Master Password, render dedicated Gatekeeper Screen
   if (!isPassAuthed) {
     return (
@@ -606,6 +771,7 @@ export const AdminPortal: React.FC = () => {
             { id: 'WITHDRAWALS', label: `Withdrawals (${pendingWithdrawals.length})`, icon: ArrowUpRight, badge: pendingWithdrawals.length },
             { id: 'TRANSACTIONS', label: 'Master Ledger', icon: FileText },
             { id: 'SETTINGS', label: 'Extra Controls', icon: Settings },
+            { id: 'BACKUP', label: 'Backup & Restore', icon: Database },
             { id: 'AUDIT_LOGS', label: 'Audit Logs', icon: ShieldAlert },
           ].map((tab) => {
             const Icon = tab.icon;
@@ -885,6 +1051,79 @@ export const AdminPortal: React.FC = () => {
                       <div className="text-[11px] text-slate-400">
                         Mobile: {user.mobile} • Email: {user.email} {user.telegram_id ? `• TG: ${user.telegram_id}` : ''}
                       </div>
+
+                      {/* User Account Credentials Strip (Password, R-PIN, Chat ID) */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 text-[11px]">
+                        {/* 1. Password with toggle & copy */}
+                        <div className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 truncate">
+                            <Lock className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                            <span className="text-slate-400 text-[10px] uppercase font-bold">Pass:</span>
+                            <span className="font-mono font-bold text-amber-300 truncate">
+                              {showUserPasswords[user.id] ? (user.password || (user.role === 'ADMIN' ? 'admin' : '123456')) : '••••••••'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => toggleShowPassword(user.id)}
+                              className="p-1 hover:bg-slate-800 text-slate-400 hover:text-white rounded"
+                              title={showUserPasswords[user.id] ? "Hide Password" : "Show Password"}
+                            >
+                              {showUserPasswords[user.id] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(user.password || (user.role === 'ADMIN' ? 'admin' : '123456'), `pwd-${user.id}`)}
+                              className="p-1 hover:bg-slate-800 text-slate-400 hover:text-white rounded"
+                              title="Copy Password"
+                            >
+                              {copiedField === `pwd-${user.id}` ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* 2. Security 4-Digit R-PIN */}
+                        <div className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 truncate">
+                            <Key className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                            <span className="text-slate-400 text-[10px] uppercase font-bold">R-PIN:</span>
+                            <span className="font-mono font-black text-emerald-300 tracking-wider">
+                              {user.rpin || '1234'}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(user.rpin || '1234', `rpin-${user.id}`)}
+                            className="p-1 hover:bg-slate-800 text-slate-400 hover:text-white rounded shrink-0"
+                            title="Copy 4-Digit RPIN"
+                          >
+                            {copiedField === `rpin-${user.id}` ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                          </button>
+                        </div>
+
+                        {/* 3. Connected Telegram Chat ID */}
+                        <div className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 truncate">
+                            <Bot className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+                            <span className="text-slate-400 text-[10px] uppercase font-bold">Chat ID:</span>
+                            <span className="font-mono font-bold text-cyan-300 truncate">
+                              {user.telegram_chat_id || (user.telegram_id ? user.telegram_id : 'Not Linked')}
+                            </span>
+                          </div>
+                          {(user.telegram_chat_id || user.telegram_id) && (
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(user.telegram_chat_id || user.telegram_id || '', `tg-${user.id}`)}
+                              className="p-1 hover:bg-slate-800 text-slate-400 hover:text-white rounded shrink-0"
+                              title="Copy Telegram ID"
+                            >
+                              {copiedField === `tg-${user.id}` ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
                       {/* Daily HTTPS API Request Quota Indicator */}
                       <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
                         <span className="text-slate-400 font-bold flex items-center gap-1">
@@ -915,6 +1154,30 @@ export const AdminPortal: React.FC = () => {
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0 flex-wrap sm:flex-nowrap">
+                        {/* Edit User Credentials */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedUserForModal(user);
+                            setCredsForm({
+                              full_name: user.full_name || '',
+                              password: user.password || '',
+                              rpin: user.rpin || '1234',
+                              telegram_chat_id: user.telegram_chat_id || '',
+                              telegram_id: user.telegram_id || '',
+                              mobile: user.mobile || '',
+                              email: user.email || '',
+                              status: user.status,
+                            });
+                            setAdminActionModal('EDIT_CREDS');
+                          }}
+                          className="px-2.5 py-1.5 bg-violet-600/30 hover:bg-violet-600/60 text-violet-200 border border-violet-500/40 font-bold rounded-xl text-xs flex items-center gap-1 transition active:scale-95 shadow-md"
+                          title="View & Edit User Password, R-PIN & Telegram Chat ID"
+                        >
+                          <Edit3 className="h-3.5 w-3.5" />
+                          <span>Credentials</span>
+                        </button>
+
                         <button
                           onClick={() => {
                             setSelectedUserForModal(user);
@@ -2251,6 +2514,246 @@ export const AdminPortal: React.FC = () => {
         </form>
       )}
 
+      {/* TAB: BACKUP & RESTORE / MIGRATION HUB */}
+      {activeAdminTab === 'BACKUP' && (
+        <div className="space-y-6">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-indigo-900/40 via-purple-900/30 to-slate-900 border border-indigo-500/30 rounded-[2rem] p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+              <div className="space-y-2 max-w-2xl">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-mono font-bold border border-indigo-500/30">
+                  <Database className="h-3.5 w-3.5" />
+                  <span>Zero-Data-Loss Migration & Backup Engine</span>
+                </div>
+                <h3 className="text-2xl font-black text-white tracking-tight">
+                  Full Database Export & Migration to Koyeb / New Host
+                </h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Render bandwidth limit exceed hone par agar aap Koyeb, Railway ya kisi naye host par app shift kar rahe hain,
+                  to aapka ek bhi user ya balance <strong>kabhi loss nahi hoga</strong>. Yahan se pura database download karein aur naye URL ke Admin Panel par 1-click me restore kar dein!
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto shrink-0">
+                <button
+                  type="button"
+                  disabled={isExportingDb}
+                  onClick={handleExportDatabase}
+                  className="px-5 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/20 transition active:scale-95 disabled:opacity-60"
+                >
+                  <Download className={`h-4 w-4 ${isExportingDb ? 'animate-bounce' : ''}`} />
+                  <span>{isExportingDb ? 'Exporting Database...' : 'Download Backup (.json) 📦'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCopyRawDatabaseJson}
+                  className="px-4 py-3 bg-slate-950 hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold text-xs rounded-2xl flex items-center justify-center gap-2 transition active:scale-95"
+                >
+                  {copiedField === 'RAW_DB_JSON' ? (
+                    <>
+                      <Check className="h-4 w-4 text-emerald-400" />
+                      <span className="text-emerald-300">Copied to Clipboard!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4 text-indigo-400" />
+                      <span>Copy Raw JSON 📋</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Step-by-Step Koyeb Migration Guide */}
+          <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-6 sm:p-8 shadow-xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-base font-black text-white">How to Migrate to Koyeb (Step-by-Step Guide / कैसे करें)</h4>
+                <p className="text-xs text-slate-400">Follow these 4 simple steps to move without losing any user, password, or balance</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+                <div className="text-[10px] font-mono text-emerald-400 font-bold uppercase">Step 1 • Backup</div>
+                <div className="font-bold text-white">Download JSON File</div>
+                <p className="text-slate-400 text-[11px]">
+                  Click the <strong>Download Backup (.json)</strong> button above. This saves all users, passwords, R-PINs, and wallets in one secure file.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+                <div className="text-[10px] font-mono text-indigo-400 font-bold uppercase">Step 2 • Deploy</div>
+                <div className="font-bold text-white">Deploy on Koyeb.com</div>
+                <p className="text-slate-400 text-[11px]">
+                  Connect your GitHub repo on Koyeb. Choose <strong>Web Service</strong>, set build type Node.js, and port <strong>3000</strong>.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+                <div className="text-[10px] font-mono text-purple-400 font-bold uppercase">Step 3 • Environment</div>
+                <div className="font-bold text-white">Add Env Variables</div>
+                <p className="text-slate-400 text-[11px]">
+                  In Koyeb settings, copy over your Render environment variables like <code>TELEGRAM_BOT_TOKEN</code> and your new Koyeb <code>APP_URL</code>.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+                <div className="text-[10px] font-mono text-amber-400 font-bold uppercase">Step 4 • Restore</div>
+                <div className="font-bold text-white">1-Click Restore</div>
+                <p className="text-slate-400 text-[11px]">
+                  Open your new Koyeb Admin Panel &rarr; Backup & Restore &rarr; Upload your JSON file. <strong>Done! All users & balances live instantly!</strong>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Export vs Import Two Column Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Box 1: Current Database Diagnostics */}
+            <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-6 sm:p-8 shadow-xl space-y-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    <CheckCircle2 className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-black text-white">Current Database Snapshot</h4>
+                    <p className="text-xs text-slate-400">All data currently live in persistent storage</p>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold">
+                  ● SYNCED WITH DISK
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 font-mono text-xs">
+                <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
+                  <div className="text-[10px] uppercase text-slate-400">Total Registered Users</div>
+                  <div className="text-2xl font-black text-white">{allProfiles.length}</div>
+                  <div className="text-[10px] text-indigo-400">All with Passwords & R-PINs</div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
+                  <div className="text-[10px] uppercase text-slate-400">Total Wallets Tracked</div>
+                  <div className="text-2xl font-black text-emerald-400">{Object.keys(allWallets).length}</div>
+                  <div className="text-[10px] text-emerald-300">
+                    {formatINR(Object.values(allWallets).reduce((s, w: any) => s + (w?.available_balance || 0), 0))} Total Bal
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
+                  <div className="text-[10px] uppercase text-slate-400">Telegram Connected</div>
+                  <div className="text-2xl font-black text-cyan-400">
+                    {allProfiles.filter((u) => u.telegram_chat_id || u.telegram_id).length}
+                  </div>
+                  <div className="text-[10px] text-cyan-300">Bot Chat IDs active</div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
+                  <div className="text-[10px] uppercase text-slate-400">Transactions Logged</div>
+                  <div className="text-2xl font-black text-amber-400">{transactions.length}</div>
+                  <div className="text-[10px] text-amber-300">Ledger history entries</div>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-[11px] font-mono text-slate-300 space-y-1">
+                <div className="flex items-center justify-between text-slate-400">
+                  <span>Backend Storage File:</span>
+                  <span className="text-indigo-300 font-bold">/data/srgateway_database.json</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-400">
+                  <span>Persistence Status:</span>
+                  <span className="text-emerald-400 font-bold">Auto-persisted on every transaction</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Box 2: Restore / Import Database */}
+            <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-6 sm:p-8 shadow-xl space-y-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                  <Upload className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="text-base font-black text-white">Restore / Import Database</h4>
+                  <p className="text-xs text-slate-400">Upload your JSON backup or paste JSON text directly</p>
+                </div>
+              </div>
+
+              {importFeedback && (
+                <div
+                  className={`p-3.5 rounded-2xl font-mono text-xs border flex items-center gap-2 ${
+                    importFeedback.type === 'success'
+                      ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                      : 'bg-rose-500/10 text-rose-300 border-rose-500/30'
+                  }`}
+                >
+                  {importFeedback.type === 'success' ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <AlertTriangle className="h-4 w-4 shrink-0" />}
+                  <span>{importFeedback.message}</span>
+                </div>
+              )}
+
+              {/* Upload via File Picker */}
+              <div>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
+                  accept=".json"
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  disabled={isImportingDb}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full py-4 border-2 border-dashed border-indigo-500/40 hover:border-indigo-500 bg-indigo-950/20 hover:bg-indigo-950/40 rounded-2xl text-center transition group cursor-pointer"
+                >
+                  <Upload className="h-6 w-6 text-indigo-400 mx-auto mb-1.5 group-hover:scale-110 transition" />
+                  <div className="font-bold text-xs text-white">Click to Select JSON Backup File (.json)</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">Loads and restores database in 1 second</div>
+                </button>
+              </div>
+
+              <div className="relative flex items-center justify-center">
+                <span className="bg-slate-900 px-3 text-[10px] font-mono text-slate-500 uppercase tracking-wider relative z-10">
+                  OR PASTE RAW JSON BELOW
+                </span>
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-800" />
+                </div>
+              </div>
+
+              {/* Paste JSON Area */}
+              <div className="space-y-2 font-mono">
+                <textarea
+                  rows={4}
+                  placeholder="Paste database JSON payload here..."
+                  value={importJsonText}
+                  onChange={(e) => setImportJsonText(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-300 font-mono focus:outline-none focus:border-indigo-500"
+                />
+
+                <button
+                  type="button"
+                  disabled={isImportingDb || !importJsonText.trim()}
+                  onClick={() => handleRestoreDatabase(importJsonText)}
+                  className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs rounded-xl transition shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 active:scale-95"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isImportingDb ? 'animate-spin' : ''}`} />
+                  <span>{isImportingDb ? 'Restoring Database...' : 'Restore Full Database From Pasted JSON ⚡'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* TAB 7: AUDIT LOGS */}
       {activeAdminTab === 'AUDIT_LOGS' && (
         <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-6 sm:p-8 shadow-xl space-y-4 font-mono text-xs">
@@ -2416,6 +2919,208 @@ export const AdminPortal: React.FC = () => {
                 Save Daily Limit
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT USER CREDENTIALS (PASSWORD, R-PIN, TELEGRAM CHAT ID) */}
+      {adminActionModal === 'EDIT_CREDS' && selectedUserForModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-violet-500/40 rounded-3xl p-6 max-w-lg w-full space-y-4 shadow-2xl font-mono text-xs my-8">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 bg-violet-500/20 text-violet-400 rounded-2xl border border-violet-500/30">
+                  <KeyRound className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white font-sans">Edit User Credentials & Access</h3>
+                  <p className="text-[11px] text-slate-400 font-sans">
+                    View & update Password, 4-digit R-PIN & Telegram Chat ID for {selectedUserForModal.full_name}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAdminActionModal(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveUserCredentials} className="space-y-4">
+              {/* User Identity Info */}
+              <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-between">
+                <div>
+                  <div className="font-extrabold text-white font-sans text-sm">{selectedUserForModal.full_name}</div>
+                  <div className="text-[10px] text-slate-400">SR ID: {selectedUserForModal.user_custom_id}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[10px] text-slate-400 uppercase">Available Balance</div>
+                  <div className="text-sm font-black text-emerald-400">
+                    {formatINR((allWallets[selectedUserForModal.id]?.available_balance) || 0)}
+                  </div>
+                </div>
+              </div>
+
+              {/* 1. Password Field */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1 font-sans flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Lock className="h-3.5 w-3.5 text-amber-400" />
+                    <span>User Login Password</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-normal">Used to login to dashboard</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={credsForm.password}
+                    onChange={(e) => setCredsForm({ ...credsForm, password: e.target.value })}
+                    placeholder="Enter user login password"
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3.5 py-2.5 text-amber-300 font-mono text-sm focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(credsForm.password, 'modal-pwd')}
+                    className="absolute right-2.5 top-2.5 p-1 text-slate-400 hover:text-white"
+                    title="Copy Password"
+                  >
+                    {copiedField === 'modal-pwd' ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. Security 4-Digit R-PIN */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1 font-sans flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Key className="h-3.5 w-3.5 text-emerald-400" />
+                    <span>Security 4-Digit R-PIN</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-normal">Used for withdrawal & API verification</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    maxLength={4}
+                    value={credsForm.rpin}
+                    onChange={(e) => setCredsForm({ ...credsForm, rpin: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                    placeholder="4-digit PIN (e.g. 1234)"
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-emerald-300 font-mono font-black text-sm tracking-widest focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(credsForm.rpin, 'modal-rpin')}
+                    className="absolute right-2.5 top-2.5 p-1 text-slate-400 hover:text-white"
+                    title="Copy R-PIN"
+                  >
+                    {copiedField === 'modal-rpin' ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* 3. Telegram Chat ID & Telegram ID */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1 font-sans flex items-center gap-1.5">
+                    <Bot className="h-3.5 w-3.5 text-cyan-400" />
+                    <span>Telegram Chat ID</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={credsForm.telegram_chat_id}
+                    onChange={(e) => setCredsForm({ ...credsForm, telegram_chat_id: e.target.value })}
+                    placeholder="e.g. 123456789"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-3 py-2 text-cyan-300 font-mono text-xs focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1 font-sans">Telegram Username/ID</label>
+                  <input
+                    type="text"
+                    value={credsForm.telegram_id}
+                    onChange={(e) => setCredsForm({ ...credsForm, telegram_id: e.target.value })}
+                    placeholder="e.g. @username"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* 4. Mobile & Email */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1 font-sans">Mobile Number</label>
+                  <input
+                    type="text"
+                    value={credsForm.mobile}
+                    onChange={(e) => setCredsForm({ ...credsForm, mobile: e.target.value })}
+                    placeholder="Mobile number"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-slate-600 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1 font-sans">Email Address</label>
+                  <input
+                    type="email"
+                    value={credsForm.email}
+                    onChange={(e) => setCredsForm({ ...credsForm, email: e.target.value })}
+                    placeholder="Email address"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-slate-600 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* 5. Account Status */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1 font-sans">Account Status</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCredsForm({ ...credsForm, status: 'ACTIVE' })}
+                    className={`py-2 px-3 rounded-xl font-bold text-xs border transition ${
+                      credsForm.status === 'ACTIVE'
+                        ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                        : 'bg-slate-950 text-slate-400 border-slate-800'
+                    }`}
+                  >
+                    ACTIVE (Normal)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCredsForm({ ...credsForm, status: 'BANNED' })}
+                    className={`py-2 px-3 rounded-xl font-bold text-xs border transition ${
+                      credsForm.status === 'BANNED'
+                        ? 'bg-rose-500/20 text-rose-400 border-rose-500/40'
+                        : 'bg-slate-950 text-slate-400 border-slate-800'
+                    }`}
+                  >
+                    BANNED (Restricted)
+                  </button>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setAdminActionModal(null)}
+                  className="px-4 py-2 text-xs font-semibold bg-slate-800 text-slate-300 rounded-xl hover:bg-slate-700 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingCreds}
+                  className="px-5 py-2 text-xs font-black rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white shadow-lg transition active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  <span>{isSavingCreds ? 'Saving Changes...' : 'Save User Credentials'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

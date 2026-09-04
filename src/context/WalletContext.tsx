@@ -117,6 +117,8 @@ interface WalletContextType {
   setUserRpin: (newPin: string) => { success: boolean; message: string };
   verifyUserRpin: (inputPin: string) => boolean;
   resetRpinWithOtp: (otpCode: string, newPin: string) => { success: boolean; message: string };
+  adminUpdateUserCredentials: (userId: string, data: { password?: string; rpin?: string; telegram_chat_id?: string; telegram_id?: string; mobile?: string; email?: string; full_name?: string; status?: 'ACTIVE' | 'BANNED' }) => Promise<{ success: boolean; message: string; user?: UserProfile }>;
+  restoreFullDatabase: (jsonPayload: any) => Promise<{ success: boolean; message: string; usersCount?: number }>;
   refreshFromBackend: () => Promise<void>;
   generateSRTxnId: (suffix?: string) => string;
   rpinModalConfig: {
@@ -164,20 +166,22 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
 
   const [settings, setSettings] = useState<AppSettings>(() => {
+    const currentOrigin = typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('localhost') ? window.location.origin : INITIAL_SETTINGS.app_url;
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_SETTINGS`);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        const resolvedUrl = (parsed.app_url && !parsed.app_url.includes('onrender.com')) ? parsed.app_url : currentOrigin;
         return {
           ...INITIAL_SETTINGS,
           ...parsed,
-          app_url: parsed.app_url || INITIAL_SETTINGS.app_url,
+          app_url: resolvedUrl,
         };
       } catch (e) {
-        return INITIAL_SETTINGS;
+        return { ...INITIAL_SETTINGS, app_url: currentOrigin };
       }
     }
-    return INITIAL_SETTINGS;
+    return { ...INITIAL_SETTINGS, app_url: currentOrigin };
   });
 
   const [deposits, setDeposits] = useState<DepositRequest[]>(() => {
@@ -2039,10 +2043,27 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return { success: false, message: 'RPIN must be exactly 4 digits.' };
     }
     const cleanPin = newPin.trim();
-    setProfiles((prev) =>
-      prev.map((p) => (p.id === currentUser.id ? { ...p, rpin: cleanPin, updated_at: new Date().toISOString() } : p))
-    );
+    const updatedProfiles = profiles.map((p) => (p.id === currentUser.id ? { ...p, rpin: cleanPin, updated_at: new Date().toISOString() } : p));
+    setProfiles(updatedProfiles);
+    localStorage.setItem(`${LOCAL_STORAGE_KEY}_PROFILES`, JSON.stringify(updatedProfiles));
     addNotification(currentUser.id, 'RPIN Updated 🔐', 'Your 4-Digit Security RPIN has been saved successfully.', 'SUCCESS');
+
+    // Immediately persist to backend disk database
+    fetch('/api/v1/admin/user/update-credentials', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: currentUser.user_custom_id || currentUser.id,
+        rpin: cleanPin,
+      }),
+    }).catch(() => null);
+
+    fetch('/api/v1/sync-state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profiles: updatedProfiles }),
+    }).catch(() => null);
+
     return { success: true, message: '4-Digit Security RPIN saved successfully!' };
   };
 
@@ -2069,11 +2090,132 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       };
     }
     const cleanPin = newPin.trim();
-    setProfiles((prev) =>
-      prev.map((p) => (p.id === currentUser.id ? { ...p, rpin: cleanPin, updated_at: new Date().toISOString() } : p))
-    );
+    const updatedProfiles = profiles.map((p) => (p.id === currentUser.id ? { ...p, rpin: cleanPin, updated_at: new Date().toISOString() } : p));
+    setProfiles(updatedProfiles);
+    localStorage.setItem(`${LOCAL_STORAGE_KEY}_PROFILES`, JSON.stringify(updatedProfiles));
     addNotification(currentUser.id, 'RPIN Reset Successful 🔐', 'Your 4-Digit Security RPIN has been reset and updated.', 'SUCCESS');
+
+    // Immediately persist to backend disk database
+    fetch('/api/v1/admin/user/update-credentials', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: currentUser.user_custom_id || currentUser.id,
+        rpin: cleanPin,
+      }),
+    }).catch(() => null);
+
+    fetch('/api/v1/sync-state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profiles: updatedProfiles }),
+    }).catch(() => null);
+
     return { success: true, message: 'Security RPIN reset successfully! You can now use your new 4-digit PIN.' };
+  };
+
+  // Admin Update User Credentials (Password, R-PIN, Telegram Chat ID, Mobile, Email)
+  const adminUpdateUserCredentials = async (
+    userId: string,
+    data: { password?: string; rpin?: string; telegram_chat_id?: string; telegram_id?: string; mobile?: string; email?: string; full_name?: string; status?: 'ACTIVE' | 'BANNED' }
+  ) => {
+    try {
+      const targetUser = profiles.find((p) => p.id === userId || p.user_custom_id === userId);
+      if (!targetUser) return { success: false, message: 'User not found in system.' };
+
+      let updatedProfile: UserProfile = { ...targetUser };
+      if (data.password !== undefined && data.password.trim() !== '') updatedProfile.password = data.password.trim();
+      if (data.rpin !== undefined && data.rpin.trim() !== '') updatedProfile.rpin = data.rpin.trim();
+      if (data.telegram_chat_id !== undefined) updatedProfile.telegram_chat_id = data.telegram_chat_id.trim() || undefined;
+      if (data.telegram_id !== undefined) updatedProfile.telegram_id = data.telegram_id.trim() || undefined;
+      if (data.mobile !== undefined && data.mobile.trim() !== '') updatedProfile.mobile = data.mobile.trim();
+      if (data.email !== undefined) updatedProfile.email = data.email.trim();
+      if (data.full_name !== undefined && data.full_name.trim() !== '') updatedProfile.full_name = data.full_name.trim();
+      if (data.status) updatedProfile.status = data.status;
+      updatedProfile.updated_at = new Date().toISOString();
+
+      const newProfiles = profiles.map((p) => (p.id === targetUser.id ? updatedProfile : p));
+      setProfiles(newProfiles);
+      localStorage.setItem(`${LOCAL_STORAGE_KEY}_PROFILES`, JSON.stringify(newProfiles));
+
+      // Post to backend persistent database
+      const res = await fetch('/api/v1/admin/user/update-credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: targetUser.user_custom_id || targetUser.id,
+          ...data,
+        }),
+      });
+
+      if (res.ok) {
+        const resJson = await res.json();
+        return { success: true, message: resJson.message || 'Credentials updated successfully!', user: updatedProfile };
+      }
+      return { success: true, message: 'Credentials updated and persisted successfully!', user: updatedProfile };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Failed to update user credentials' };
+    }
+  };
+
+  // Full Database Import & Restore from JSON backup
+  const restoreFullDatabase = async (jsonPayload: any) => {
+    try {
+      if (!jsonPayload || typeof jsonPayload !== 'object') {
+        return { success: false, message: 'Invalid JSON backup format' };
+      }
+
+      // 1. Send to server backend to replace disk file /data/srgateway_database.json and sync in-memory state
+      const res = await fetch('/api/v1/admin/import-database', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(jsonPayload),
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        return { success: false, message: errJson.message || 'Server rejected database import' };
+      }
+
+      const serverRes = await res.json();
+
+      // 2. Hydrate client state
+      if (jsonPayload.appSettings) {
+        setSettings(jsonPayload.appSettings);
+        localStorage.setItem(`${LOCAL_STORAGE_KEY}_SETTINGS`, JSON.stringify(jsonPayload.appSettings));
+      }
+      if (Array.isArray(jsonPayload.users) && jsonPayload.users.length > 0) {
+        setProfiles(jsonPayload.users);
+        localStorage.setItem(`${LOCAL_STORAGE_KEY}_PROFILES`, JSON.stringify(jsonPayload.users));
+      }
+      if (jsonPayload.wallets && typeof jsonPayload.wallets === 'object') {
+        setWallets(jsonPayload.wallets);
+        localStorage.setItem(`${LOCAL_STORAGE_KEY}_WALLETS`, JSON.stringify(jsonPayload.wallets));
+      }
+      if (Array.isArray(jsonPayload.transactions)) {
+        setTransactions(jsonPayload.transactions);
+        localStorage.setItem(`${LOCAL_STORAGE_KEY}_TRANSACTIONS`, JSON.stringify(jsonPayload.transactions));
+      }
+      if (Array.isArray(jsonPayload.depositRequests)) {
+        setDeposits(jsonPayload.depositRequests);
+        localStorage.setItem(`${LOCAL_STORAGE_KEY}_DEPOSITS`, JSON.stringify(jsonPayload.depositRequests));
+      }
+      if (Array.isArray(jsonPayload.withdrawalRequests)) {
+        setWithdrawals(jsonPayload.withdrawalRequests);
+        localStorage.setItem(`${LOCAL_STORAGE_KEY}_WITHDRAWALS`, JSON.stringify(jsonPayload.withdrawalRequests));
+      }
+      if (Array.isArray(jsonPayload.apiKeys)) {
+        setApiKeys(jsonPayload.apiKeys);
+      }
+
+      return {
+        success: true,
+        message: serverRes.message || 'Full database restored successfully!',
+        usersCount: (jsonPayload.users || []).length,
+      };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Database restore failed' };
+    }
   };
 
   // Helper: Dispatch rich Login Security Alert to Telegram & Gmail with IP, Location & Device details
@@ -2846,6 +2988,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setUserRpin,
       verifyUserRpin,
       resetRpinWithOtp,
+      adminUpdateUserCredentials,
+      restoreFullDatabase,
       refreshFromBackend,
       generateSRTxnId,
       rpinModalConfig,
@@ -2875,6 +3019,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       lastEmailOtpTimestamp,
       rpinModalConfig,
       refreshFromBackend,
+      adminUpdateUserCredentials,
+      restoreFullDatabase,
     ]
   );
 

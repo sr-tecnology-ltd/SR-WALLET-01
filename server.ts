@@ -4,6 +4,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
 import nodemailer from 'nodemailer';
+import { EMBEDDED_BACKUP } from './embeddedBackup';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -189,6 +190,20 @@ app.use((req: Request, res: Response, next: any) => {
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
+
+  // Auto-detect dynamic hosting domain (Koyeb, Cloud Run, VPS)
+  // If app_url is unset or points to the old suspended render domain, update to current host automatically!
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  if (host && typeof host === 'string') {
+    const proto = (req.headers['x-forwarded-proto'] as string) || (req.secure ? 'https' : 'http');
+    const currentOrigin = `${proto}://${host}`;
+    if (!appSettings.app_url || appSettings.app_url.includes('onrender.com') || appSettings.app_url.includes('localhost')) {
+      if (!host.includes('localhost') && !host.includes('127.0.0.1')) {
+        appSettings.app_url = currentOrigin;
+      }
+    }
+  }
+
   next();
 });
 
@@ -352,14 +367,31 @@ function saveDatabase() {
 
 function loadDatabase() {
   try {
-    if (!fs.existsSync(DB_FILE)) {
-      console.log('[PERSISTENCE] Initializing new storage database file.');
-      saveDatabase();
-      return;
+    let data: any = null;
+
+    if (fs.existsSync(DB_FILE)) {
+      try {
+        const raw = fs.readFileSync(DB_FILE, 'utf-8');
+        data = JSON.parse(raw);
+      } catch (readErr) {
+        console.warn('[PERSISTENCE] Error reading DB_FILE, falling back to embedded backup:', readErr);
+      }
     }
 
-    const raw = fs.readFileSync(DB_FILE, 'utf-8');
-    const data = JSON.parse(raw);
+    // If file did not exist or had no users, seed instantly from EMBEDDED_BACKUP
+    if (!data || !Array.isArray(data.users) || data.users.length === 0) {
+      console.log('[PERSISTENCE] Initializing or recovering storage with EMBEDDED_BACKUP production snapshot...');
+      data = EMBEDDED_BACKUP;
+      try {
+        if (!fs.existsSync(DATA_DIR)) {
+          fs.mkdirSync(DATA_DIR, { recursive: true });
+        }
+        fs.writeFileSync(DB_FILE, JSON.stringify(EMBEDDED_BACKUP, null, 2), 'utf-8');
+        console.log('[PERSISTENCE] Wrote EMBEDDED_BACKUP to DB_FILE successfully.');
+      } catch (writeErr) {
+        console.error('[PERSISTENCE] Could not write DB_FILE:', writeErr);
+      }
+    }
 
     if (data && typeof data === 'object') {
       if (data.appSettings && typeof data.appSettings === 'object') {
@@ -3830,6 +3862,177 @@ app.post('/api/v1/admin/user/reset-count', (req: Request, res: Response) => {
       daily_api_requests_count: 0,
       status: user.status,
     },
+  });
+});
+
+// Admin: Export Full Database (JSON Backup & Migration Payload)
+app.get('/api/v1/admin/export-database', (req: Request, res: Response) => {
+  try {
+    const uniqueUserMap = new Map<string, any>();
+    for (const u of Object.values(users)) {
+      if (u && (u.id || u.user_custom_id)) {
+        const key = u.id || u.user_custom_id;
+        uniqueUserMap.set(key, u);
+      }
+    }
+
+    const payload = {
+      version: '1.0.0',
+      exported_at: new Date().toISOString(),
+      appSettings,
+      users: Array.from(uniqueUserMap.values()),
+      wallets,
+      transactions: transactions.slice(0, 1000),
+      depositRequests: depositRequests.slice(0, 500),
+      withdrawalRequests: withdrawalRequests.slice(0, 500),
+      apiKeys,
+    };
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="srgateway_database_backup_${new Date().toISOString().slice(0, 10)}.json"`);
+    res.json(payload);
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', code: 500, message: err?.message || 'Database export failed' });
+  }
+});
+
+// Admin: Import Full Database (JSON Restore & Migration Sync)
+app.post('/api/v1/admin/import-database', (req: Request, res: Response) => {
+  try {
+    const data = req.body;
+    if (!data || typeof data !== 'object') {
+      return res.status(400).json({ status: 'error', code: 400, message: 'Invalid database payload. Expected JSON object.' });
+    }
+
+    if (data.appSettings && typeof data.appSettings === 'object') {
+      appSettings = { ...appSettings, ...data.appSettings };
+    }
+
+    if (Array.isArray(data.users)) {
+      users = {};
+      for (const u of data.users) {
+        if (!u) continue;
+        if (u.id) users[u.id] = u;
+        if (u.user_custom_id) users[u.user_custom_id] = u;
+        if (u.mobile) {
+          const clean = normalizePhone(u.mobile);
+          if (clean) users[clean] = u;
+        }
+        if (u.telegram_chat_id) {
+          const cid = u.telegram_chat_id.toString().trim();
+          users[cid] = u;
+          const digits = cid.replace(/[^0-9]/g, '');
+          if (digits) users[digits] = u;
+        }
+        if (u.telegram_id) {
+          const tid = u.telegram_id.toString().trim().replace(/^@/, '').toLowerCase();
+          users[tid] = u;
+          users[`@${tid}`] = u;
+        }
+        if (u.email) {
+          users[u.email.toLowerCase().trim()] = u;
+        }
+      }
+      reindexUsers();
+    }
+
+    if (data.wallets && typeof data.wallets === 'object') {
+      wallets = { ...wallets, ...data.wallets };
+    }
+
+    if (Array.isArray(data.transactions)) {
+      transactions = data.transactions;
+    }
+
+    if (Array.isArray(data.depositRequests)) {
+      depositRequests = data.depositRequests;
+    }
+
+    if (Array.isArray(data.withdrawalRequests)) {
+      withdrawalRequests = data.withdrawalRequests;
+    }
+
+    if (Array.isArray(data.apiKeys)) {
+      apiKeys = data.apiKeys;
+    }
+
+    saveDatabase();
+
+    const uniqueUserMap = new Map<string, any>();
+    for (const u of Object.values(users)) {
+      if (u && (u.id || u.user_custom_id)) {
+        const key = u.id || u.user_custom_id;
+        uniqueUserMap.set(key, u);
+      }
+    }
+
+    res.json({
+      status: 'success',
+      code: 200,
+      message: `Database restored successfully! Loaded ${uniqueUserMap.size} users and ${Object.keys(wallets).length} wallets.`,
+      users_count: uniqueUserMap.size,
+      wallets_count: Object.keys(wallets).length,
+      settings: appSettings,
+      profiles: Array.from(uniqueUserMap.values()),
+      wallets,
+    });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', code: 500, message: err?.message || 'Database restore failed' });
+  }
+});
+
+// Admin: Update User Credentials (Password, RPIN, Telegram Chat ID, Mobile, Email)
+app.post('/api/v1/admin/user/update-credentials', (req: Request, res: Response) => {
+  const { user_id, password, rpin, telegram_chat_id, telegram_id, mobile, email, full_name, status } = req.body || {};
+  const targetId = (user_id || '').toString().trim();
+
+  if (!targetId) {
+    return res.status(400).json({ status: 'error', code: 400, message: 'user_id is required' });
+  }
+
+  const resolved = resolveUserAndWallet(targetId);
+  if (!resolved.user) {
+    return res.status(404).json({ status: 'error', code: 404, message: `User '${targetId}' not found.` });
+  }
+
+  const user = resolved.user;
+
+  if (password !== undefined && password !== null && password.trim() !== '') {
+    user.password = password.trim();
+  }
+  if (rpin !== undefined && rpin !== null && rpin.trim() !== '') {
+    user.rpin = rpin.trim();
+  }
+  if (telegram_chat_id !== undefined) {
+    const cleanCid = telegram_chat_id ? telegram_chat_id.toString().trim() : '';
+    user.telegram_chat_id = cleanCid || undefined;
+  }
+  if (telegram_id !== undefined) {
+    const cleanTid = telegram_id ? telegram_id.toString().trim() : '';
+    user.telegram_id = cleanTid || undefined;
+  }
+  if (mobile !== undefined && mobile.trim() !== '') {
+    user.mobile = mobile.trim();
+  }
+  if (email !== undefined) {
+    user.email = email.trim();
+  }
+  if (full_name !== undefined && full_name.trim() !== '') {
+    user.full_name = full_name.trim();
+  }
+  if (status && ['ACTIVE', 'BANNED'].includes(status)) {
+    user.status = status;
+  }
+  user.updated_at = new Date().toISOString();
+
+  reindexUsers();
+  saveDatabase();
+
+  res.json({
+    status: 'success',
+    code: 200,
+    message: `Credentials updated successfully for ${user.full_name} (${user.user_custom_id})`,
+    user,
   });
 });
 

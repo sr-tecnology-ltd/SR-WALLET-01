@@ -11,7 +11,7 @@ export interface UserProfile {
   telegram_chat_id?: string; // numeric Chat ID from Telegram Bot
   role: UserRole;
   status: AccountStatus;
-  referral_code: string;
+  referral_code?: string;
   referred_by?: string;
   rpin?: string; // 4-digit security RPIN
   password?: string; // Account password
@@ -99,6 +99,7 @@ export interface Transaction {
   id: string;
   user_id: string;
   user_name?: string;
+  user_custom_id?: string;
   type: TransactionType;
   amount: number;
   fee: number;
@@ -108,6 +109,7 @@ export interface Transaction {
   description: string;
   balance_before: number;
   balance_after: number;
+  signature?: string;
   created_at: string;
 }
 
