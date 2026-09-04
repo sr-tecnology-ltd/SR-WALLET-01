@@ -191,7 +191,12 @@ app.use((req: Request, res: Response, next: any) => {
     return res.sendStatus(200);
   }
 
-  // Auto-detect dynamic hosting domain (Koyeb, Cloud Run, VPS)
+  // Healthcheck endpoints for Railway, Render & Cloud Monitoring
+  if (req.path === '/health' || req.path === '/api/health' || req.path === '/ping' || req.path === '/api/ping') {
+    return res.status(200).json({ status: 'ok', uptime: process.uptime(), timestamp: Date.now() });
+  }
+
+  // Auto-detect dynamic hosting domain (Railway, Koyeb, Cloud Run, Render, VPS)
   // If app_url is unset or points to the old suspended render domain, update to current host automatically!
   const host = req.headers['x-forwarded-host'] || req.headers.host;
   if (host && typeof host === 'string') {
@@ -4738,11 +4743,19 @@ async function startTelegramPollingWorker() {
           await processTelegramMessageUpdate(update);
         }
       } else if (data && !data.ok) {
-        console.warn('[TELEGRAM POLLING NOTICE]', data.description || 'API Error');
-        if (data.error_code === 401) {
+        if (data.error_code === 409) {
+          // Conflict: Another bot instance is polling or webhook is active. Back off to avoid log spam and CPU burn.
+          console.warn('[TELEGRAM POLLING NOTICE] Another bot instance is active. Retrying in 30s...');
+          if (isPollingActive) {
+            pollingIntervalTimeout = setTimeout(pollLoop, 30000);
+          }
+          return;
+        } else if (data.error_code === 401) {
           console.error('[TELEGRAM POLLING ERROR] 401 Unauthorized - Bot Token is revoked/invalid.');
           isPollingActive = false;
           return;
+        } else {
+          console.warn('[TELEGRAM POLLING NOTICE]', data.description || 'API Error');
         }
       }
     } catch (err: any) {
@@ -4750,7 +4763,7 @@ async function startTelegramPollingWorker() {
     }
 
     if (isPollingActive) {
-      pollingIntervalTimeout = setTimeout(pollLoop, 1500);
+      pollingIntervalTimeout = setTimeout(pollLoop, 2000);
     }
   };
 
@@ -5531,8 +5544,16 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 SR Gateway API Server running on http://0.0.0.0:${PORT}`);
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 SR Gateway API Server successfully started and listening on 0.0.0.0:${PORT}`);
+  });
+
+  process.on('SIGTERM', () => {
+    console.log('[SYSTEM] SIGTERM received. Gracefully shutting down...');
+    server.close(() => {
+      console.log('[SYSTEM] HTTP server closed.');
+      process.exit(0);
+    });
   });
 }
 
