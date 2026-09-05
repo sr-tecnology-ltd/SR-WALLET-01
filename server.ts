@@ -3598,6 +3598,101 @@ const handleWipeAllUsers = (req: Request, res: Response) => {
   });
 };
 
+// Admin Create User endpoint
+const handleAdminCreateUser = (req: Request, res: Response) => {
+  const { full_name, mobile, email, password, rpin, initial_balance, telegram_chat_id } = req.body || {};
+  if (!full_name || !mobile || !email) {
+    return res.status(400).json({ status: 'error', code: 400, message: 'Full name, mobile number, and email are required.' });
+  }
+
+  const cleanMobile = mobile.trim();
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanName = full_name.trim();
+  const cleanChatId = telegram_chat_id ? String(telegram_chat_id).trim() : '';
+
+  // Check unique mobile
+  const normPhone = normalizePhone(cleanMobile);
+  if (users[cleanMobile] || (normPhone && users[normPhone])) {
+    return res.status(400).json({ status: 'error', code: 400, message: 'This mobile number is already registered with an account!' });
+  }
+
+  // Check unique email
+  if (users[cleanEmail]) {
+    return res.status(400).json({ status: 'error', code: 400, message: 'This email is already linked to another account!' });
+  }
+
+  const customIdNumber = Math.floor(10000 + Math.random() * 90000);
+  const userCustomId = `SR-${customIdNumber}`;
+  const userId = `user-${Date.now().toString().slice(-6)}`;
+
+  const cleanRpin = rpin ? String(rpin).trim() : '7477';
+  const cleanPass = password ? String(password).trim() : '123456';
+  const initialBal = initial_balance !== undefined && !isNaN(Number(initial_balance)) ? Math.max(0, Number(initial_balance)) : 0;
+
+  const newUser: any = {
+    id: userId,
+    user_custom_id: userCustomId,
+    full_name: cleanName,
+    mobile: cleanMobile,
+    email: cleanEmail,
+    telegram_id: cleanChatId ? (cleanChatId.startsWith('@') ? cleanChatId : `@chat_${cleanChatId}`) : '',
+    telegram_chat_id: cleanChatId || undefined,
+    role: 'USER',
+    status: 'ACTIVE',
+    referral_code: `SRREF${customIdNumber}`,
+    password: cleanPass,
+    rpin: cleanRpin,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  users[userCustomId] = newUser;
+  users[userId] = newUser;
+  if (normPhone) users[normPhone] = newUser;
+  users[cleanEmail] = newUser;
+
+  const newWallet: any = {
+    id: `w-${userId}`,
+    user_id: userCustomId,
+    available_balance: initialBal,
+    locked_balance: 0.0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  wallets[userCustomId] = newWallet;
+  wallets[userId] = newWallet;
+  if (normPhone) wallets[normPhone] = newWallet;
+
+  // Generate API key for the new user
+  const userPrefix = userCustomId.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const randSuffix = Math.random().toString(36).slice(2, 6);
+  const newApiKeyRecord = {
+    id: `KEY-${Date.now()}`,
+    user_id: userId,
+    key_name: `${cleanName} Gateway Key`,
+    api_key_prefix: `sr_live_${userPrefix}_${randSuffix}`,
+    secret_key_masked: `sr_sec_${userPrefix}_••••••••••••${randSuffix}`,
+    permissions: ['balance.read', 'transfer.write', 'deposit.request', 'withdraw.request'],
+    is_active: true,
+    created_at: new Date().toISOString(),
+  };
+  apiKeys.unshift(newApiKeyRecord);
+
+  reindexUsers();
+  saveDatabase();
+
+  res.json({
+    status: 'success',
+    code: 200,
+    message: 'User account created successfully.',
+    user: newUser,
+    wallet: newWallet,
+    apiKey: newApiKeyRecord,
+  });
+};
+
+app.post('/api/v1/admin/create-user', handleAdminCreateUser);
 app.post('/api/v1/admin/wipe-users', handleWipeAllUsers);
 app.post('/api/v1/admin/wipe-all-users', handleWipeAllUsers);
 

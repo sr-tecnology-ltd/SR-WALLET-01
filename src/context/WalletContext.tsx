@@ -117,6 +117,15 @@ interface WalletContextType {
   setUserRpin: (newPin: string) => { success: boolean; message: string };
   verifyUserRpin: (inputPin: string) => boolean;
   resetRpinWithOtp: (otpCode: string, newPin: string) => { success: boolean; message: string };
+  adminCreateUser: (data: {
+    fullName: string;
+    mobile: string;
+    email: string;
+    password?: string;
+    rpin?: string;
+    initialBalance?: number;
+    telegramChatId?: string;
+  }) => Promise<{ success: boolean; message: string; user?: UserProfile }>;
   adminUpdateUserCredentials: (userId: string, data: { password?: string; rpin?: string; telegram_chat_id?: string; telegram_id?: string; mobile?: string; email?: string; full_name?: string; status?: 'ACTIVE' | 'BANNED' }) => Promise<{ success: boolean; message: string; user?: UserProfile }>;
   restoreFullDatabase: (jsonPayload: any) => Promise<{ success: boolean; message: string; usersCount?: number }>;
   refreshFromBackend: () => Promise<void>;
@@ -2114,6 +2123,115 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return { success: true, message: 'Security RPIN reset successfully! You can now use your new 4-digit PIN.' };
   };
 
+  // Admin Action: Create New User Account directly from Admin Panel
+  const adminCreateUser = async (data: {
+    fullName: string;
+    mobile: string;
+    email: string;
+    password?: string;
+    rpin?: string;
+    initialBalance?: number;
+    telegramChatId?: string;
+  }): Promise<{ success: boolean; message: string; user?: UserProfile }> => {
+    try {
+      if (!data.fullName || !data.mobile || !data.email) {
+        return { success: false, message: 'Please provide full name, mobile number, and email.' };
+      }
+
+      const cleanMobile = data.mobile.trim();
+      const cleanEmail = data.email.trim().toLowerCase();
+      const cleanChatId = (data.telegramChatId || '').trim();
+
+      // Check duplicate mobile in local profiles
+      const mobileExists = profiles.some(
+        (p) => p.mobile.replace(/[^0-9]/g, '') === cleanMobile.replace(/[^0-9]/g, '') || p.mobile === cleanMobile
+      );
+      if (mobileExists) {
+        return {
+          success: false,
+          message: '⚠️ This mobile number is already registered with an account! 1 Mobile number can only be connected to 1 account.',
+        };
+      }
+
+      // Check duplicate email in local profiles
+      const emailExists = profiles.some((p) => p.email.toLowerCase() === cleanEmail);
+      if (emailExists) {
+        return {
+          success: false,
+          message: '⚠️ This email is already linked to another account! 1 Email can only be connected to 1 account.',
+        };
+      }
+
+      const res = await fetch('/api/v1/admin/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: data.fullName,
+          mobile: cleanMobile,
+          email: cleanEmail,
+          password: data.password || '123456',
+          rpin: data.rpin || '7477',
+          initial_balance: data.initialBalance ?? 0,
+          telegram_chat_id: cleanChatId || undefined,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || json.status === 'error') {
+        return { success: false, message: json.message || 'Failed to create user account on server.' };
+      }
+
+      const newUser: UserProfile = json.user;
+      const newWallet: Wallet = json.wallet;
+
+      setProfiles((prev) => {
+        const next = [...prev, newUser];
+        localStorage.setItem(`${LOCAL_STORAGE_KEY}_PROFILES`, JSON.stringify(next));
+        return next;
+      });
+
+      if (newWallet) {
+        setWallets((prev) => {
+          const next = {
+            ...prev,
+            [newUser.id]: newWallet,
+            [newUser.user_custom_id]: newWallet,
+            [cleanMobile]: newWallet,
+          };
+          localStorage.setItem(`${LOCAL_STORAGE_KEY}_WALLETS`, JSON.stringify(next));
+          return next;
+        });
+      }
+
+      if (json.apiKey) {
+        setApiKeys((prev) => [json.apiKey, ...prev]);
+      }
+
+      // Trigger registration email if enabled
+      fetch('/api/v1/auth/register-alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: newUser.user_custom_id,
+          user_name: newUser.full_name,
+          email: newUser.email,
+          mobile: newUser.mobile,
+          welcome_bonus: data.initialBalance ?? 0,
+        }),
+      }).catch(() => null);
+
+      addAuditLog('ADMIN_CREATE_USER', `Admin created user ${newUser.full_name} (${newUser.user_custom_id}) with initial balance ₹${data.initialBalance ?? 0}`);
+
+      return {
+        success: true,
+        message: `✅ Account for ${newUser.full_name} (${newUser.user_custom_id}) created successfully!`,
+        user: newUser,
+      };
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Error creating user account.' };
+    }
+  };
+
   // Admin Update User Credentials (Password, R-PIN, Telegram Chat ID, Mobile, Email)
   const adminUpdateUserCredentials = async (
     userId: string,
@@ -2988,6 +3106,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setUserRpin,
       verifyUserRpin,
       resetRpinWithOtp,
+      adminCreateUser,
       adminUpdateUserCredentials,
       restoreFullDatabase,
       refreshFromBackend,
@@ -3019,6 +3138,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       lastEmailOtpTimestamp,
       rpinModalConfig,
       refreshFromBackend,
+      adminCreateUser,
       adminUpdateUserCredentials,
       restoreFullDatabase,
     ]

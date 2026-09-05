@@ -66,6 +66,7 @@ export const AdminPortal: React.FC = () => {
     unbanUser,
     updateUserRequestLimit,
     resetUserDailyRequestCount,
+    adminCreateUser,
     adminUpdateUserCredentials,
     restoreFullDatabase,
     settings,
@@ -73,6 +74,25 @@ export const AdminPortal: React.FC = () => {
     auditLogs,
     formatINR,
   } = useWallet();
+
+  // Add New User Modal State
+  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserMobile, setNewUserMobile] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('123456');
+  const [newUserRpin, setNewUserRpin] = useState('7477');
+  const [newUserBalance, setNewUserBalance] = useState('0');
+  const [newUserChatId, setNewUserChatId] = useState('');
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [addUserError, setAddUserError] = useState<string | null>(null);
+  const [createdUserResult, setCreatedUserResult] = useState<{
+    user: UserProfile;
+    password: string;
+    rpin: string;
+    balance: number;
+  } | null>(null);
+  const [copiedAllCreds, setCopiedAllCreds] = useState(false);
 
   const [activeAdminTab, setActiveAdminTab] = useState<
     'DASHBOARD' | 'USERS' | 'DEPOSITS' | 'WITHDRAWALS' | 'TRANSACTIONS' | 'SETTINGS' | 'BACKUP' | 'AUDIT_LOGS'
@@ -269,6 +289,78 @@ export const AdminPortal: React.FC = () => {
     } finally {
       setIsWipeUsersLoading(false);
     }
+  };
+
+  const handleCreateUserSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserName.trim()) {
+      setAddUserError('Please enter full name of user.');
+      return;
+    }
+    const cleanPhone = newUserMobile.trim().replace(/[^0-9]/g, '');
+    if (cleanPhone.length < 10) {
+      setAddUserError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+    if (!newUserEmail.trim() || !newUserEmail.includes('@')) {
+      setAddUserError('Please enter a valid Gmail / email address.');
+      return;
+    }
+    const cleanRpin = newUserRpin.trim().replace(/[^0-9]/g, '');
+    if (cleanRpin.length !== 4) {
+      setAddUserError('R-PIN must be exactly 4 digits (e.g. 7477).');
+      return;
+    }
+
+    setIsCreatingUser(true);
+    setAddUserError(null);
+    try {
+      const result = await adminCreateUser({
+        fullName: newUserName.trim(),
+        mobile: cleanPhone,
+        email: newUserEmail.trim(),
+        password: newUserPassword.trim() || '123456',
+        rpin: cleanRpin,
+        initialBalance: Number(newUserBalance) || 0,
+        telegramChatId: newUserChatId.trim() || undefined,
+      });
+
+      if (result.success && result.user) {
+        setCreatedUserResult({
+          user: result.user,
+          password: newUserPassword.trim() || '123456',
+          rpin: cleanRpin,
+          balance: Number(newUserBalance) || 0,
+        });
+        showAlert(`✅ User ${result.user.full_name} (${result.user.user_custom_id}) created successfully!`);
+      } else {
+        setAddUserError(result.message || 'Failed to create user account.');
+      }
+    } catch (err: any) {
+      setAddUserError(err?.message || 'Unexpected error creating user account.');
+    } finally {
+      setIsCreatingUser(false);
+    }
+  };
+
+  const handleCopyCreatedUserCreds = () => {
+    if (!createdUserResult) return;
+    const { user, password, rpin, balance } = createdUserResult;
+    const text = `🎉 *SR GATEWAY • ACCOUNT CREDENTIALS*\n\n` +
+      `👤 Name: ${user.full_name}\n` +
+      `🆔 User ID: ${user.user_custom_id}\n` +
+      `📱 Mobile / Login: ${user.mobile}\n` +
+      `🔑 Password: ${password}\n` +
+      `🔒 Security R-PIN: ${rpin}\n` +
+      `💰 Opening Balance: ₹${balance}\n` +
+      `🌐 Portal Login: https://sr-gateway-in.up.railway.app/\n\n` +
+      `⚠️ *Important Security Advice:*\n` +
+      `1. Log in to your account and go to Profile / Security.\n` +
+      `2. Connect your Telegram Chat ID via the Telegram OTP Bot to enable two-factor protection on your wallet!`;
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedAllCreds(true);
+      setTimeout(() => setCopiedAllCreds(false), 2500);
+    });
   };
 
   const handleTestTelegramDispatch = async () => {
@@ -1007,15 +1099,38 @@ export const AdminPortal: React.FC = () => {
               <p className="text-xs text-slate-400">Total Registered: {allProfiles.filter(p => p.role !== 'ADMIN').length} Users • Add balance, cut balance, or suspend user accounts</p>
             </div>
 
-            <div className="relative sm:w-80">
-              <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search Name, SR-ID, Mobile..."
-                value={userSearch}
-                onChange={(e) => setUserSearch(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-10 pr-4 py-2 text-xs text-white font-mono focus:outline-none focus:ring-2 focus:ring-rose-500"
-              />
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <button
+                type="button"
+                id="admin-open-add-user-modal-btn"
+                onClick={() => {
+                  setNewUserName('');
+                  setNewUserMobile('');
+                  setNewUserEmail('');
+                  setNewUserPassword('123456');
+                  setNewUserRpin('7477');
+                  setNewUserBalance('0');
+                  setNewUserChatId('');
+                  setAddUserError(null);
+                  setCreatedUserResult(null);
+                  setIsAddUserModalOpen(true);
+                }}
+                className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs rounded-xl shadow-lg transition active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer"
+              >
+                <PlusCircle className="h-4 w-4" />
+                <span>+ Add / Create User</span>
+              </button>
+
+              <div className="relative sm:w-72">
+                <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search Name, SR-ID, Mobile..."
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-10 pr-4 py-2 text-xs text-white font-mono focus:outline-none focus:ring-2 focus:ring-rose-500"
+                />
+              </div>
             </div>
           </div>
 
@@ -3362,6 +3477,316 @@ export const AdminPortal: React.FC = () => {
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* ADD / CREATE USER MODAL                                                   */}
+      {/* ========================================================================= */}
+      {isAddUserModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
+          <div className="relative w-full max-w-xl bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-6 text-slate-100 my-8">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-5">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                  <PlusCircle className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">Create New User Account</h3>
+                  <p className="text-xs text-slate-400">Admin Portal Manual Account Creation</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddUserModalOpen(false);
+                  setCreatedUserResult(null);
+                  setAddUserError(null);
+                }}
+                className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition"
+              >
+                <XCircle className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Error Message */}
+            {addUserError && (
+              <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>{addUserError}</span>
+              </div>
+            )}
+
+            {/* SUCCESS STATE */}
+            {createdUserResult ? (
+              <div className="space-y-4">
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center space-y-2">
+                  <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-emerald-500/20 text-emerald-400 mb-1">
+                    <CheckCircle2 className="h-6 w-6" />
+                  </div>
+                  <h4 className="text-sm font-black text-emerald-300">Account Created & Saved Successfully!</h4>
+                  <p className="text-xs text-slate-300">
+                    The user account and wallet have been saved to the persistent database.
+                  </p>
+                </div>
+
+                {/* Credentials Card */}
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 font-mono text-xs space-y-2.5">
+                  <div className="flex justify-between items-center py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400 font-sans">Full Name:</span>
+                    <span className="text-white font-bold">{createdUserResult.user.full_name}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400 font-sans">User ID (SR-ID):</span>
+                    <span className="text-emerald-400 font-bold bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40">
+                      {createdUserResult.user.user_custom_id}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400 font-sans">Mobile / Login ID:</span>
+                    <span className="text-white font-bold">{createdUserResult.user.mobile}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400 font-sans">Email / Gmail:</span>
+                    <span className="text-slate-300">{createdUserResult.user.email}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400 font-sans">Login Password:</span>
+                    <span className="text-amber-300 font-bold bg-amber-950/30 px-2 py-0.5 rounded border border-amber-800/30">
+                      {createdUserResult.password}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-slate-800/60">
+                    <span className="text-slate-400 font-sans">Security R-PIN (4 Digits):</span>
+                    <span className="text-purple-300 font-bold bg-purple-950/30 px-2 py-0.5 rounded border border-purple-800/30">
+                      {createdUserResult.rpin}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-slate-400 font-sans">Opening Wallet Balance:</span>
+                    <span className="text-emerald-400 font-bold">₹{createdUserResult.balance.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                {/* Telegram info notice */}
+                <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-[11px] text-blue-300 leading-relaxed">
+                  <span className="font-bold">📱 Telegram Security Link: </span>
+                  {createdUserResult.user.telegram_chat_id ? (
+                    <span>Connected with Chat ID: <code className="text-white font-bold">{createdUserResult.user.telegram_chat_id}</code></span>
+                  ) : (
+                    <span>
+                      Chat ID khali hai. User apne <b>Mobile & Password</b> se login karega, fir <b>Profile &gt; Security</b> section me jakar <b>Telegram Bot OTP</b> se apna Chat ID 1-click me connect karke account secure kar sakta hai!
+                    </span>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleCopyCreatedUserCreds}
+                    className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-2"
+                  >
+                    {copiedAllCreds ? (
+                      <>
+                        <Check className="h-4 w-4" />
+                        <span>Copied to Clipboard!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4" />
+                        <span>Copy All Credentials</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewUserName('');
+                      setNewUserMobile('');
+                      setNewUserEmail('');
+                      setNewUserPassword('123456');
+                      setNewUserRpin('7477');
+                      setNewUserBalance('0');
+                      setNewUserChatId('');
+                      setCreatedUserResult(null);
+                      setAddUserError(null);
+                    }}
+                    className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition"
+                  >
+                    + Add Another User
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddUserModalOpen(false);
+                      setCreatedUserResult(null);
+                    }}
+                    className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl transition"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* FORM STATE */
+              <form onSubmit={handleCreateUserSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Full Name */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Full Name <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Rahul Sharma or Sk Rihan"
+                      value={newUserName}
+                      onChange={(e) => setNewUserName(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  {/* Mobile Number */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Mobile Number (10 Digits) <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      maxLength={10}
+                      placeholder="e.g. 7477661867"
+                      value={newUserMobile}
+                      onChange={(e) => setNewUserMobile(e.target.value.replace(/[^0-9]/g, ''))}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <span className="text-[10px] text-slate-500 mt-0.5 block">Used by user to log in</span>
+                  </div>
+
+                  {/* Gmail / Email */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Email / Gmail <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="e.g. user@gmail.com"
+                      value={newUserEmail}
+                      onChange={(e) => setNewUserEmail(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <span className="text-[10px] text-slate-500 mt-0.5 block">For OTPs & payment alerts</span>
+                  </div>
+
+                  {/* Password */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Login Password <span className="text-slate-500 text-[10px] font-normal">(Default: 123456)</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="123456"
+                      value={newUserPassword}
+                      onChange={(e) => setNewUserPassword(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  {/* R-PIN */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Security R-PIN (4 Digits) <span className="text-slate-500 text-[10px] font-normal">(Default: 7477)</span>
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={4}
+                      placeholder="7477"
+                      value={newUserRpin}
+                      onChange={(e) => setNewUserRpin(e.target.value.replace(/[^0-9]/g, ''))}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  {/* Opening Balance */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Opening Balance (₹) <span className="text-slate-500 text-[10px] font-normal">(Default: ₹0)</span>
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="any"
+                      placeholder="0"
+                      value={newUserBalance}
+                      onChange={(e) => setNewUserBalance(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  {/* Telegram Chat ID (Optional) */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Telegram Chat ID <span className="text-slate-500 text-[10px] font-normal">(Optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 6624207638 (or leave blank)"
+                      value={newUserChatId}
+                      onChange={(e) => setNewUserChatId(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Helpful Note about Telegram Bot OTP */}
+                <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl text-[11px] text-slate-400 space-y-1">
+                  <div className="flex items-center gap-1.5 text-slate-300 font-bold">
+                    <Bot className="h-3.5 w-3.5 text-blue-400" />
+                    <span>Telegram Chat ID connect nahi kiya to?</span>
+                  </div>
+                  <p className="leading-relaxed">
+                    Koi baat nahi! Aap ise khali chhod sakte hain. Account create hone ke baad user khud apne <b>Mobile Number</b> aur <b>Password</b> se login karega, aur apni profile me <b>Telegram Bot OTP</b> option se apna Chat ID connect karke account secure kar lega.
+                  </p>
+                </div>
+
+                {/* Form Buttons */}
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddUserModalOpen(false);
+                      setAddUserError(null);
+                    }}
+                    className="px-4 py-2.5 text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isCreatingUser}
+                    className="px-5 py-2.5 text-xs font-black bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl shadow-lg transition active:scale-95 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {isCreatingUser ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        <span>Creating Account...</span>
+                      </>
+                    ) : (
+                      <>
+                        <PlusCircle className="h-4 w-4" />
+                        <span>Create User Account</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

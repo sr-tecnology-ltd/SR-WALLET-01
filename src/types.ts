@@ -144,6 +144,7 @@ export interface UserNotification {
 export type AuditActionType =
   | 'ADMIN_CREDIT'
   | 'ADMIN_DEBIT'
+  | 'ADMIN_CREATE_USER'
   | 'RESET_ALL_BALANCES'
   | 'WIPE_ALL_USERS'
   | 'DEPOSIT_APPROVED'
