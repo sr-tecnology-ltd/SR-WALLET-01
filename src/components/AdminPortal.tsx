@@ -1030,12 +1030,12 @@ export const AdminPortal: React.FC = () => {
 
           <div className="space-y-1.5">
             <h3 className="text-2xl font-black text-white tracking-tight">
-              {isMasterOwner ? '👑 Master Owner Security Gate' : '🛡️ Sub-Admin Staff Security Gate'}
+              {isMasterOwner ? '👑 Master Owner Security Gate' : '🛡️ SR Gateway Admin Security Gate'}
             </h3>
             <p className="text-xs text-slate-400">
               {isMasterOwner
                 ? 'Enter the Master Owner Security Password to unlock full configuration, sub-admin management & gateway security.'
-                : 'Enter your authorized Sub-Admin Staff Password to access verification desk & global transaction tracking.'}
+                : 'Enter your authorized Administrator Password to access the Admin Control Panel.'}
             </p>
           </div>
 
@@ -1048,11 +1048,11 @@ export const AdminPortal: React.FC = () => {
           <form onSubmit={handleAdminLogin} className="space-y-4 text-left">
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1.5 font-mono">
-                {isMasterOwner ? 'Master Owner Password' : 'Staff Login Password'}
+                {isMasterOwner ? 'Master Owner Password' : 'Admin Login Password'}
               </label>
               <input
                 type="password"
-                placeholder={isMasterOwner ? 'Enter master owner password...' : 'Enter sub-admin staff password...'}
+                placeholder={isMasterOwner ? 'Enter master owner password...' : 'Enter admin password...'}
                 value={adminPassInput}
                 onChange={(e) => {
                   setAdminPassInput(e.target.value);
@@ -1073,12 +1073,12 @@ export const AdminPortal: React.FC = () => {
               } font-black text-xs uppercase tracking-wider rounded-2xl transition shadow-xl active:scale-95 flex items-center justify-center gap-2`}
             >
               <ShieldCheck className="h-4 w-4" />
-              <span>{isMasterOwner ? 'Unlock Owner Panel 👑' : 'Unlock Staff Desk ⚡'}</span>
+              <span>{isMasterOwner ? 'Unlock Owner Panel 👑' : 'Unlock Admin Panel ⚡'}</span>
             </button>
           </form>
 
           <div className="pt-2 border-t border-slate-800/80 text-[11px] text-slate-500 font-mono">
-            {isMasterOwner ? 'Master Access Protocol (SR-OWNER-01)' : 'Authorized Staff Protocol (SR-ADMIN)'}
+            {isMasterOwner ? 'Master Access Protocol (SR-OWNER-01)' : 'Gateway Administration Protocol (SR-ADMIN)'}
           </div>
         </div>
       </div>
@@ -1112,16 +1112,16 @@ export const AdminPortal: React.FC = () => {
                   isMasterOwner ? 'text-amber-300' : 'text-indigo-300'
                 }`}
               >
-                {isMasterOwner ? 'SR GATEWAY MASTER OWNER CONTROL PANEL' : 'SR GATEWAY SUB-ADMIN STAFF DESK'}
+                {isMasterOwner ? 'SR GATEWAY MASTER OWNER CONTROL PANEL' : 'SR GATEWAY ADMIN CONTROL PANEL'}
               </span>
             </div>
             <h2 className="text-2xl font-black text-white">
-              {isMasterOwner ? 'Master Owner Dashboard & Gateway Governance' : 'Sub-Admin Operations Desk'}
+              {isMasterOwner ? 'Master Owner Dashboard & Gateway Governance' : 'Admin Control & Operations Center'}
             </h2>
             <p className="text-xs text-slate-300 mt-1">
               {isMasterOwner
                 ? 'Supreme control • Sub-Admin & staff operations desk • Gateway charges & UPI safety • Master ledger audit trail.'
-                : 'Deposit & withdrawal verification • User assistance & balance operations • Fixed gateway rates view • Global transaction tracking.'}
+                : 'Account administration • Verification queue • Financial security rules & transaction audit ledger.'}
             </p>
           </div>
 
@@ -1134,7 +1134,7 @@ export const AdminPortal: React.FC = () => {
               }`}
             >
               <span className={`w-2 h-2 rounded-full ${isMasterOwner ? 'bg-amber-400' : 'bg-indigo-400'} animate-pulse`} />
-              <span>{isMasterOwner ? '👑 Master Owner Active' : '🛡️ Sub-Admin Staff Active'}</span>
+              <span>{isMasterOwner ? '👑 Master Owner Active' : '🛡️ Admin Session Active'}</span>
             </span>
             <button
               onClick={handleAdminLock}
@@ -1156,7 +1156,7 @@ export const AdminPortal: React.FC = () => {
             { id: 'DEPOSITS', label: `Deposits (${pendingDeposits.length})`, icon: PlusCircle, badge: pendingDeposits.length },
             { id: 'WITHDRAWALS', label: `Withdrawals (${pendingWithdrawals.length})`, icon: ArrowUpRight, badge: pendingWithdrawals.length },
             { id: 'TRANSACTIONS', label: 'Global Transactions (Master Ledger)', icon: FileText },
-            { id: 'SETTINGS', label: isSubAdmin ? 'Gateway Charges & UPI (Fixed View)' : 'Gateway Charges & Controls', icon: Settings },
+            { id: 'SETTINGS', label: isSubAdmin ? 'Gateway Configuration & UPI Parameters' : 'Gateway Charges & Controls', icon: Settings },
             ...(isMasterOwner ? [{ id: 'BACKUP', label: 'Backup & Restore', icon: Database }] : []),
             { id: 'AUDIT_LOGS', label: 'Audit Logs', icon: ShieldAlert },
           ].map((tab) => {
