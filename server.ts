@@ -239,10 +239,13 @@ let appSettings: Record<string, any> = {
   telegram_channel_enabled: true,
   telegram_channel_name: 'SR TECHNOLOGY LTD',
   telegram_channel_url: 'https://t.me/SRTECHNOLOGYLTD1',
-  support_url: 'https://t.me/SRGatewaySupportBot',
-  app_url: process.env.APP_URL || 'https://srgateway-5jj4.onrender.com',
+  support_url: 'https://t.me/SRGatewayBot',
+  support_telegram_username: '@SRGatewayBot',
+  whatsapp_support_number: '+91 7477661867',
+  whatsapp_support_url: 'https://wa.me/917477661867',
+  app_url: process.env.APP_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'https://sr-gateway-in.up.railway.app'),
   otp_telegram_bot_username: process.env.TELEGRAM_BOT_USERNAME || '@SRGatewayBot',
-  otp_telegram_bot_token: process.env.TELEGRAM_BOT_TOKEN || '',
+  otp_telegram_bot_token: process.env.TELEGRAM_BOT_TOKEN || '8853576053:AAHQ_USjZRB4zH7J4_p3ceSASQpXC1LN-2c',
   admin_upi_id: 'sk190rihan@mvhdfc',
   admin_qr_url: 'https://cdn.phototourl.com/free/2026-08-27-63157f0f-6206-4166-a6c1-150d1d4bb343.png',
   admin_bank_name: 'AIRTEL PAYMENT BANK',
@@ -262,10 +265,10 @@ let appSettings: Record<string, any> = {
   email_withdraw_alert_enabled: true,
   smtp_host: process.env.SMTP_HOST || 'smtp.gmail.com',
   smtp_port: parseInt(process.env.SMTP_PORT || '587', 10),
-  smtp_user: process.env.SMTP_USER || '',
-  smtp_pass: process.env.SMTP_PASS || '',
-  smtp_from_name: process.env.SMTP_FROM_NAME || 'SR GATEWAY Alerts',
-  smtp_from_email: process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'sr.notify.hub@gmail.com',
+  smtp_user: process.env.SMTP_USER || 'sr.notify.hub@gmail.com',
+  smtp_pass: process.env.SMTP_PASS || 'ridpqxftbgqhswaa',
+  smtp_from_name: process.env.SMTP_FROM_NAME || 'SR GATEWAY IN',
+  smtp_from_email: process.env.SMTP_FROM_EMAIL || 'sr.notify.hub@gmail.com',
   // User Daily HTTPS/API Request Limits (Default: 10/day)
   default_daily_api_limit: 10,
   auto_suspend_on_limit_exceeded: true,
@@ -402,6 +405,19 @@ function loadDatabase() {
       if (data.appSettings && typeof data.appSettings === 'object') {
         appSettings = { ...appSettings, ...data.appSettings };
       }
+
+      // Ensure active SMTP credentials and customer support links
+      if (!appSettings.smtp_user) appSettings.smtp_user = 'sr.notify.hub@gmail.com';
+      if (!appSettings.smtp_pass) appSettings.smtp_pass = 'ridpqxftbgqhswaa';
+      if (!appSettings.smtp_host) appSettings.smtp_host = 'smtp.gmail.com';
+      if (!appSettings.smtp_port) appSettings.smtp_port = 587;
+      if (!appSettings.smtp_from_name) appSettings.smtp_from_name = 'SR GATEWAY IN';
+      if (!appSettings.smtp_from_email) appSettings.smtp_from_email = 'sr.notify.hub@gmail.com';
+      if (appSettings.email_alerts_enabled === undefined) appSettings.email_alerts_enabled = true;
+      if (!appSettings.whatsapp_support_number) appSettings.whatsapp_support_number = '+91 7477661867';
+      if (!appSettings.whatsapp_support_url) appSettings.whatsapp_support_url = 'https://wa.me/917477661867';
+      if (!appSettings.support_telegram_username) appSettings.support_telegram_username = '@SRGatewayBot';
+      if (!appSettings.support_url) appSettings.support_url = 'https://t.me/SRGatewayBot';
 
       if (Array.isArray(data.users)) {
         for (const u of data.users) {
@@ -848,12 +864,14 @@ function isRealTelegramToken(tok?: string | null): boolean {
   return true;
 }
 
+const DEFAULT_FALLBACK_TELEGRAM_BOT_TOKEN = '8853576053:AAHQ_USjZRB4zH7J4_p3ceSASQpXC1LN-2c';
+
 // Helper: Resolve active Telegram bot token prioritizing non-empty, non-example credentials
 function getTelegramBotToken(customToken?: string | null): string {
   if (isRealTelegramToken(customToken)) return customToken!.trim();
   if (isRealTelegramToken(process.env.TELEGRAM_BOT_TOKEN)) return process.env.TELEGRAM_BOT_TOKEN!.trim();
   if (isRealTelegramToken(appSettings.otp_telegram_bot_token)) return appSettings.otp_telegram_bot_token.trim();
-  return (customToken || process.env.TELEGRAM_BOT_TOKEN || appSettings.otp_telegram_bot_token || '').trim();
+  return DEFAULT_FALLBACK_TELEGRAM_BOT_TOKEN;
 }
 
 // Helper: Send Real-Time Telegram HTML Notification with automatic token & chat ID sanitization
@@ -1270,24 +1288,33 @@ function executeUserToUserTransfer(
       return `SR-${str}`;
     };
 
-    const txnId = generateSRId();
-    const recipientTxnId = generateSRId();
+    const sharedTxnId = generateSRId();
+    const txnId = sharedTxnId;
     const timestamp = new Date().toISOString();
     const txnSignature = generateTxnSignature(txnId, senderUser.user_custom_id, recipientUser.user_custom_id, amount, timestamp);
 
     // 8. Transaction log for Sender (TRANSFER_OUT)
     const senderOutTxn = {
-      id: txnId,
+      id: `${sharedTxnId}-DR`,
       user_id: senderUser.id || senderUser.user_custom_id,
       user_custom_id: senderUser.user_custom_id,
       user_name: senderUser.full_name,
+      sender_id: senderUser.user_custom_id || senderUser.id,
+      sender_name: senderUser.full_name,
+      sender_mobile: senderUser.mobile,
+      receiver_id: recipientUser.user_custom_id || recipientUser.id,
+      receiver_name: recipientUser.full_name,
+      receiver_mobile: recipientUser.mobile,
+      counterparty_id: recipientUser.user_custom_id || recipientUser.id,
+      counterparty_name: recipientUser.full_name,
+      counterparty_mobile: recipientUser.mobile,
       type: 'TRANSFER_OUT',
       amount,
       fee: 0,
       net_amount: amount,
       status: 'SUCCESS',
-      reference_id: recipientUser.user_custom_id || recipientUser.mobile,
-      description: `Transfer Sent to ${recipientUser.full_name} (${recipientUser.mobile || recipientUser.user_custom_id}) - ${cleanNote} [via ${source}]`,
+      reference_id: sharedTxnId,
+      description: `Transfer Sent to ${recipientUser.full_name} (${recipientUser.mobile || recipientUser.user_custom_id}) ${cleanNote ? `- ${cleanNote}` : ''} [via ${source}]`,
       balance_before: prevSenderBal,
       balance_after: newSenderBal,
       signature: txnSignature,
@@ -1297,17 +1324,26 @@ function executeUserToUserTransfer(
 
     // 9. Transaction log for Recipient (TRANSFER_IN)
     const recipientInTxn = {
-      id: recipientTxnId,
+      id: `${sharedTxnId}-CR`,
       user_id: recipientUser.id || recipientUser.user_custom_id,
       user_custom_id: recipientUser.user_custom_id,
       user_name: recipientUser.full_name,
+      sender_id: senderUser.user_custom_id || senderUser.id,
+      sender_name: senderUser.full_name,
+      sender_mobile: senderUser.mobile,
+      receiver_id: recipientUser.user_custom_id || recipientUser.id,
+      receiver_name: recipientUser.full_name,
+      receiver_mobile: recipientUser.mobile,
+      counterparty_id: senderUser.user_custom_id || senderUser.id,
+      counterparty_name: senderUser.full_name,
+      counterparty_mobile: senderUser.mobile,
       type: 'TRANSFER_IN',
       amount,
       fee: 0,
       net_amount: amount,
       status: 'SUCCESS',
-      reference_id: senderUser.user_custom_id || senderUser.mobile,
-      description: `Transfer Received from ${senderUser.full_name} (${senderUser.mobile || senderUser.user_custom_id}) - ${cleanNote} [via ${source}]`,
+      reference_id: sharedTxnId,
+      description: `Transfer Received from ${senderUser.full_name} (${senderUser.mobile || senderUser.user_custom_id}) ${cleanNote ? `- ${cleanNote}` : ''} [via ${source}]`,
       balance_before: prevRecipientBal,
       balance_after: newRecipientBal,
       signature: txnSignature,
@@ -1412,6 +1448,8 @@ function executeUserToUserTransfer(
       message: 'User to User Transaction Completed Successfully',
       txn_id: txnId,
       signature: txnSignature,
+      sender_tx: senderOutTxn,
+      receiver_tx: recipientInTxn,
       sender: {
         user_id: senderUser.user_custom_id,
         name: senderUser.full_name,
@@ -3063,6 +3101,48 @@ app.post('/api/v1/transfer', validateApiKey, (req: Request, res: Response) => {
   });
 });
 
+// Web Client Internal Wallet Transfer Endpoint (No API key required; validated by user session)
+app.post('/api/v1/wallet/transfer', (req: Request, res: Response) => {
+  const { sender, recipient, amount, note, shared_txn_id } = req.body || {};
+  const numAmt = parseFloat(amount);
+
+  if (!sender) {
+    return res.status(400).json({ status: 'error', code: 400, message: 'Sender ID is required' });
+  }
+  if (!recipient) {
+    return res.status(400).json({ status: 'error', code: 400, message: 'Recipient identifier is required' });
+  }
+  if (isNaN(numAmt) || numAmt <= 0) {
+    return res.status(400).json({ status: 'error', code: 400, message: 'Please enter a valid transfer amount.' });
+  }
+
+  const result = executeUserToUserTransfer(sender, recipient, numAmt, note || 'Internal Wallet Transfer', 'Web Portal');
+
+  if (!result.success) {
+    return res.status(result.code || 400).json({
+      status: 'error',
+      code: result.code || 400,
+      message: result.message,
+      ...(result.available_balance !== undefined ? { available_balance: result.available_balance } : {}),
+      ...(result.requested_amount !== undefined ? { requested_amount: result.requested_amount } : {}),
+    });
+  }
+
+  res.json({
+    status: 'success',
+    code: 200,
+    message: result.message,
+    txn_id: result.txn_id,
+    sender_balance: result.sender.remaining_balance,
+    receiver_balance: result.recipient.new_balance,
+    sender: result.sender,
+    recipient: result.recipient,
+    sender_tx: result.sender_tx,
+    receiver_tx: result.receiver_tx,
+    timestamp: result.timestamp,
+  });
+});
+
 // 6. Deposit Request API
 app.post('/api/v1/deposit/request', validateApiKey, async (req: Request, res: Response) => {
   const { user_id, amount, utr, payment_method = 'UPI', email } = req.body;
@@ -3786,53 +3866,70 @@ app.post('/api/v1/sync-state', (req: Request, res: Response) => {
   }
 
   if (Array.isArray(profiles)) {
-    const cleanUserMap = new Map<string, any>();
+    // UPSERT incoming profiles without wiping existing database users
     profiles.forEach((p: any) => {
-      if (p && (p.id || p.user_custom_id)) {
-        const primaryKey = p.id || p.user_custom_id;
-        cleanUserMap.set(primaryKey, p);
-      }
-    });
-
-    users = {};
-    for (const p of cleanUserMap.values()) {
-      if (p.id) users[p.id] = p;
-      if (p.user_custom_id) users[p.user_custom_id] = p;
+      if (!p) return;
+      if (p.id) users[p.id] = { ...(users[p.id] || {}), ...p };
+      if (p.user_custom_id) users[p.user_custom_id] = { ...(users[p.user_custom_id] || {}), ...p };
       if (p.mobile) {
         const clean = normalizePhone(p.mobile);
-        if (clean) users[clean] = p;
+        if (clean) users[clean] = { ...(users[clean] || {}), ...p };
       }
       if (p.email && p.email.trim()) {
-        users[p.email.trim().toLowerCase()] = p;
+        users[p.email.trim().toLowerCase()] = { ...(users[p.email.trim().toLowerCase()] || {}), ...p };
       }
       if (p.telegram_chat_id && p.telegram_chat_id.toString().trim()) {
-        users[p.telegram_chat_id.toString().trim()] = p;
+        users[p.telegram_chat_id.toString().trim()] = { ...(users[p.telegram_chat_id.toString().trim()] || {}), ...p };
       }
       if (p.telegram_id && p.telegram_id.toString().trim()) {
         const rawTg = p.telegram_id.toString().trim();
         const cleanTg = rawTg.replace(/^@/, '').toLowerCase();
-        users[cleanTg] = p;
-        users[`@${cleanTg}`] = p;
+        users[cleanTg] = { ...(users[cleanTg] || {}), ...p };
+        users[`@${cleanTg}`] = { ...(users[`@${cleanTg}`] || {}), ...p };
+      }
+    });
+  }
+
+  // WALLETS: Server memory/database is the financial source of truth.
+  // We ONLY seed wallets that do not exist yet on server, or allow explicit admin overrides.
+  if (incomingWallets && typeof incomingWallets === 'object') {
+    for (const [uid, w] of Object.entries(incomingWallets)) {
+      if (!wallets[uid]) {
+        wallets[uid] = w;
+      } else if (isAdmin && req.body.forceAdminWalletSync) {
+        wallets[uid] = w;
       }
     }
   }
 
-  if (incomingWallets && typeof incomingWallets === 'object') {
-    for (const [uid, w] of Object.entries(incomingWallets)) {
-      wallets[uid] = w;
+  if (Array.isArray(deposits)) {
+    const existingDepIds = new Set(depositRequests.map((d) => d.id));
+    for (const d of deposits) {
+      if (d && d.id && !existingDepIds.has(d.id)) {
+        depositRequests.unshift(d);
+        existingDepIds.add(d.id);
+      }
     }
   }
 
-  if (Array.isArray(deposits)) {
-    depositRequests = deposits;
-  }
-
   if (Array.isArray(withdrawals)) {
-    withdrawalRequests = withdrawals;
+    const existingWithIds = new Set(withdrawalRequests.map((w) => w.id));
+    for (const w of withdrawals) {
+      if (w && w.id && !existingWithIds.has(w.id)) {
+        withdrawalRequests.unshift(w);
+        existingWithIds.add(w.id);
+      }
+    }
   }
 
   if (Array.isArray(incomingTxns)) {
-    transactions = incomingTxns;
+    const existingTxIds = new Set(transactions.map((t) => t.id || t.reference_id));
+    for (const tx of incomingTxns) {
+      if (tx && tx.id && !existingTxIds.has(tx.id)) {
+        transactions.unshift(tx);
+        existingTxIds.add(tx.id);
+      }
+    }
   }
 
   if (Array.isArray(incomingKeys)) {
@@ -4877,6 +4974,107 @@ app.post('/api/telegram-webhook', handleTelegramWebhook);
 app.post('/api/v1/telegram-webhook', handleTelegramWebhook);
 app.post('/webhook/telegram', handleTelegramWebhook);
 
+// Live Telegram Webhook & Bot Status Endpoint
+app.get('/api/v1/telegram/status', async (req: Request, res: Response) => {
+  const token = getTelegramBotToken();
+  if (!isRealTelegramToken(token)) {
+    return res.json({
+      status: 'unconfigured',
+      ok: false,
+      message: 'Telegram Bot Token is not configured.',
+    });
+  }
+
+  try {
+    const [meResp, webhookResp] = await Promise.all([
+      fetch(`https://api.telegram.org/bot${token}/getMe`).then((r) => r.json()).catch(() => null),
+      fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`).then((r) => r.json()).catch(() => null),
+    ]);
+
+    const isWebhookActive = Boolean(webhookResp?.result?.url && webhookResp.result.url.length > 0);
+
+    return res.json({
+      status: 'success',
+      ok: true,
+      bot: meResp?.result || null,
+      webhook: webhookResp?.result || null,
+      is_webhook_active: isWebhookActive,
+      webhook_url: webhookResp?.result?.url || '',
+      polling_active: isPollingActive,
+      configured_token_prefix: token.slice(0, 10) + '...',
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      status: 'error',
+      ok: false,
+      message: err?.message || 'Error querying Telegram Bot API',
+    });
+  }
+});
+
+// Set Webhook Endpoint
+app.post('/api/v1/telegram/set-webhook', async (req: Request, res: Response) => {
+  const token = getTelegramBotToken();
+  if (!isRealTelegramToken(token)) {
+    return res.status(400).json({ status: 'error', message: 'No valid Telegram Bot Token configured.' });
+  }
+
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  const proto = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
+  const defaultBase = process.env.RAILWAY_PUBLIC_DOMAIN
+    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+    : host && !host.toString().includes('localhost') && !host.toString().includes('127.0.0.1')
+    ? `${proto}://${host}`
+    : 'https://sr-gateway-in.up.railway.app';
+
+  const webhookUrl = req.body?.webhook_url || `${defaultBase}/api/v1/telegram-webhook`;
+
+  try {
+    const resp = await fetch(
+      `https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(webhookUrl)}&drop_pending_updates=true`
+    );
+    const data: any = await resp.json();
+    if (data && data.ok) {
+      isPollingActive = false; // Stop polling because webhook is active
+      return res.json({
+        status: 'success',
+        message: `✅ Telegram Webhook successfully connected to: ${webhookUrl}`,
+        webhook_url: webhookUrl,
+        telegram_response: data,
+      });
+    } else {
+      return res.status(400).json({
+        status: 'error',
+        message: data?.description || 'Failed to set Telegram webhook.',
+        telegram_response: data,
+      });
+    }
+  } catch (err: any) {
+    return res.status(500).json({ status: 'error', message: err?.message || 'Network error setting webhook.' });
+  }
+});
+
+// Delete Webhook (Switch to Polling) Endpoint
+app.post('/api/v1/telegram/delete-webhook', async (req: Request, res: Response) => {
+  const token = getTelegramBotToken();
+  if (!isRealTelegramToken(token)) {
+    return res.status(400).json({ status: 'error', message: 'No valid Telegram Bot Token configured.' });
+  }
+
+  try {
+    const resp = await fetch(`https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=true`);
+    const data: any = await resp.json();
+    startTelegramPollingWorker(); // Restart polling worker
+    return res.json({
+      status: 'success',
+      message: '✅ Telegram Webhook deleted. Switched back to long-polling mode.',
+      telegram_response: data,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ status: 'error', message: err?.message || 'Error deleting webhook.' });
+  }
+});
+
 // Simulation Endpoint for Telegram Bot Testing directly from Frontend UI
 app.post('/api/v1/telegram-bot/simulate-command', async (req: Request, res: Response) => {
   const { command = '/balance', chat_id = '638291048', username = '@rahul_dev' } = req.body;
@@ -5622,8 +5820,32 @@ app.get('/api/v1/admin/bot-health', async (req: Request, res: Response) => {
 // ==========================================
 
 async function startServer() {
-  // Start Telegram Long Polling Worker
-  startTelegramPollingWorker();
+  // Initialize Telegram Bot (prefer webhook for Railway/cloud production, fallback to long-polling)
+  const token = getTelegramBotToken();
+  if (isRealTelegramToken(token)) {
+    try {
+      const hookInfo: any = await fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`).then((r) => r.json()).catch(() => null);
+      if (hookInfo?.result?.url && hookInfo.result.url.length > 0) {
+        console.log(`[TELEGRAM] Webhook is active and receiving updates: ${hookInfo.result.url}`);
+      } else {
+        const defaultDomain = process.env.RAILWAY_PUBLIC_DOMAIN
+          ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+          : (process.env.NODE_ENV === 'production' && !process.env.AIS_ENV ? 'https://sr-gateway-in.up.railway.app' : null);
+
+        if (defaultDomain) {
+          const whUrl = `${defaultDomain}/api/v1/telegram-webhook`;
+          console.log(`[TELEGRAM] Auto-configuring Webhook on: ${whUrl}`);
+          await fetch(`https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(whUrl)}&drop_pending_updates=true`).catch(() => null);
+        } else {
+          startTelegramPollingWorker();
+        }
+      }
+    } catch (e) {
+      startTelegramPollingWorker();
+    }
+  } else {
+    startTelegramPollingWorker();
+  }
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

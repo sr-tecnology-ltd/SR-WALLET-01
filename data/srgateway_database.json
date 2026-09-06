@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "last_saved": "2026-08-28T06:43:02.911Z",
+  "last_saved": "2026-09-05T15:56:26.621Z",
   "appSettings": {
     "deposit_enabled": true,
     "withdraw_enabled": true,
@@ -28,9 +28,9 @@
     "telegram_channel_name": "SR TECHNOLOGY LTD",
     "telegram_channel_url": "https://t.me/SRTECHNOLOGYLTD1",
     "support_url": "https://t.me/SRGatewaySupportBot",
-    "app_url": "https://srgateway-5jj4.onrender.com",
+    "app_url": "https://sr-gateway-in.up.railway.app",
     "otp_telegram_bot_username": "@SRGatewayBot",
-    "otp_telegram_bot_token": "",
+    "otp_telegram_bot_token": "8853576053:AAHQ_USjZRB4zH7J4_p3ceSASQpXC1LN-2c",
     "admin_upi_id": "sk190rihan@mvhdfc",
     "admin_qr_url": "https://cdn.phototourl.com/free/2026-08-27-63157f0f-6206-4166-a6c1-150d1d4bb343.png",
     "admin_bank_name": "AIRTEL PAYMENT BANK",
@@ -51,7 +51,9 @@
     "smtp_user": "sr.notify.hub@gmail.com",
     "smtp_pass": "ridpqxftbgqhswaa",
     "smtp_from_name": "SR GATEWAY IN",
-    "smtp_from_email": "sr.notify.hub@gmail.com"
+    "smtp_from_email": "sr.notify.hub@gmail.com",
+    "default_daily_api_limit": 10,
+    "auto_suspend_on_limit_exceeded": true
   },
   "users": [
     {

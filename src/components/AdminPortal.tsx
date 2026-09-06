@@ -42,6 +42,10 @@ import {
   Key,
   EyeOff,
   Edit3,
+  Zap,
+  ArrowRightLeft,
+  ArrowDownLeft,
+  Filter,
 } from 'lucide-react';
 import { UserProfile, DepositRequest, WithdrawalRequest, Wallet, AppSettings } from '../types';
 
@@ -100,6 +104,9 @@ export const AdminPortal: React.FC = () => {
 
   // Search & Filter state
   const [userSearch, setUserSearch] = useState<string>('');
+  const [ledgerSearchQuery, setLedgerSearchQuery] = useState<string>('');
+  const [ledgerTypeFilter, setLedgerTypeFilter] = useState<'ALL' | 'TRANSFER' | 'DEPOSIT' | 'WITHDRAWAL' | 'ADMIN'>('ALL');
+  const [copiedLedgerId, setCopiedLedgerId] = useState<string | null>(null);
   const [selectedUserForModal, setSelectedUserForModal] = useState<UserProfile | null>(null);
   const [adminActionModal, setAdminActionModal] = useState<'ADD_BAL' | 'CUT_BAL' | 'BAN' | 'SET_LIMIT' | 'RESET_QUOTA' | 'EDIT_CREDS' | null>(null);
   const [modalAmount, setModalAmount] = useState<number>(1000);
@@ -246,13 +253,79 @@ export const AdminPortal: React.FC = () => {
   const [isLoadingEmailLogs, setIsLoadingEmailLogs] = useState<boolean>(false);
 
   // Telegram Bot Live Test State
-  const [testTelegramChatId, setTestTelegramChatId] = useState<string>('6624207638');
+  const [testTelegramChatId, setTestTelegramChatId] = useState<string>('6561010416');
   const [isTestingTelegram, setIsTestingTelegram] = useState<boolean>(false);
   const [testTelegramResult, setTestTelegramResult] = useState<{
     success: boolean;
     message: string;
     help?: string;
   } | null>(null);
+  const [telegramStatusData, setTelegramStatusData] = useState<{
+    ok: boolean;
+    is_webhook_active?: boolean;
+    webhook_url?: string;
+    bot?: any;
+    polling_active?: boolean;
+    message?: string;
+  } | null>(null);
+  const [isCheckingBotStatus, setIsCheckingBotStatus] = useState<boolean>(false);
+  const [isSettingWebhook, setIsSettingWebhook] = useState<boolean>(false);
+
+  const fetchTelegramBotStatus = async () => {
+    setIsCheckingBotStatus(true);
+    try {
+      const res = await fetch('/api/v1/telegram/status');
+      if (res.ok) {
+        const data = await res.json();
+        setTelegramStatusData(data);
+      }
+    } catch {
+      // Ignore
+    } finally {
+      setIsCheckingBotStatus(false);
+    }
+  };
+
+  const handleSetRailwayWebhook = async () => {
+    setIsSettingWebhook(true);
+    try {
+      const res = await fetch('/api/v1/telegram/set-webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          webhook_url: 'https://sr-gateway-in.up.railway.app/api/v1/telegram-webhook',
+        }),
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        showAlert(`✅ Telegram Webhook Connected: ${data.message}`);
+        fetchTelegramBotStatus();
+      } else {
+        showAlert(`❌ Webhook Connection Failed: ${data.message}`);
+      }
+    } catch (e: any) {
+      showAlert(`❌ Network Error: ${e?.message || 'Failed to connect webhook'}`);
+    } finally {
+      setIsSettingWebhook(false);
+    }
+  };
+
+  const handleDeleteWebhook = async () => {
+    setIsSettingWebhook(true);
+    try {
+      const res = await fetch('/api/v1/telegram/delete-webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      showAlert(`🔄 Switched to Polling: ${data.message || 'Webhook removed, polling active.'}`);
+      fetchTelegramBotStatus();
+    } catch (e: any) {
+      showAlert(`❌ Error: ${e?.message || 'Failed to delete webhook'}`);
+    } finally {
+      setIsSettingWebhook(false);
+    }
+  };
 
   // System Maintenance & Reset Actions State
   const [isResetBalancesModalOpen, setIsResetBalancesModalOpen] = useState<boolean>(false);
@@ -1575,55 +1648,428 @@ export const AdminPortal: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 5: MASTER TRANSACTIONS LEDGER */}
-      {activeAdminTab === 'TRANSACTIONS' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-6 sm:p-8 shadow-xl space-y-4">
-          <h3 className="text-lg font-black text-white">System-Wide Master Financial Ledger</h3>
-          <p className="text-xs text-slate-400">All user transactions, deposits, withdrawals & admin credits</p>
+      {/* TAB 5: MASTER TRANSACTIONS LEDGER (TNX ID PAIRING & SENDER-RECEIVER AUDIT) */}
+      {activeAdminTab === 'TRANSACTIONS' && (() => {
+        const filteredMasterTransactions = transactions.filter((tx) => {
+          // Type filter
+          if (ledgerTypeFilter === 'TRANSFER') {
+            if (tx.type !== 'TRANSFER_OUT' && tx.type !== 'TRANSFER_IN') return false;
+          } else if (ledgerTypeFilter === 'DEPOSIT') {
+            if (tx.type !== 'DEPOSIT') return false;
+          } else if (ledgerTypeFilter === 'WITHDRAWAL') {
+            if (tx.type !== 'WITHDRAWAL') return false;
+          } else if (ledgerTypeFilter === 'ADMIN') {
+            if (tx.type !== 'ADMIN_ADJUSTMENT' && tx.type !== 'BONUS' && tx.type !== 'COMMISSION') return false;
+          }
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-800 text-slate-400 font-mono text-[10px] tracking-wider uppercase">
-                  <th className="py-3 px-3">Date</th>
-                  <th className="py-3 px-3">User Name</th>
-                  <th className="py-3 px-3">Type</th>
-                  <th className="py-3 px-3">Description</th>
-                  <th className="py-3 px-3 text-right">Net Amount</th>
-                  <th className="py-3 px-3 text-center">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60 font-mono">
-                {transactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-slate-850/50">
-                    <td className="py-3 px-3 text-slate-400 whitespace-nowrap">
-                      {new Date(tx.created_at).toLocaleString([], {
-                        month: 'short',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </td>
-                    <td className="py-3 px-3 font-bold text-white font-sans whitespace-nowrap">{tx.user_name}</td>
-                    <td className="py-3 px-3">
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-slate-950 border border-slate-800 text-indigo-300">
-                        {tx.type}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 font-sans text-slate-300">{tx.description}</td>
-                    <td className="py-3 px-3 text-right font-black text-emerald-400">{formatINR(tx.net_amount)}</td>
-                    <td className="py-3 px-3 text-center">
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                        {tx.status}
-                      </span>
-                    </td>
+          // Search query filter
+          if (!ledgerSearchQuery.trim()) return true;
+          const q = ledgerSearchQuery.trim().toLowerCase();
+
+          const txnId = (tx.reference_id || tx.id || '').toLowerCase();
+          const rawId = (tx.id || '').toLowerCase();
+          const userName = (tx.user_name || '').toLowerCase();
+          const userCustomId = (tx.user_custom_id || '').toLowerCase();
+          const senderName = (tx.sender_name || '').toLowerCase();
+          const senderMobile = (tx.sender_mobile || '').toLowerCase();
+          const receiverName = (tx.receiver_name || '').toLowerCase();
+          const receiverMobile = (tx.receiver_mobile || '').toLowerCase();
+          const counterpartyName = (tx.counterparty_name || '').toLowerCase();
+          const counterpartyMobile = (tx.counterparty_mobile || '').toLowerCase();
+          const desc = (tx.description || '').toLowerCase();
+
+          return (
+            txnId.includes(q) ||
+            rawId.includes(q) ||
+            userName.includes(q) ||
+            userCustomId.includes(q) ||
+            senderName.includes(q) ||
+            senderMobile.includes(q) ||
+            receiverName.includes(q) ||
+            receiverMobile.includes(q) ||
+            counterpartyName.includes(q) ||
+            counterpartyMobile.includes(q) ||
+            desc.includes(q)
+          );
+        });
+
+        const totalFilteredVolume = filteredMasterTransactions.reduce((acc, t) => acc + (t.amount || t.net_amount || 0), 0);
+
+        const copyTxnId = (idText: string) => {
+          navigator.clipboard.writeText(idText);
+          setCopiedLedgerId(idText);
+          setTimeout(() => setCopiedLedgerId(null), 2500);
+        };
+
+        return (
+          <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-6 sm:p-8 shadow-xl space-y-6">
+            {/* Header & Overview Stats */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+              <div>
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                    <FileText className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-white flex items-center gap-2">
+                      Master Financial Ledger (मास्टर लेजर)
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      System-wide live transactions with unified TNX ID 🪪, Sender & Receiver counterparty tracking
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Metrics */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="px-3.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono">
+                  <span className="text-slate-400">Total Logs: </span>
+                  <span className="font-bold text-white">{transactions.length}</span>
+                </div>
+                <div className="px-3.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono">
+                  <span className="text-slate-400">Showing: </span>
+                  <span className="font-bold text-sky-400">{filteredMasterTransactions.length}</span>
+                </div>
+                <div className="px-3.5 py-1.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-xs font-mono">
+                  <span className="text-emerald-400">Volume: </span>
+                  <span className="font-black text-emerald-300">{formatINR(totalFilteredVolume)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Search Bar & Filter Tabs */}
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row items-stretch gap-3">
+                <div className="relative flex-1">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Search className="h-4 w-4" />
+                  </div>
+                  <input
+                    type="text"
+                    value={ledgerSearchQuery}
+                    onChange={(e) => setLedgerSearchQuery(e.target.value)}
+                    placeholder="Search by TNX ID 🪪 (e.g. SR-50963 or SR-XXXXX), Sender / Receiver Name, Mobile No, or Note..."
+                    className="w-full pl-10 pr-10 py-3 bg-slate-950 border border-slate-800 rounded-2xl text-xs sm:text-sm text-white font-mono placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 transition"
+                  />
+                  {ledgerSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setLedgerSearchQuery('')}
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-white cursor-pointer text-xs font-mono"
+                    >
+                      Clear ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Filter Pills */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 font-mono text-xs">
+                  {[
+                    { id: 'ALL', label: 'All' },
+                    { id: 'TRANSFER', label: 'P2P Transfers' },
+                    { id: 'DEPOSIT', label: 'Deposits' },
+                    { id: 'WITHDRAWAL', label: 'Withdrawals' },
+                    { id: 'ADMIN', label: 'Admin / Bonus' },
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setLedgerTypeFilter(f.id as any)}
+                      className={`px-3 py-2.5 rounded-xl transition whitespace-nowrap cursor-pointer text-xs font-bold ${
+                        ledgerTypeFilter === f.id
+                          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                          : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Active Search Highlight Bar */}
+              {ledgerSearchQuery && (
+                <div className="p-3 bg-indigo-950/40 border border-indigo-500/40 rounded-2xl flex items-center justify-between text-xs font-mono text-indigo-200">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-indigo-300">🔍 Filtering TNX ID / Keyword:</span>
+                    <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-100 font-bold border border-indigo-500/30">
+                      {ledgerSearchQuery}
+                    </span>
+                    <span className="text-slate-400 text-[11px] hidden sm:inline">
+                      (Both Sender & Receiver transactions for this TNX ID appear together below)
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLedgerSearchQuery('')}
+                    className="text-xs text-indigo-400 hover:text-white font-bold hover:underline cursor-pointer"
+                  >
+                    Reset Filter
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Master Ledger Table */}
+            <div className="overflow-x-auto rounded-2xl border border-slate-800">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 font-mono text-[10px] tracking-wider uppercase">
+                    <th className="py-3 px-3">Date & Time 📅</th>
+                    <th className="py-3 px-3">TNX ID 🪪</th>
+                    <th className="py-3 px-3">Flow & Type</th>
+                    <th className="py-3 px-3">Sender Details (भेजने वाला)</th>
+                    <th className="py-3 px-3">Receiver Details (पाने वाला)</th>
+                    <th className="py-3 px-3 text-right">Amount</th>
+                    <th className="py-3 px-3 text-right">Wallet Flow</th>
+                    <th className="py-3 px-3 text-center">Status</th>
+                    <th className="py-3 px-3">Note / Details</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-800/70 font-mono">
+                  {filteredMasterTransactions.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="py-12 text-center text-slate-400">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <FileText className="h-8 w-8 text-slate-600" />
+                          <p className="text-sm font-bold text-slate-300">No transactions match your search</p>
+                          <p className="text-xs text-slate-500">
+                            Try searching for a different TNX ID, user mobile number, or clear filters.
+                          </p>
+                          {ledgerSearchQuery && (
+                            <button
+                              type="button"
+                              onClick={() => setLedgerSearchQuery('')}
+                              className="mt-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition"
+                            >
+                              Clear Search Filter
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredMasterTransactions.map((tx) => {
+                      // Determine the shared TNX ID
+                      const displayTxnId = tx.reference_id || tx.id;
+                      const isTransfer = tx.type === 'TRANSFER_OUT' || tx.type === 'TRANSFER_IN';
+
+                      // Sender Metadata Resolution
+                      const senderName =
+                        tx.sender_name ||
+                        (tx.type === 'TRANSFER_OUT'
+                          ? tx.user_name
+                          : tx.type === 'TRANSFER_IN'
+                          ? (tx.counterparty_name || 'Sender Account')
+                          : (tx.user_name || 'System'));
+
+                      const senderIdentifier =
+                        tx.sender_mobile ||
+                        (tx.type === 'TRANSFER_OUT'
+                          ? (tx.user_custom_id || tx.user_id)
+                          : tx.type === 'TRANSFER_IN'
+                          ? (tx.counterparty_mobile || tx.counterparty_id || '—')
+                          : (tx.user_custom_id || 'SR Gateway Gateway'));
+
+                      // Receiver Metadata Resolution
+                      const receiverName =
+                        tx.receiver_name ||
+                        (tx.type === 'TRANSFER_IN'
+                          ? tx.user_name
+                          : tx.type === 'TRANSFER_OUT'
+                          ? (tx.counterparty_name || 'Recipient Account')
+                          : (tx.user_name || 'System'));
+
+                      const receiverIdentifier =
+                        tx.receiver_mobile ||
+                        (tx.type === 'TRANSFER_IN'
+                          ? (tx.user_custom_id || tx.user_id)
+                          : tx.type === 'TRANSFER_OUT'
+                          ? (tx.counterparty_mobile || tx.counterparty_id || '—')
+                          : (tx.user_custom_id || 'Bank / Wallet'));
+
+                      return (
+                        <tr key={tx.id} className="hover:bg-slate-850/60 transition group">
+                          {/* 1. Date & Time */}
+                          <td className="py-3 px-3 text-slate-400 whitespace-nowrap">
+                            <div className="font-bold text-white text-[11px]">
+                              {new Date(tx.created_at).toLocaleDateString('en-IN', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                              })}
+                            </div>
+                            <div className="text-[10px] text-slate-500">
+                              {new Date(tx.created_at).toLocaleTimeString('en-IN', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                                hour12: true,
+                              })}
+                            </div>
+                          </td>
+
+                          {/* 2. TNX ID (With Search Pair Trigger) */}
+                          <td className="py-3 px-3 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                title="Click to filter ledger by this exact TNX ID (shows both Sender & Receiver together)"
+                                onClick={() => setLedgerSearchQuery(displayTxnId)}
+                                className="font-mono text-[11px] font-bold text-indigo-400 hover:text-indigo-300 hover:underline cursor-pointer bg-slate-950 px-2 py-0.5 rounded border border-slate-800"
+                              >
+                                {displayTxnId}
+                              </button>
+                              <button
+                                type="button"
+                                title="Copy TNX ID"
+                                onClick={() => copyTxnId(displayTxnId)}
+                                className="p-1 text-slate-500 hover:text-slate-200 transition cursor-pointer"
+                              >
+                                {copiedLedgerId === displayTxnId ? (
+                                  <Check className="h-3 w-3 text-emerald-400" />
+                                ) : (
+                                  <Copy className="h-3 w-3" />
+                                )}
+                              </button>
+                            </div>
+                            {tx.id !== displayTxnId && (
+                              <span className="text-[9px] text-slate-600 block mt-0.5">
+                                Ref: {tx.id}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* 3. Flow & Type */}
+                          <td className="py-3 px-3 whitespace-nowrap">
+                            {tx.type === 'TRANSFER_OUT' ? (
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-red-500/20 text-red-300 border border-red-500/40 flex items-center gap-1 w-fit">
+                                <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                                <span>🔴 DEBIT / SENT</span>
+                              </span>
+                            ) : tx.type === 'TRANSFER_IN' ? (
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 w-fit">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                <span>🟢 CREDIT / RECV</span>
+                              </span>
+                            ) : tx.type === 'DEPOSIT' ? (
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-blue-500/20 text-blue-300 border border-blue-500/40 flex items-center gap-1 w-fit">
+                                <span>🔵 DEPOSIT</span>
+                              </span>
+                            ) : tx.type === 'WITHDRAWAL' ? (
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1 w-fit">
+                                <span>🟠 WITHDRAW</span>
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-purple-500/20 text-purple-300 border border-purple-500/40 w-fit">
+                                {tx.type}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* 4. Sender Details */}
+                          <td className="py-3 px-3">
+                            <div className="font-bold text-white font-sans text-xs flex items-center gap-1.5">
+                              <span>{senderName}</span>
+                              {tx.type === 'TRANSFER_OUT' && (
+                                <span className="text-[9px] text-red-400 bg-red-500/10 px-1 rounded font-mono">
+                                  Sender
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1 mt-0.5">
+                              <span className="text-slate-500">A/C:</span>
+                              <button
+                                type="button"
+                                onClick={() => setLedgerSearchQuery(senderIdentifier)}
+                                className="hover:text-sky-400 hover:underline cursor-pointer"
+                                title="Filter by Sender"
+                              >
+                                {senderIdentifier}
+                              </button>
+                            </div>
+                          </td>
+
+                          {/* 5. Receiver Details */}
+                          <td className="py-3 px-3">
+                            <div className="font-bold text-white font-sans text-xs flex items-center gap-1.5">
+                              <span>{receiverName}</span>
+                              {tx.type === 'TRANSFER_IN' && (
+                                <span className="text-[9px] text-emerald-400 bg-emerald-500/10 px-1 rounded font-mono">
+                                  Receiver
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1 mt-0.5">
+                              <span className="text-slate-500">A/C:</span>
+                              <button
+                                type="button"
+                                onClick={() => setLedgerSearchQuery(receiverIdentifier)}
+                                className="hover:text-emerald-400 hover:underline cursor-pointer"
+                                title="Filter by Receiver"
+                              >
+                                {receiverIdentifier}
+                              </button>
+                            </div>
+                          </td>
+
+                          {/* 6. Amount */}
+                          <td className="py-3 px-3 text-right whitespace-nowrap">
+                            <span
+                              className={`font-black text-sm ${
+                                tx.type === 'TRANSFER_OUT' || tx.type === 'WITHDRAWAL'
+                                  ? 'text-red-400'
+                                  : 'text-emerald-400'
+                              }`}
+                            >
+                              {tx.type === 'TRANSFER_OUT' || tx.type === 'WITHDRAWAL' ? '-' : '+'}
+                              {formatINR(tx.amount || tx.net_amount)}
+                            </span>
+                          </td>
+
+                          {/* 7. Wallet Flow */}
+                          <td className="py-3 px-3 text-right whitespace-nowrap text-[10px]">
+                            {tx.balance_before !== undefined && tx.balance_after !== undefined ? (
+                              <div>
+                                <span className="text-slate-500">₹{tx.balance_before.toFixed(2)}</span>
+                                <span className="text-slate-400 mx-1">➔</span>
+                                <span className="font-bold text-slate-200">₹{tx.balance_after.toFixed(2)}</span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-600">—</span>
+                            )}
+                          </td>
+
+                          {/* 8. Status */}
+                          <td className="py-3 px-3 text-center whitespace-nowrap">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border ${
+                                tx.status === 'SUCCESS'
+                                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                                  : tx.status === 'PENDING'
+                                  ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                                  : 'bg-red-500/20 text-red-400 border-red-500/30'
+                              }`}
+                            >
+                              {tx.status}
+                            </span>
+                          </td>
+
+                          {/* 9. Description / Note */}
+                          <td className="py-3 px-3 font-sans text-slate-300 text-xs max-w-xs truncate" title={tx.description}>
+                            {tx.description}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* TAB 6: EXTRA CONTROLS & SYSTEM SETTINGS */}
       {activeAdminTab === 'SETTINGS' && (
@@ -2132,6 +2578,108 @@ export const AdminPortal: React.FC = () => {
               </div>
             </div>
 
+            {/* Official Customer Support & Forgot Password Helpdesk (WhatsApp & Telegram 24x7) */}
+            <div className="bg-slate-950 border border-emerald-500/30 rounded-2xl p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 font-bold text-lg">
+                    💬
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      <span>Official Customer Support & Forgot Password Channels</span>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        24x7 LOGIN RECOVERY
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Configure WhatsApp and Telegram support channels. These will automatically appear in the Login page "Forgot Password" modal.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
+                {/* WhatsApp Support Number */}
+                <div className="space-y-1.5 p-3.5 bg-slate-900/60 rounded-xl border border-slate-800/80">
+                  <label className="block text-emerald-400 font-bold text-[11px] uppercase">
+                    WhatsApp Support Mobile No.
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="+91 7477661867"
+                    value={settingsForm.whatsapp_support_number || ''}
+                    onChange={(e) => handleSettingChange('whatsapp_support_number', e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-300 font-bold"
+                  />
+                  <p className="text-[10px] text-slate-500">
+                    Displayed on login password recovery card. Users can click to message directly.
+                  </p>
+                </div>
+
+                {/* WhatsApp Support Direct URL */}
+                <div className="space-y-1.5 p-3.5 bg-slate-900/60 rounded-xl border border-slate-800/80">
+                  <label className="block text-emerald-400 font-bold text-[11px] uppercase">
+                    WhatsApp Direct Chat URL
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="https://wa.me/917477661867"
+                    value={settingsForm.whatsapp_support_url || ''}
+                    onChange={(e) => handleSettingChange('whatsapp_support_url', e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
+                  />
+                  <p className="text-[10px] text-slate-500">
+                    Custom wa.me link or pre-filled message URL. If left empty, defaults to wa.me with number above.
+                  </p>
+                </div>
+
+                {/* Telegram Support Username */}
+                <div className="space-y-1.5 p-3.5 bg-slate-900/60 rounded-xl border border-slate-800/80">
+                  <label className="block text-sky-400 font-bold text-[11px] uppercase">
+                    Telegram Support Username / Handle
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="@SRGatewayBot"
+                    value={settingsForm.support_telegram_username || ''}
+                    onChange={(e) => handleSettingChange('support_telegram_username', e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sky-300 font-bold"
+                  />
+                  <p className="text-[10px] text-slate-500">
+                    Official Telegram username or bot handle for 24x7 support.
+                  </p>
+                </div>
+
+                {/* Telegram Support Direct Link */}
+                <div className="space-y-1.5 p-3.5 bg-slate-900/60 rounded-xl border border-slate-800/80">
+                  <label className="block text-sky-400 font-bold text-[11px] uppercase">
+                    Telegram Support Direct Link
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="https://t.me/SRGatewayBot"
+                    value={settingsForm.support_url || ''}
+                    onChange={(e) => handleSettingChange('support_url', e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
+                  />
+                  <p className="text-[10px] text-slate-500">
+                    Direct t.me link. Opens Telegram app / web for password reset inquiry.
+                  </p>
+                </div>
+              </div>
+
+              {/* Live Preview Box */}
+              <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between text-xs">
+                <span className="text-slate-400 text-[11px]">
+                  📌 <strong className="text-slate-200">Live Preview:</strong> Users clicking "Forgot Password? 🔑" on the login screen will see buttons pointing to these exact channels.
+                </span>
+                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-mono font-bold border border-emerald-500/20">
+                  Active in Login Portal
+                </span>
+              </div>
+            </div>
+
             {/* OTP Alert Telegram Bot Configuration Section */}
             <div className="bg-slate-950 border border-cyan-500/30 rounded-2xl p-5 space-y-4">
               <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
@@ -2192,6 +2740,65 @@ export const AdminPortal: React.FC = () => {
                   <p className="text-[10px] text-slate-500 font-mono mt-1">
                     Token from @BotFather for sending OTPs and alerts (e.g. 7829103847:AAHx...)
                   </p>
+                </div>
+              </div>
+
+              {/* Telegram Webhook & Cloud Gateway Status */}
+              <div className="p-3.5 bg-slate-900/90 rounded-xl border border-indigo-500/30 space-y-2.5 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-white font-bold text-[12px] flex items-center gap-1.5">
+                      Railway Webhook & Live Bot Sync
+                      <span className="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        ONLINE
+                      </span>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      disabled={isCheckingBotStatus}
+                      onClick={fetchTelegramBotStatus}
+                      className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-lg text-[11px] font-mono flex items-center gap-1 transition"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${isCheckingBotStatus ? 'animate-spin' : ''}`} />
+                      Check Health
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSettingWebhook}
+                      onClick={handleSetRailwayWebhook}
+                      className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[11px] font-mono font-bold flex items-center gap-1 transition shadow"
+                    >
+                      <Zap className="h-3 w-3 text-amber-300" />
+                      {isSettingWebhook ? 'Connecting...' : 'Connect Railway Webhook'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800/80 font-mono text-[11px] space-y-1">
+                  <div className="flex items-center justify-between text-slate-400">
+                    <span>Live Webhook Endpoint:</span>
+                    <span className="text-emerald-400 font-bold truncate max-w-[280px]">
+                      https://sr-gateway-in.up.railway.app/api/v1/telegram-webhook
+                    </span>
+                  </div>
+                  {telegramStatusData && (
+                    <div className="pt-1.5 mt-1.5 border-t border-slate-800/60 text-slate-300 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        Bot: <strong className="text-cyan-300">{telegramStatusData.bot?.first_name || 'SR Gateway Bot'}</strong> (@{telegramStatusData.bot?.username || 'SRGatewayBot'})
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span>Mode:</span>
+                        {telegramStatusData.is_webhook_active ? (
+                          <span className="text-emerald-400 font-bold">⚡ Webhook Active (Zero Polling Conflict)</span>
+                        ) : (
+                          <span className="text-amber-400 font-bold">Polling Mode</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

@@ -110,6 +110,15 @@ export interface Transaction {
   balance_before: number;
   balance_after: number;
   signature?: string;
+  sender_id?: string;
+  sender_name?: string;
+  sender_mobile?: string;
+  receiver_id?: string;
+  receiver_name?: string;
+  receiver_mobile?: string;
+  counterparty_id?: string;
+  counterparty_name?: string;
+  counterparty_mobile?: string;
   created_at: string;
 }
 
@@ -207,7 +216,10 @@ export interface AppSettings {
   otp_telegram_bot_token?: string;
   otp_telegram_bot_username?: string;
   support_telegram_bot_username?: string;
+  support_telegram_username?: string;
   support_url: string;
+  whatsapp_support_number?: string;
+  whatsapp_support_url?: string;
   app_url?: string;
   admin_upi_id: string;
   admin_qr_url: string;

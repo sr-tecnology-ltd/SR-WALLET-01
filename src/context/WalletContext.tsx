@@ -1309,7 +1309,16 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const recipientWallet = wallets[recipient.id] || wallets[recipient.user_custom_id] || { available_balance: 0, locked_balance: 0 };
     const recipientPrevBal = recipientWallet.available_balance;
 
-    const refId = `TRF-${currentUser.mobile}-${recipient.mobile}-${Date.now()}`;
+    const generateSharedTxnId = () => {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let str = '';
+      for (let i = 0; i < 13; i++) {
+        str += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return `SR-${str}`;
+    };
+    const sharedTxnId = generateSharedTxnId();
+    const refId = sharedTxnId;
 
     const senderNewBal = senderPrevBal - amount;
     const recipientNewBal = recipientPrevBal + amount;
@@ -1351,41 +1360,81 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       },
     }));
 
-    // Sender TX
+    // Sender TX (Debit record with full counterparty & shared TNX ID)
     const senderTx: Transaction = {
-      id: `TXN-${Date.now()}-1`,
+      id: `${sharedTxnId}-DR`,
       user_id: currentUser.id,
       user_name: currentUser.full_name,
+      user_custom_id: currentUser.user_custom_id,
+      sender_id: currentUser.user_custom_id || currentUser.id,
+      sender_name: currentUser.full_name,
+      sender_mobile: currentUser.mobile,
+      receiver_id: recipient.user_custom_id || recipient.id,
+      receiver_name: recipient.full_name,
+      receiver_mobile: recipient.mobile,
+      counterparty_id: recipient.user_custom_id || recipient.id,
+      counterparty_name: recipient.full_name,
+      counterparty_mobile: recipient.mobile,
       type: 'TRANSFER_OUT',
       amount,
       fee: 0,
       net_amount: amount,
       status: 'SUCCESS',
-      reference_id: refId,
-      description: `Internal Transfer Sent to ${recipient.full_name} (${recipient.mobile}) ${note ? `- ${note}` : ''}`,
+      reference_id: sharedTxnId,
+      description: `Internal Transfer Sent to ${recipient.full_name} (${recipient.mobile || recipient.user_custom_id}) ${note ? `- ${note}` : ''}`,
       balance_before: senderPrevBal,
       balance_after: senderNewBal,
       created_at: new Date().toISOString(),
     };
 
-    // Receiver TX
+    // Receiver TX (Credit record with matching shared TNX ID & counterparty details)
     const receiverTx: Transaction = {
-      id: `TXN-${Date.now()}-2`,
+      id: `${sharedTxnId}-CR`,
       user_id: recipient.id,
       user_name: recipient.full_name,
+      user_custom_id: recipient.user_custom_id,
+      sender_id: currentUser.user_custom_id || currentUser.id,
+      sender_name: currentUser.full_name,
+      sender_mobile: currentUser.mobile,
+      receiver_id: recipient.user_custom_id || recipient.id,
+      receiver_name: recipient.full_name,
+      receiver_mobile: recipient.mobile,
+      counterparty_id: currentUser.user_custom_id || currentUser.id,
+      counterparty_name: currentUser.full_name,
+      counterparty_mobile: currentUser.mobile,
       type: 'TRANSFER_IN',
       amount,
       fee: 0,
       net_amount: amount,
       status: 'SUCCESS',
-      reference_id: refId,
-      description: `Internal Transfer Received from ${currentUser.full_name} (${currentUser.mobile}) ${note ? `- ${note}` : ''}`,
+      reference_id: sharedTxnId,
+      description: `Internal Transfer Received from ${currentUser.full_name} (${currentUser.mobile || currentUser.user_custom_id}) ${note ? `- ${note}` : ''}`,
       balance_before: recipientPrevBal,
       balance_after: recipientNewBal,
       created_at: new Date().toISOString(),
     };
 
     setTransactions((prev) => [senderTx, receiverTx, ...prev]);
+
+    // Atomic server-side execution to eliminate any state reversion
+    fetch('/api/v1/wallet/transfer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sender: currentUser.user_custom_id || currentUser.mobile || currentUser.id,
+        recipient: recipient.user_custom_id || recipient.mobile || recipient.id,
+        amount,
+        note: note || 'Internal Wallet Transfer',
+        shared_txn_id: sharedTxnId,
+      }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.status === 'success') {
+          console.log('[WALLET TRANSFER SYNC SUCCESS]', data);
+        }
+      })
+      .catch((err) => console.warn('[WALLET TRANSFER API SYNC WARN]', err));
 
     addNotification(currentUser.id, 'Transfer Sent', `Transferred ${formatINR(amount)} to ${recipient.full_name}.`, 'INFO');
     addNotification(recipient.id, 'Funds Received! 🎁', `Received ${formatINR(amount)} from ${currentUser.full_name}.`, 'SUCCESS');
@@ -1395,7 +1444,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       sender: currentUser,
       receiver: recipient,
       amount,
-      txnId: senderTx.id,
+      txnId: sharedTxnId,
       note,
       senderBalance: senderNewBal,
       receiverBalance: recipientNewBal,

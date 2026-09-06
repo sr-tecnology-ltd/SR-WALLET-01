@@ -22,6 +22,7 @@ import {
   Volume2,
   Cpu,
   Fingerprint,
+  X,
 } from 'lucide-react';
 
 interface AuthPortalProps {
@@ -47,6 +48,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
 
   // Register Form States (with Real-time Telegram Bot & Email OTP Verification)
   const [regFullName, setRegFullName] = useState('');
@@ -634,6 +636,16 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
+                  <div className="flex items-center justify-between mt-1.5 px-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotPasswordModal(true)}
+                      className="text-[11px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 transition cursor-pointer hover:underline"
+                    >
+                      <span>🔑 Forgot Password? (पासवर्ड भूल गए?)</span>
+                    </button>
+                    <span className="text-[10px] text-slate-500 font-mono">24x7 Support Available</span>
+                  </div>
                 </div>
 
                 {/* Smart Anti-Bot Captcha Verification */}
@@ -1178,6 +1190,141 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
           </p>
         </div>
       </footer>
+
+      {/* Forgot Password Official Customer Support Modal */}
+      {showForgotPasswordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+          <div className="bg-slate-900 border border-slate-750 rounded-[2rem] w-full max-w-lg p-6 sm:p-8 shadow-2xl relative overflow-hidden space-y-5">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center text-2xl shadow-inner shrink-0">
+                  🔑
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                    Password Recovery Support
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Contact 24x7 Official Customer Support for instant password reset & verification
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowForgotPasswordModal(false)}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition cursor-pointer shrink-0"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Instruction Notice */}
+            <div className="p-3.5 bg-slate-950/90 border border-amber-500/30 rounded-2xl text-xs text-amber-200/90 leading-relaxed">
+              <p className="font-bold text-amber-300 mb-1 flex items-center gap-1.5">
+                <span>🛡️ Official Security Support System</span>
+              </p>
+              Agar aap apna login password bhool gaye hain, toh admin/customer support se directly WhatsApp ya Telegram par contact karke 2 minute me verify karwake apna password recover/reset karwa sakte hain.
+            </div>
+
+            {/* Support Channels Grid */}
+            <div className="space-y-3">
+              {/* WhatsApp Support Card */}
+              <a
+                href={
+                  settings.whatsapp_support_url ||
+                  `https://wa.me/${(settings.whatsapp_support_number || '7477661867').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                    `Hello SR Gateway Support, I forgot my account login password. My Registered Mobile / User ID is: ${loginIdentifier || ''}. Please help me verify and reset my password.`
+                  )}`
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex items-center justify-between p-4 bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-500/40 hover:border-emerald-400 rounded-2xl transition duration-200 shadow-lg"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-bold text-lg shrink-0">
+                    💬
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-white group-hover:text-emerald-300 transition">
+                        WhatsApp Customer Support
+                      </h4>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        24x7 DIRECT CHAT
+                      </span>
+                    </div>
+                    <p className="text-xs font-mono text-emerald-400 font-bold mt-0.5">
+                      {settings.whatsapp_support_number || '+91 7477661867'}
+                    </p>
+                  </div>
+                </div>
+                <ExternalLink className="h-4 w-4 text-emerald-400 group-hover:translate-x-0.5 transition shrink-0" />
+              </a>
+
+              {/* Telegram Support Card */}
+              <a
+                href={settings.support_url || 'https://t.me/SRGatewayBot'}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex items-center justify-between p-4 bg-sky-950/40 hover:bg-sky-900/50 border border-sky-500/40 hover:border-sky-400 rounded-2xl transition duration-200 shadow-lg"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-sky-500/20 text-sky-400 border border-sky-500/30 flex items-center justify-center font-bold text-lg shrink-0">
+                    ✈️
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-white group-hover:text-sky-300 transition">
+                        Telegram Official Bot & Support
+                      </h4>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                        ONLINE
+                      </span>
+                    </div>
+                    <p className="text-xs font-mono text-sky-400 font-bold mt-0.5">
+                      {settings.support_telegram_username || '@SRGatewayBot'}
+                    </p>
+                  </div>
+                </div>
+                <ExternalLink className="h-4 w-4 text-sky-400 group-hover:translate-x-0.5 transition shrink-0" />
+              </a>
+            </div>
+
+            {/* Quick 3 Steps */}
+            <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl space-y-2">
+              <p className="font-bold text-slate-300 text-[11px] uppercase tracking-wider font-mono">
+                3 Steps to Reset Password:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px] text-slate-400">
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                  <span className="font-bold text-white block mb-0.5">1. Send Info</span>
+                  Provide Mobile No. or User ID to Support chat.
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                  <span className="font-bold text-white block mb-0.5">2. Identity Check</span>
+                  Support verifies via OTP or registered email.
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                  <span className="font-bold text-white block mb-0.5">3. Password Reset</span>
+                  Receive temporary password & regain access.
+                </div>
+              </div>
+            </div>
+
+            {/* Close button */}
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowForgotPasswordModal(false)}
+                className="w-full sm:w-auto px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                Close & Return to Login
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
