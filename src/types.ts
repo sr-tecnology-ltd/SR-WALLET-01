@@ -1,4 +1,4 @@
-export type UserRole = 'USER' | 'ADMIN';
+export type UserRole = 'USER' | 'ADMIN' | 'OWNER';
 export type AccountStatus = 'ACTIVE' | 'BANNED' | 'PENDING_VERIFICATION';
 
 export interface UserProfile {
@@ -170,6 +170,9 @@ export type AuditActionType =
   | 'API_KEY_REVOKED'
   | 'TELEGRAM_CHAT_ID_UPDATED'
   | 'MAINTENANCE_MODE_TOGGLED'
+  | 'OWNER_CREATE_ADMIN'
+  | 'OWNER_UPDATE_ADMIN'
+  | 'OWNER_DELETE_ADMIN'
   | 'USER_LOGIN';
 
 export interface AuditLog {

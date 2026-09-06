@@ -289,12 +289,26 @@ let appSettings: Record<string, any> = {
 };
 
 let users: Record<string, any> = {
+  'SR-OWNER-01': {
+    id: 'owner-001',
+    user_custom_id: 'SR-OWNER-01',
+    full_name: 'SR Gateway Master Owner',
+    mobile: '7477661867',
+    email: 'sk190rihan@gmail.com',
+    telegram_id: '6561010416',
+    telegram_chat_id: '6561010416',
+    role: 'OWNER',
+    status: 'ACTIVE',
+    referral_code: 'OWNER001',
+    created_at: new Date(Date.now() - 86400000 * 90).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
   'SR-ADMIN-01': {
     id: 'admin-001',
     user_custom_id: 'SR-ADMIN-01',
-    full_name: 'SR Gateway System Admin',
+    full_name: 'SR Gateway Staff Sub-Admin',
     mobile: '+91 90000 00000',
-    email: '',
+    email: 'staff@srgateway.in',
     telegram_id: '',
     telegram_chat_id: '',
     role: 'ADMIN',
@@ -305,11 +319,30 @@ let users: Record<string, any> = {
   },
 };
 
-// Aliases for admin
+// Aliases for owner and admin
+users['owner-001'] = users['SR-OWNER-01'];
+users['7477661867'] = users['SR-OWNER-01'];
+users['sk190rihan@gmail.com'] = users['SR-OWNER-01'];
 users['admin-001'] = users['SR-ADMIN-01'];
 users['9000000000'] = users['SR-ADMIN-01'];
 
 let wallets: Record<string, any> = {
+  'SR-OWNER-01': {
+    id: 'w-owner',
+    user_id: 'owner-001',
+    available_balance: 5000000.0,
+    locked_balance: 0,
+    created_at: new Date(Date.now() - 86400000 * 90).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  'owner-001': {
+    id: 'w-owner',
+    user_id: 'owner-001',
+    available_balance: 5000000.0,
+    locked_balance: 0,
+    created_at: new Date(Date.now() - 86400000 * 90).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
   'SR-ADMIN-01': {
     id: 'w-admin',
     user_id: 'admin-001',
@@ -3974,6 +4007,39 @@ app.get('/api/v1/admin/settings', (req: Request, res: Response) => {
 
 const handleUpdateAdminSettings = (req: Request, res: Response) => {
   const incoming = req.body || {};
+  const userRole = (req.headers['x-user-role'] as string) || incoming.operator_role;
+
+  // Sensitive fields that ONLY Master Owner can configure:
+  const sensitiveFields = [
+    'admin_upi_id',
+    'admin_qr_url',
+    'admin_bank_name',
+    'admin_bank_account_name',
+    'admin_bank_account_no',
+    'admin_bank_ifsc',
+    'deposit_charge_percent',
+    'withdraw_charge_percent',
+    'minimum_deposit',
+    'minimum_withdraw',
+    'maximum_withdraw',
+    'otp_telegram_bot_token',
+    'smtp_pass',
+    'smtp_user',
+    'maintenance_mode_enabled'
+  ];
+
+  if (userRole === 'ADMIN') {
+    for (const key of sensitiveFields) {
+      if (incoming[key] !== undefined && incoming[key] !== (appSettings as any)[key]) {
+        return res.status(403).json({
+          status: 'error',
+          code: 403,
+          message: 'Security Restriction: Sub-Admin (Staff) is not permitted to modify core Gateway UPI, Bank credentials, fees, or security secrets. Only Master Owner has permission.',
+        });
+      }
+    }
+  }
+
   appSettings = { ...appSettings, ...incoming };
   saveDatabase();
   res.json({
@@ -3989,11 +4055,167 @@ app.put('/api/v1/admin/settings', handleUpdateAdminSettings);
 app.post('/api/v1/settings', handleUpdateAdminSettings);
 app.put('/api/v1/settings', handleUpdateAdminSettings);
 
-// Admin Reset All User Balances (0 RS)
+// Sub-Admin Management Endpoints (Owner Only)
+app.get('/api/v1/owner/admins', (req: Request, res: Response) => {
+  const adminList = Object.values(users)
+    .filter((u: any, idx: number, arr: any[]) => 
+      u && u.role === 'ADMIN' && arr.findIndex((x: any) => x.id === u.id) === idx
+    )
+    .map((u: any) => ({
+      id: u.id,
+      user_custom_id: u.user_custom_id,
+      full_name: u.full_name,
+      mobile: u.mobile,
+      email: u.email,
+      telegram_id: u.telegram_id,
+      telegram_chat_id: u.telegram_chat_id,
+      role: u.role,
+      status: u.status,
+      created_at: u.created_at,
+      rpin: u.rpin || '1234',
+    }));
+
+  res.json({
+    status: 'success',
+    code: 200,
+    admins: adminList,
+    total: adminList.length,
+  });
+});
+
+app.post('/api/v1/owner/admins', (req: Request, res: Response) => {
+  const userRole = (req.headers['x-user-role'] as string) || (req.body && req.body.operator_role);
+  if (userRole === 'ADMIN') {
+    return res.status(403).json({ status: 'error', code: 403, message: 'Access Denied: Only Master Owner can create Sub-Admins' });
+  }
+
+  const { full_name, mobile, email, password, rpin, telegram_id, telegram_chat_id } = req.body;
+  if (!full_name || !mobile) {
+    return res.status(400).json({ status: 'error', code: 400, message: 'Full name and mobile number are required' });
+  }
+
+  const cleanPhone = normalizePhone(mobile);
+  const adminCount = Object.values(users).filter((u: any, idx: number, arr: any[]) => u && u.role === 'ADMIN' && arr.findIndex((x: any) => x.id === u.id) === idx).length;
+  const newAdminId = `admin-00${adminCount + 2}`;
+  const customId = `SR-ADMIN-0${adminCount + 2}`;
+
+  const newAdminUser = {
+    id: newAdminId,
+    user_custom_id: customId,
+    full_name: full_name.trim(),
+    mobile: mobile.trim(),
+    email: (email || `${cleanPhone}@srgateway.in`).trim(),
+    password: password || 'Staff@123',
+    rpin: rpin || '1234',
+    telegram_id: telegram_id || '',
+    telegram_chat_id: telegram_chat_id || '',
+    role: 'ADMIN',
+    status: 'ACTIVE',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  users[newAdminId] = newAdminUser;
+  users[customId] = newAdminUser;
+  if (cleanPhone) users[cleanPhone] = newAdminUser;
+
+  wallets[customId] = {
+    id: `w-${newAdminId}`,
+    user_id: newAdminId,
+    available_balance: 0,
+    locked_balance: 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  wallets[newAdminId] = wallets[customId];
+
+  saveDatabase();
+
+  res.status(201).json({
+    status: 'success',
+    code: 201,
+    message: `Sub-Admin '${full_name}' created successfully with ID ${customId}`,
+    admin: newAdminUser,
+  });
+});
+
+app.put('/api/v1/owner/admins/:id', (req: Request, res: Response) => {
+  const userRole = (req.headers['x-user-role'] as string) || (req.body && req.body.operator_role);
+  if (userRole === 'ADMIN') {
+    return res.status(403).json({ status: 'error', code: 403, message: 'Access Denied: Only Master Owner can update Sub-Admins' });
+  }
+
+  const { id } = req.params;
+  const targetUser = users[id] || Object.values(users).find((u: any) => u.id === id || u.user_custom_id === id);
+
+  if (!targetUser) {
+    return res.status(404).json({ status: 'error', code: 404, message: 'Sub-Admin not found' });
+  }
+
+  if (targetUser.role === 'OWNER') {
+    return res.status(403).json({ status: 'error', code: 403, message: 'Cannot modify Master Owner account' });
+  }
+
+  const { full_name, mobile, email, password, rpin, status, telegram_chat_id } = req.body;
+  if (full_name) targetUser.full_name = full_name;
+  if (mobile) targetUser.mobile = mobile;
+  if (email) targetUser.email = email;
+  if (password) targetUser.password = password;
+  if (rpin) targetUser.rpin = rpin;
+  if (status) targetUser.status = status; // 'ACTIVE' | 'BANNED'
+  if (telegram_chat_id !== undefined) targetUser.telegram_chat_id = telegram_chat_id;
+  targetUser.updated_at = new Date().toISOString();
+
+  saveDatabase();
+
+  res.json({
+    status: 'success',
+    code: 200,
+    message: `Sub-Admin '${targetUser.full_name}' updated successfully`,
+    admin: targetUser,
+  });
+});
+
+app.delete('/api/v1/owner/admins/:id', (req: Request, res: Response) => {
+  const userRole = (req.headers['x-user-role'] as string);
+  if (userRole === 'ADMIN') {
+    return res.status(403).json({ status: 'error', code: 403, message: 'Access Denied: Only Master Owner can delete Sub-Admins' });
+  }
+
+  const { id } = req.params;
+  const targetUser = users[id] || Object.values(users).find((u: any) => u.id === id || u.user_custom_id === id);
+
+  if (!targetUser) {
+    return res.status(404).json({ status: 'error', code: 404, message: 'Sub-Admin not found' });
+  }
+
+  if (targetUser.role === 'OWNER' || targetUser.id === 'owner-001' || targetUser.user_custom_id === 'SR-OWNER-01') {
+    return res.status(403).json({ status: 'error', code: 403, message: 'Action Denied: Cannot delete Master Owner' });
+  }
+
+  delete users[targetUser.id];
+  delete users[targetUser.user_custom_id];
+  const clean = normalizePhone(targetUser.mobile);
+  if (clean && users[clean] === targetUser) delete users[clean];
+
+  saveDatabase();
+
+  res.json({
+    status: 'success',
+    code: 200,
+    message: `Sub-Admin '${targetUser.full_name}' removed from the system`,
+  });
+});
+
+// Admin Reset All User Balances (0 RS) - OWNER ONLY
 const handleResetAllBalances = (req: Request, res: Response) => {
+  const userRole = (req.headers['x-user-role'] as string);
+  if (userRole === 'ADMIN') {
+    return res.status(403).json({ status: 'error', code: 403, message: 'Security: Only Master Owner has permission to reset user balances.' });
+  }
   let count = 0;
   for (const [key, wallet] of Object.entries(wallets)) {
-    if (wallet && wallet.user_id !== 'admin-001' && wallet.user_id !== 'SR-ADMIN-01') {
+    if (wallet && wallet.user_id !== 'admin-001' && wallet.user_id !== 'SR-ADMIN-01' && wallet.user_id !== 'owner-001' && wallet.user_id !== 'SR-OWNER-01') {
       wallet.available_balance = 0;
       wallet.locked_balance = 0;
       wallet.updated_at = new Date().toISOString();
@@ -4016,6 +4238,10 @@ app.post('/api/v1/admin/reset-all-balances', handleResetAllBalances);
 
 // Admin Wipe All Registered Users Data
 const handleWipeAllUsers = (req: Request, res: Response) => {
+  const userRole = (req.headers['x-user-role'] as string);
+  if (userRole === 'ADMIN') {
+    return res.status(403).json({ status: 'error', code: 403, message: 'Security: Only Master Owner has permission to wipe user data.' });
+  }
   // Master Admin with fresh, unlinked credentials
   const adminUser = {
     id: 'admin-001',

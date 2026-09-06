@@ -32,9 +32,12 @@ interface WalletContextType {
   // Active User & Auth State
   currentUser: UserProfile;
   activeRole: UserRole;
+  isOwner: boolean;
+  isAdmin: boolean;
   isAuthenticated: boolean;
   switchUser: (userId: string) => void;
   toggleRoleMode: () => void;
+  switchRoleMode: (role: 'USER' | 'ADMIN' | 'OWNER') => void;
   allProfiles: UserProfile[];
 
   // Wallets
@@ -127,6 +130,10 @@ interface WalletContextType {
     telegramChatId?: string;
   }) => Promise<{ success: boolean; message: string; user?: UserProfile }>;
   adminUpdateUserCredentials: (userId: string, data: { password?: string; rpin?: string; telegram_chat_id?: string; telegram_id?: string; mobile?: string; email?: string; full_name?: string; status?: 'ACTIVE' | 'BANNED' }) => Promise<{ success: boolean; message: string; user?: UserProfile }>;
+  ownerCreateSubAdmin: (data: { full_name: string; mobile: string; email?: string; password?: string; rpin?: string; telegram_id?: string; telegram_chat_id?: string }) => Promise<{ success: boolean; message: string; admin?: any }>;
+  ownerUpdateSubAdmin: (id: string, data: { full_name?: string; mobile?: string; email?: string; password?: string; rpin?: string; status?: 'ACTIVE' | 'BANNED'; telegram_chat_id?: string }) => Promise<{ success: boolean; message: string; admin?: any }>;
+  ownerDeleteSubAdmin: (id: string) => Promise<{ success: boolean; message: string }>;
+  ownerFetchAdmins: () => Promise<UserProfile[]>;
   restoreFullDatabase: (jsonPayload: any) => Promise<{ success: boolean; message: string; usersCount?: number }>;
   refreshFromBackend: () => Promise<void>;
   generateSRTxnId: (suffix?: string) => string;
@@ -610,19 +617,49 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  const isOwner = activeRole === 'OWNER';
+  const isAdmin = activeRole === 'ADMIN' || activeRole === 'OWNER';
+
+  const switchRoleMode = (role: 'USER' | 'ADMIN' | 'OWNER') => {
+    if (role === 'OWNER') {
+      const ownerUser = profiles.find((p) => p.role === 'OWNER') || profiles.find((p) => p.id === 'owner-001' || p.user_custom_id === 'SR-OWNER-01' || p.id === 'user-964253');
+      const targetId = ownerUser ? ownerUser.id : 'owner-001';
+      setActiveUserId(targetId);
+      localStorage.setItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`, targetId);
+    } else if (role === 'ADMIN') {
+      const adminUser = profiles.find((p) => p.role === 'ADMIN') || profiles.find((p) => p.id === 'admin-001' || p.user_custom_id === 'SR-ADMIN-01');
+      const targetId = adminUser ? adminUser.id : 'admin-001';
+      setActiveUserId(targetId);
+      localStorage.setItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`, targetId);
+    } else {
+      const regularUser = profiles.find((p) => p.role === 'USER') || profiles.find((p) => p.id !== 'owner-001' && p.id !== 'admin-001');
+      const targetId = regularUser ? regularUser.id : 'user-001';
+      setActiveUserId(targetId);
+      localStorage.setItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`, targetId);
+    }
+  };
+
   const toggleRoleMode = () => {
-    if (activeRole === 'ADMIN') {
-      const firstNonAdmin = profiles.find((p) => p.role !== 'ADMIN');
-      if (firstNonAdmin) {
-        setActiveUserId(firstNonAdmin.id);
-        localStorage.setItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`, firstNonAdmin.id);
+    if (activeRole === 'OWNER' || activeRole === 'ADMIN') {
+      // Switch back to regular User
+      const regularUser = profiles.find((p) => p.role === 'USER') || profiles.find((p) => p.id !== 'owner-001' && p.id !== 'admin-001');
+      if (regularUser) {
+        setActiveUserId(regularUser.id);
+        localStorage.setItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`, regularUser.id);
       } else {
-        setActiveUserId(null);
-        localStorage.removeItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`);
+        setActiveUserId('user-001');
+        localStorage.setItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`, 'user-001');
       }
     } else {
-      setActiveUserId('admin-001'); // Switch to Admin
-      localStorage.setItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`, 'admin-001');
+      // From USER -> Switch to OWNER
+      const ownerUser = profiles.find((p) => p.role === 'OWNER') || profiles.find((p) => p.id === 'owner-001');
+      if (ownerUser) {
+        setActiveUserId(ownerUser.id);
+        localStorage.setItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`, ownerUser.id);
+      } else {
+        setActiveUserId('owner-001');
+        localStorage.setItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`, 'owner-001');
+      }
     }
   };
 
@@ -642,8 +679,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // Push to backend settings API and sync-state immediately
       fetch('/api/v1/admin/settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(merged),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': activeRole,
+        },
+        body: JSON.stringify({ ...merged, operator_role: activeRole }),
       }).catch(() => null);
 
       fetch('/api/v1/sync-state', {
@@ -3337,6 +3377,117 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   };
 
+  const ownerCreateSubAdmin = async (data: {
+    full_name: string;
+    mobile: string;
+    email?: string;
+    password?: string;
+    rpin?: string;
+    telegram_id?: string;
+    telegram_chat_id?: string;
+  }) => {
+    try {
+      const res = await fetch('/api/v1/owner/admins', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': activeRole,
+        },
+        body: JSON.stringify({ ...data, operator_role: activeRole }),
+      });
+      const result = await res.json();
+      if (res.ok && result.admin) {
+        setProfiles((prev) => {
+          const updated = [...prev, result.admin];
+          localStorage.setItem(`${LOCAL_STORAGE_KEY}_PROFILES`, JSON.stringify(updated));
+          return updated;
+        });
+        addAuditLog('OWNER_CREATE_ADMIN', `Created Sub-Admin: ${data.full_name} (${result.admin.user_custom_id})`);
+        return { success: true, message: result.message, admin: result.admin };
+      }
+      return { success: false, message: result.message || 'Failed to create sub-admin' };
+    } catch (e: any) {
+      return { success: false, message: e.message || 'Network error creating sub-admin' };
+    }
+  };
+
+  const ownerUpdateSubAdmin = async (
+    id: string,
+    data: {
+      full_name?: string;
+      mobile?: string;
+      email?: string;
+      password?: string;
+      rpin?: string;
+      status?: 'ACTIVE' | 'BANNED';
+      telegram_chat_id?: string;
+    }
+  ) => {
+    try {
+      const res = await fetch(`/api/v1/owner/admins/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': activeRole,
+        },
+        body: JSON.stringify({ ...data, operator_role: activeRole }),
+      });
+      const result = await res.json();
+      if (res.ok && result.admin) {
+        setProfiles((prev) => {
+          const updated = prev.map((p) => (p.id === id || p.user_custom_id === id ? { ...p, ...result.admin } : p));
+          localStorage.setItem(`${LOCAL_STORAGE_KEY}_PROFILES`, JSON.stringify(updated));
+          return updated;
+        });
+        addAuditLog('OWNER_UPDATE_ADMIN', `Updated Sub-Admin ${id}: ${data.status ? `Status -> ${data.status}` : 'Credentials updated'}`);
+        return { success: true, message: result.message, admin: result.admin };
+      }
+      return { success: false, message: result.message || 'Failed to update sub-admin' };
+    } catch (e: any) {
+      return { success: false, message: e.message || 'Network error updating sub-admin' };
+    }
+  };
+
+  const ownerDeleteSubAdmin = async (id: string) => {
+    try {
+      const res = await fetch(`/api/v1/owner/admins/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': activeRole,
+        },
+      });
+      const result = await res.json();
+      if (res.ok) {
+        setProfiles((prev) => {
+          const updated = prev.filter((p) => p.id !== id && p.user_custom_id !== id);
+          localStorage.setItem(`${LOCAL_STORAGE_KEY}_PROFILES`, JSON.stringify(updated));
+          return updated;
+        });
+        addAuditLog('OWNER_DELETE_ADMIN', `Permanently deleted Sub-Admin ${id}`);
+        return { success: true, message: result.message };
+      }
+      return { success: false, message: result.message || 'Failed to delete sub-admin' };
+    } catch (e: any) {
+      return { success: false, message: e.message || 'Network error deleting sub-admin' };
+    }
+  };
+
+  const ownerFetchAdmins = async (): Promise<UserProfile[]> => {
+    try {
+      const res = await fetch('/api/v1/owner/admins', {
+        headers: { 'x-user-role': activeRole },
+      });
+      const result = await res.json();
+      if (res.ok && Array.isArray(result.admins)) {
+        return result.admins;
+      }
+    } catch (e) {
+      console.warn('Failed to fetch admins from server:', e);
+    }
+    return profiles.filter((p) => p.role === 'ADMIN');
+  };
+
   const resetDemoData = () => {
     localStorage.removeItem(`${LOCAL_STORAGE_KEY}_PROFILES`);
     localStorage.removeItem(`${LOCAL_STORAGE_KEY}_WALLETS`);
@@ -3365,9 +3516,12 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     () => ({
       currentUser,
       activeRole,
+      isOwner,
+      isAdmin,
       isAuthenticated,
       switchUser,
       toggleRoleMode,
+      switchRoleMode,
       allProfiles: profiles,
       currentWallet,
       allWallets: wallets,
@@ -3424,6 +3578,10 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       resetRpinWithOtp,
       adminCreateUser,
       adminUpdateUserCredentials,
+      ownerCreateSubAdmin,
+      ownerUpdateSubAdmin,
+      ownerDeleteSubAdmin,
+      ownerFetchAdmins,
       restoreFullDatabase,
       refreshFromBackend,
       generateSRTxnId,
@@ -3434,6 +3592,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     [
       currentUser,
       activeRole,
+      isOwner,
+      isAdmin,
       isAuthenticated,
       profiles,
       currentWallet,

@@ -40,10 +40,17 @@ function WalletAppContent() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [activeTab]);
 
-  // Check for secret admin portal access via URL query or hash
+  // Check for secret owner or admin portal access via URL query or hash
   useEffect(() => {
     const checkAdminQuery = () => {
       const params = new URLSearchParams(window.location.search);
+      const isSecretOwnerRoute =
+        params.get('owner') === 'portal' ||
+        params.get('owner') === 'true' ||
+        params.get('route') === 'owner' ||
+        window.location.hash === '#owner' ||
+        window.location.hash === '#owner-portal';
+
       const isSecretAdminRoute =
         params.get('admin') === 'portal' ||
         params.get('admin') === 'true' ||
@@ -51,7 +58,9 @@ function WalletAppContent() {
         window.location.hash === '#admin' ||
         window.location.hash === '#admin-portal';
 
-      if (isSecretAdminRoute && activeRole !== 'ADMIN') {
+      if (isSecretOwnerRoute && activeRole !== 'OWNER') {
+        switchUser('owner-001');
+      } else if (isSecretAdminRoute && activeRole !== 'ADMIN' && activeRole !== 'OWNER') {
         switchUser('admin-001');
       }
     };
@@ -77,8 +86,8 @@ function WalletAppContent() {
     setIsAppUnlocked(false);
   };
 
-  // If Maintenance Mode is enabled and user is not ADMIN, immediately render MaintenanceScreen
-  if (settings.maintenance_mode_enabled && activeRole !== 'ADMIN') {
+  // If Maintenance Mode is enabled and user is not ADMIN or OWNER, immediately render MaintenanceScreen
+  if (settings.maintenance_mode_enabled && activeRole !== 'ADMIN' && activeRole !== 'OWNER') {
     return <MaintenanceScreen />;
   }
 
@@ -145,7 +154,7 @@ function WalletAppContent() {
           )}
 
           {/* Role Switch Banner Notice */}
-          {activeRole === 'ADMIN' ? (
+          {activeRole === 'ADMIN' || activeRole === 'OWNER' ? (
             <AdminPortal />
           ) : (
             <>

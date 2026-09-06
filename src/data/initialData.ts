@@ -117,18 +117,34 @@ export const INITIAL_PROFILES: UserProfile[] = [
     "rpin": "2121"
   },
   {
+    "id": "owner-001",
+    "user_custom_id": "SR-OWNER-01",
+    "full_name": "SR Gateway Master Owner",
+    "mobile": "7477661867",
+    "email": "sk190rihan@gmail.com",
+    "telegram_id": "6561010416",
+    "telegram_chat_id": "6561010416",
+    "role": "OWNER",
+    "status": "ACTIVE",
+    "referral_code": "OWNER001",
+    "created_at": "2026-07-01T00:00:00.000Z",
+    "updated_at": "2026-08-22T00:00:00.000Z",
+    "rpin": "7477"
+  },
+  {
     "id": "admin-001",
     "user_custom_id": "SR-ADMIN-01",
-    "full_name": "SR Gateway System Admin",
+    "full_name": "SR Gateway Staff Sub-Admin",
     "mobile": "+91 90000 00000",
-    "email": "",
+    "email": "staff@srgateway.in",
     "telegram_id": "",
     "role": "ADMIN",
     "status": "ACTIVE",
     "referral_code": "ADMIN001",
     "created_at": "2026-07-01T00:00:00.000Z",
     "updated_at": "2026-08-22T00:00:00.000Z",
-    "telegram_chat_id": ""
+    "telegram_chat_id": "",
+    "rpin": "1234"
   },
   {
     "id": "user-964253",
@@ -138,7 +154,7 @@ export const INITIAL_PROFILES: UserProfile[] = [
     "email": "sk190rihan@gmail.com",
     "telegram_id": "6561010416",
     "telegram_chat_id": "6561010416",
-    "role": "USER",
+    "role": "OWNER",
     "status": "ACTIVE",
     "referral_code": "SRREF50963",
     "created_at": "2026-08-14T17:19:24.253Z",
@@ -159,6 +175,22 @@ export const INITIAL_PROFILES: UserProfile[] = [
 ];
 
 export const INITIAL_WALLETS: Record<string, Wallet> = {
+  "SR-OWNER-01": {
+    "id": "w-owner",
+    "user_id": "SR-OWNER-01",
+    "available_balance": 5000000,
+    "locked_balance": 0,
+    "created_at": "2026-05-18T12:51:02.422Z",
+    "updated_at": "2026-08-16T12:51:02.422Z"
+  },
+  "owner-001": {
+    "id": "w-owner",
+    "user_id": "owner-001",
+    "available_balance": 5000000,
+    "locked_balance": 0,
+    "created_at": "2026-05-18T12:51:02.422Z",
+    "updated_at": "2026-08-16T12:51:02.422Z"
+  },
   "SR-ADMIN-01": {
     "id": "w-admin",
     "user_id": "SR-ADMIN-01",

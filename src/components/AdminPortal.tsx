@@ -46,12 +46,25 @@ import {
   ArrowRightLeft,
   ArrowDownLeft,
   Filter,
+  Crown,
+  UserCog,
+  UserCheck,
+  UserX,
+  ShieldOff,
+  X,
 } from 'lucide-react';
 import { UserProfile, DepositRequest, WithdrawalRequest, Wallet, AppSettings } from '../types';
 
 export const AdminPortal: React.FC = () => {
   const {
     currentUser,
+    activeRole,
+    isOwner,
+    isAdmin,
+    ownerCreateSubAdmin,
+    ownerUpdateSubAdmin,
+    ownerDeleteSubAdmin,
+    ownerFetchAdmins,
     allProfiles,
     allWallets,
     deposits,
@@ -101,9 +114,162 @@ export const AdminPortal: React.FC = () => {
   } | null>(null);
   const [copiedAllCreds, setCopiedAllCreds] = useState(false);
 
+  const isMasterOwner = currentUser.role === 'OWNER' || activeRole === 'OWNER';
+  const isSubAdmin = !isMasterOwner;
+
   const [activeAdminTab, setActiveAdminTab] = useState<
-    'DASHBOARD' | 'USERS' | 'DEPOSITS' | 'WITHDRAWALS' | 'TRANSACTIONS' | 'SETTINGS' | 'BACKUP' | 'AUDIT_LOGS'
+    'DASHBOARD' | 'USERS' | 'SUB_ADMINS' | 'DEPOSITS' | 'WITHDRAWALS' | 'TRANSACTIONS' | 'SETTINGS' | 'BACKUP' | 'AUDIT_LOGS'
   >('DASHBOARD');
+
+  // Sub-Admin Management State (Owner Only)
+  const [subAdminList, setSubAdminList] = useState<UserProfile[]>([]);
+  const [isLoadingSubAdmins, setIsLoadingSubAdmins] = useState<boolean>(false);
+  const [isAddSubAdminModalOpen, setIsAddSubAdminModalOpen] = useState<boolean>(false);
+  const [newAdminFullName, setNewAdminFullName] = useState<string>('');
+  const [newAdminMobile, setNewAdminMobile] = useState<string>('');
+  const [newAdminEmail, setNewAdminEmail] = useState<string>('');
+  const [newAdminPassword, setNewAdminPassword] = useState<string>('Staff@123');
+  const [newAdminRpin, setNewAdminRpin] = useState<string>('1234');
+  const [newAdminTelegramChatId, setNewAdminTelegramChatId] = useState<string>('');
+  const [isSubmittingAdmin, setIsSubmittingAdmin] = useState<boolean>(false);
+  const [addSubAdminError, setAddSubAdminError] = useState<string | null>(null);
+
+  // Edit Sub-Admin State
+  const [selectedAdminForEdit, setSelectedAdminForEdit] = useState<UserProfile | null>(null);
+  const [editAdminForm, setEditAdminForm] = useState<{
+    full_name: string;
+    mobile: string;
+    email: string;
+    password: string;
+    rpin: string;
+    status: 'ACTIVE' | 'BANNED';
+    telegram_chat_id: string;
+  }>({
+    full_name: '',
+    mobile: '',
+    email: '',
+    password: '',
+    rpin: '',
+    status: 'ACTIVE',
+    telegram_chat_id: '',
+  });
+  const [isSavingAdminEdit, setIsSavingAdminEdit] = useState<boolean>(false);
+  const [showAdminPasswords, setShowAdminPasswords] = useState<Record<string, boolean>>({});
+  const [showAdminRpins, setShowAdminRpins] = useState<Record<string, boolean>>({});
+
+  const fetchSubAdmins = useCallback(async () => {
+    setIsLoadingSubAdmins(true);
+    try {
+      const admins = await ownerFetchAdmins();
+      setSubAdminList(admins);
+    } catch (e) {
+      console.warn('Failed to load sub-admins', e);
+    } finally {
+      setIsLoadingSubAdmins(false);
+    }
+  }, [ownerFetchAdmins]);
+
+  useEffect(() => {
+    fetchSubAdmins();
+  }, [fetchSubAdmins, allProfiles]);
+
+  const handleCreateSubAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAdminFullName.trim() || !newAdminMobile.trim()) {
+      setAddSubAdminError('Please provide Full Name and Mobile Number.');
+      return;
+    }
+    setIsSubmittingAdmin(true);
+    setAddSubAdminError(null);
+    try {
+      const res = await ownerCreateSubAdmin({
+        full_name: newAdminFullName.trim(),
+        mobile: newAdminMobile.trim(),
+        email: newAdminEmail.trim() || undefined,
+        password: newAdminPassword.trim() || 'Staff@123',
+        rpin: newAdminRpin.trim() || '1234',
+        telegram_chat_id: newAdminTelegramChatId.trim() || undefined,
+      });
+      if (res.success) {
+        showAlert(res.message || '✅ Sub-Admin created successfully!');
+        setIsAddSubAdminModalOpen(false);
+        setNewAdminFullName('');
+        setNewAdminMobile('');
+        setNewAdminEmail('');
+        setNewAdminPassword('Staff@123');
+        setNewAdminRpin('1234');
+        setNewAdminTelegramChatId('');
+        await fetchSubAdmins();
+      } else {
+        setAddSubAdminError(res.message);
+      }
+    } catch (err: any) {
+      setAddSubAdminError(err?.message || 'Failed to create sub-admin');
+    } finally {
+      setIsSubmittingAdmin(false);
+    }
+  };
+
+  const handleOpenEditSubAdmin = (admin: UserProfile) => {
+    setSelectedAdminForEdit(admin);
+    setEditAdminForm({
+      full_name: admin.full_name || '',
+      mobile: admin.mobile || '',
+      email: admin.email || '',
+      password: admin.password || '',
+      rpin: admin.rpin || '1234',
+      status: admin.status || 'ACTIVE',
+      telegram_chat_id: admin.telegram_chat_id || '',
+    });
+  };
+
+  const handleSaveSubAdminEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAdminForEdit) return;
+    setIsSavingAdminEdit(true);
+    try {
+      const res = await ownerUpdateSubAdmin(selectedAdminForEdit.id, editAdminForm);
+      if (res.success) {
+        showAlert(res.message || '✅ Sub-Admin updated successfully!');
+        setSelectedAdminForEdit(null);
+        await fetchSubAdmins();
+      } else {
+        alert('Failed: ' + res.message);
+      }
+    } catch (e: any) {
+      alert('Error updating sub-admin: ' + e?.message);
+    } finally {
+      setIsSavingAdminEdit(false);
+    }
+  };
+
+  const handleToggleSubAdminBan = async (admin: UserProfile) => {
+    const newStatus = admin.status === 'BANNED' ? 'ACTIVE' : 'BANNED';
+    const actionLabel = newStatus === 'BANNED' ? 'BAN' : 'UNBAN';
+    if (!window.confirm(`Are you sure you want to ${actionLabel} Sub-Admin ${admin.full_name} (${admin.user_custom_id})?`)) {
+      return;
+    }
+    const res = await ownerUpdateSubAdmin(admin.id, { status: newStatus });
+    if (res.success) {
+      showAlert(`✅ Sub-Admin ${admin.full_name} is now ${newStatus}!`);
+      await fetchSubAdmins();
+    } else {
+      alert('Failed: ' + res.message);
+    }
+  };
+
+  const handleDeleteSubAdmin = async (admin: UserProfile) => {
+    if (!window.confirm(`⚠️ PERMANENT ACTION:\nAre you sure you want to permanently REMOVE Sub-Admin ${admin.full_name} (${admin.user_custom_id})?\nTheir access to the staff portal will be revoked immediately.`)) {
+      return;
+    }
+    const res = await ownerDeleteSubAdmin(admin.id);
+    if (res.success) {
+      showAlert(`✅ Sub-Admin ${admin.full_name} removed successfully!`);
+      await fetchSubAdmins();
+    } else {
+      alert('Failed: ' + res.message);
+    }
+  };
 
   // Search & Filter state
   const [userSearch, setUserSearch] = useState<string>('');
@@ -853,19 +1019,23 @@ export const AdminPortal: React.FC = () => {
     reader.readAsText(file);
   };
 
-  // If not authenticated with Master Password, render dedicated Gatekeeper Screen
+  // If not authenticated with Security Password, render dedicated Gatekeeper Screen
   if (!isPassAuthed) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center p-4">
-        <div className="bg-slate-900 border border-rose-500/40 rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl space-y-6 text-center text-white relative">
-          <div className="w-16 h-16 rounded-3xl bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center mx-auto shadow-lg shadow-rose-500/20">
-            <Lock className="h-8 w-8" />
+        <div className={`bg-slate-900 border ${isMasterOwner ? 'border-amber-500/40' : 'border-indigo-500/40'} rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl space-y-6 text-center text-white relative`}>
+          <div className={`w-16 h-16 rounded-3xl ${isMasterOwner ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' : 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30'} border flex items-center justify-center mx-auto shadow-lg`}>
+            {isMasterOwner ? <Crown className="h-8 w-8" /> : <ShieldCheck className="h-8 w-8" />}
           </div>
 
           <div className="space-y-1.5">
-            <h3 className="text-2xl font-black text-white tracking-tight">Super Admin Security Gate</h3>
+            <h3 className="text-2xl font-black text-white tracking-tight">
+              {isMasterOwner ? '👑 Master Owner Security Gate' : '🛡️ Sub-Admin Staff Security Gate'}
+            </h3>
             <p className="text-xs text-slate-400">
-              Enter the authorized Master Security Password to access Admin Portal controls & ledger management.
+              {isMasterOwner
+                ? 'Enter the Master Owner Security Password to unlock full configuration, sub-admin management & gateway security.'
+                : 'Enter your authorized Sub-Admin Staff Password to access verification desk & global transaction tracking.'}
             </p>
           </div>
 
@@ -878,17 +1048,17 @@ export const AdminPortal: React.FC = () => {
           <form onSubmit={handleAdminLogin} className="space-y-4 text-left">
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1.5 font-mono">
-                Master Security Password
+                {isMasterOwner ? 'Master Owner Password' : 'Staff Login Password'}
               </label>
               <input
                 type="password"
-                placeholder="Enter admin password..."
+                placeholder={isMasterOwner ? 'Enter master owner password...' : 'Enter sub-admin staff password...'}
                 value={adminPassInput}
                 onChange={(e) => {
                   setAdminPassInput(e.target.value);
                   setPassError(null);
                 }}
-                className="w-full bg-slate-950 border border-slate-800 focus:border-rose-500 rounded-2xl px-4 py-3 text-white font-mono text-sm focus:outline-none"
+                className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-2xl px-4 py-3 text-white font-mono text-sm focus:outline-none"
                 autoFocus
                 required
               />
@@ -896,15 +1066,19 @@ export const AdminPortal: React.FC = () => {
 
             <button
               type="submit"
-              className="w-full py-3.5 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition shadow-xl shadow-rose-600/30 active:scale-95 flex items-center justify-center gap-2"
+              className={`w-full py-3.5 ${
+                isMasterOwner
+                  ? 'bg-gradient-to-r from-amber-600 to-yellow-500 hover:from-amber-500 hover:to-yellow-400 text-slate-950'
+                  : 'bg-gradient-to-r from-indigo-600 to-rose-600 hover:from-indigo-500 hover:to-rose-500 text-white'
+              } font-black text-xs uppercase tracking-wider rounded-2xl transition shadow-xl active:scale-95 flex items-center justify-center gap-2`}
             >
               <ShieldCheck className="h-4 w-4" />
-              <span>Unlock Admin Portal ⚡</span>
+              <span>{isMasterOwner ? 'Unlock Owner Panel 👑' : 'Unlock Staff Desk ⚡'}</span>
             </button>
           </form>
 
           <div className="pt-2 border-t border-slate-800/80 text-[11px] text-slate-500 font-mono">
-            Protected by SR GATEWAY Master Key Protocol
+            {isMasterOwner ? 'Master Access Protocol (SR-OWNER-01)' : 'Authorized Staff Protocol (SR-ADMIN)'}
           </div>
         </div>
       </div>
@@ -914,27 +1088,53 @@ export const AdminPortal: React.FC = () => {
   return (
     <div className="space-y-6 text-slate-100">
       {/* Admin Top Header Banner */}
-      <div className="rounded-[2rem] bg-gradient-to-r from-rose-950 via-slate-900 to-indigo-950 border border-rose-500/30 p-6 sm:p-8 shadow-2xl">
+      <div
+        className={`rounded-[2rem] border p-6 sm:p-8 shadow-2xl ${
+          isMasterOwner
+            ? 'bg-gradient-to-r from-amber-950/60 via-slate-900 to-yellow-950/40 border-amber-500/30'
+            : 'bg-gradient-to-r from-slate-950 via-indigo-950/40 to-slate-900 border-indigo-500/30'
+        }`}
+      >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="p-1.5 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                <ShieldCheck className="h-4 w-4" />
+              <span
+                className={`p-1.5 rounded-xl border ${
+                  isMasterOwner
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                    : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
+                }`}
+              >
+                {isMasterOwner ? <Crown className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
               </span>
-              <span className="text-xs font-bold uppercase tracking-wider text-rose-300">
-                SR GATEWAY Super Admin Control Panel
+              <span
+                className={`text-xs font-bold uppercase tracking-wider ${
+                  isMasterOwner ? 'text-amber-300' : 'text-indigo-300'
+                }`}
+              >
+                {isMasterOwner ? 'SR GATEWAY MASTER OWNER CONTROL PANEL' : 'SR GATEWAY SUB-ADMIN STAFF DESK'}
               </span>
             </div>
-            <h2 className="text-2xl font-black text-white">Administrator Dashboard & Controls</h2>
+            <h2 className="text-2xl font-black text-white">
+              {isMasterOwner ? 'Master Owner Dashboard & Gateway Governance' : 'Sub-Admin Operations Desk'}
+            </h2>
             <p className="text-xs text-slate-300 mt-1">
-              Manual deposit/withdrawal verification, atomic balance adjustments, settings toggles & audit trail.
+              {isMasterOwner
+                ? 'Supreme control • Sub-Admin & staff operations desk • Gateway charges & UPI safety • Master ledger audit trail.'
+                : 'Deposit & withdrawal verification • User assistance & balance operations • Fixed gateway rates view • Global transaction tracking.'}
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="bg-rose-500/20 border border-rose-500/30 text-rose-300 px-3 py-1.5 rounded-full text-xs font-mono font-bold flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
-              <span>Admin Mode Active</span>
+            <span
+              className={`px-3 py-1.5 rounded-full text-xs font-mono font-bold flex items-center gap-1.5 border ${
+                isMasterOwner
+                  ? 'bg-amber-500/20 border-amber-500/30 text-amber-300'
+                  : 'bg-indigo-500/20 border-indigo-500/30 text-indigo-300'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${isMasterOwner ? 'bg-amber-400' : 'bg-indigo-400'} animate-pulse`} />
+              <span>{isMasterOwner ? '👑 Master Owner Active' : '🛡️ Sub-Admin Staff Active'}</span>
             </span>
             <button
               onClick={handleAdminLock}
@@ -942,21 +1142,22 @@ export const AdminPortal: React.FC = () => {
               title="Lock Admin Session"
             >
               <Lock className="h-3 w-3 text-rose-400" />
-              <span>Lock Admin</span>
+              <span>Lock Panel</span>
             </button>
           </div>
         </div>
 
         {/* Admin Navigation Tabs */}
-        <div className="flex flex-wrap gap-2 mt-6 pt-6 border-t border-rose-500/20">
+        <div className="flex flex-wrap gap-2 mt-6 pt-6 border-t border-slate-800/80">
           {[
             { id: 'DASHBOARD', label: 'Overview', icon: ShieldCheck },
             { id: 'USERS', label: `Users (${totalUsersCount})`, icon: Users },
+            ...(isMasterOwner ? [{ id: 'SUB_ADMINS', label: `Manage Sub-Admins (${subAdminList.length})`, icon: UserCog, badge: subAdminList.length }] : []),
             { id: 'DEPOSITS', label: `Deposits (${pendingDeposits.length})`, icon: PlusCircle, badge: pendingDeposits.length },
             { id: 'WITHDRAWALS', label: `Withdrawals (${pendingWithdrawals.length})`, icon: ArrowUpRight, badge: pendingWithdrawals.length },
-            { id: 'TRANSACTIONS', label: 'Master Ledger', icon: FileText },
-            { id: 'SETTINGS', label: 'Extra Controls', icon: Settings },
-            { id: 'BACKUP', label: 'Backup & Restore', icon: Database },
+            { id: 'TRANSACTIONS', label: 'Global Transactions (Master Ledger)', icon: FileText },
+            { id: 'SETTINGS', label: isSubAdmin ? 'Gateway Charges & UPI (Fixed View)' : 'Gateway Charges & Controls', icon: Settings },
+            ...(isMasterOwner ? [{ id: 'BACKUP', label: 'Backup & Restore', icon: Database }] : []),
             { id: 'AUDIT_LOGS', label: 'Audit Logs', icon: ShieldAlert },
           ].map((tab) => {
             const Icon = tab.icon;
@@ -967,7 +1168,9 @@ export const AdminPortal: React.FC = () => {
                 onClick={() => setActiveAdminTab(tab.id as any)}
                 className={`px-4 py-2.5 rounded-2xl font-black text-xs flex items-center gap-2 transition active:scale-95 ${
                   isActive
-                    ? 'bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-lg shadow-rose-600/20'
+                    ? isMasterOwner
+                      ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 shadow-lg shadow-amber-500/20'
+                      : 'bg-gradient-to-r from-indigo-600 to-rose-600 text-white shadow-lg shadow-indigo-600/20'
                     : 'bg-slate-950/80 hover:bg-slate-800 text-slate-300 border border-slate-800'
                 }`}
               >
@@ -1003,14 +1206,21 @@ export const AdminPortal: React.FC = () => {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => toggleMaintenanceMode(false)}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold font-mono transition shrink-0 shadow-lg flex items-center gap-1.5"
-          >
-            <CheckCircle2 className="h-4 w-4" />
-            <span>Turn OFF Maintenance Mode</span>
-          </button>
+          {isMasterOwner ? (
+            <button
+              type="button"
+              onClick={() => toggleMaintenanceMode(false)}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold font-mono transition shrink-0 shadow-lg flex items-center gap-1.5 cursor-pointer"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              <span>Turn OFF Maintenance Mode</span>
+            </button>
+          ) : (
+            <div className="px-3.5 py-2 bg-slate-950/60 border border-amber-500/30 rounded-xl text-amber-300 text-xs font-mono font-bold flex items-center gap-1.5 shrink-0">
+              <Lock className="h-3.5 w-3.5 text-amber-400" />
+              <span>Owner Access Only (Sub-Admin Cannot Change)</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -1123,96 +1333,104 @@ export const AdminPortal: React.FC = () => {
             </div>
           )}
 
-          {/* Master Admin Danger Controls Bar */}
-          <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-amber-500/30 rounded-2xl p-5 shadow-lg space-y-4">
-            <div className="flex items-center gap-2">
-              <ShieldAlert className="h-5 w-5 text-amber-400" />
-              <div>
-                <h4 className="text-sm font-extrabold text-white">System Maintenance & Global Reset Controls</h4>
-                <p className="text-[11px] text-slate-400">
-                  Execute master actions across all registered user accounts with one click
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Button 1: Reset All Balances */}
-              <div className="bg-amber-950/20 border border-amber-500/30 rounded-xl p-4 flex flex-col justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 text-amber-400" />
-                    <span className="font-extrabold text-xs text-amber-300">Clear All User Balances</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Instantly sets every user's available and locked balance to <strong className="text-amber-300">₹0.00</strong>. Master Admin balance remains protected.
+          {/* Master Admin Danger Controls Bar (Master Owner Only) */}
+          {isMasterOwner && (
+            <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-amber-500/30 rounded-2xl p-5 shadow-lg space-y-4">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5 text-amber-400" />
+                <div>
+                  <h4 className="text-sm font-extrabold text-white">System Maintenance & Global Reset Controls</h4>
+                  <p className="text-[11px] text-slate-400">
+                    Execute master actions across all registered user accounts with one click
                   </p>
                 </div>
-                <button
-                  id="admin-reset-all-balances-btn"
-                  onClick={() => {
-                    setResetConfirmText('');
-                    setIsResetBalancesModalOpen(true);
-                  }}
-                  className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-2"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  <span>Clear All User Balance (0 RS)</span>
-                </button>
               </div>
 
-              {/* Button 2: Wipe All User Data */}
-              <div className="bg-rose-950/20 border border-rose-500/30 rounded-xl p-4 flex flex-col justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Trash2 className="h-4 w-4 text-rose-400" />
-                    <span className="font-extrabold text-xs text-rose-300">Wipe All Registered Users</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Button 1: Reset All Balances */}
+                <div className="bg-amber-950/20 border border-amber-500/30 rounded-xl p-4 flex flex-col justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-amber-400" />
+                      <span className="font-extrabold text-xs text-amber-300">Clear All User Balances</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Instantly sets every user's available and locked balance to <strong className="text-amber-300">₹0.00</strong>. Master Admin balance remains protected.
+                    </p>
                   </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Permanently deletes all registered user profiles and records. <strong className="text-rose-300">Users can then re-register</strong> with the same mobile, email, or chat ID.
-                  </p>
+                  <button
+                    id="admin-reset-all-balances-btn"
+                    onClick={() => {
+                      setResetConfirmText('');
+                      setIsResetBalancesModalOpen(true);
+                    }}
+                    className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    <span>Clear All User Balance (0 RS)</span>
+                  </button>
                 </div>
-                <button
-                  id="admin-wipe-all-users-btn"
-                  onClick={() => {
-                    setWipeConfirmText('');
-                    setIsWipeUsersModalOpen(true);
-                  }}
-                  className="w-full py-2.5 px-4 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-2"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  <span>Factory Wipe All User Data</span>
-                </button>
+
+                {/* Button 2: Wipe All User Data */}
+                <div className="bg-rose-950/20 border border-rose-500/30 rounded-xl p-4 flex flex-col justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Trash2 className="h-4 w-4 text-rose-400" />
+                      <span className="font-extrabold text-xs text-rose-300">Wipe All Registered Users</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Permanently deletes all registered user profiles and records. <strong className="text-rose-300">Users can then re-register</strong> with the same mobile, email, or chat ID.
+                    </p>
+                  </div>
+                  <button
+                    id="admin-wipe-all-users-btn"
+                    onClick={() => {
+                      setWipeConfirmText('');
+                      setIsWipeUsersModalOpen(true);
+                    }}
+                    className="w-full py-2.5 px-4 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Factory Wipe All User Data</span>
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
             <div>
               <h3 className="text-lg font-black text-white">Registered Users Directory</h3>
-              <p className="text-xs text-slate-400">Total Registered: {allProfiles.filter(p => p.role !== 'ADMIN').length} Users • Add balance, cut balance, or suspend user accounts</p>
+              <p className="text-xs text-slate-400">
+                {isMasterOwner
+                  ? `Total Registered: ${allProfiles.filter(p => p.role !== 'ADMIN').length} Users • Add balance, cut balance, or manage accounts`
+                  : `Total Registered: ${allProfiles.filter(p => p.role !== 'ADMIN').length} Users • View user details, ban or unban accounts (Owner authority required for balance/quota changes)`}
+              </p>
             </div>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <button
-                type="button"
-                id="admin-open-add-user-modal-btn"
-                onClick={() => {
-                  setNewUserName('');
-                  setNewUserMobile('');
-                  setNewUserEmail('');
-                  setNewUserPassword('123456');
-                  setNewUserRpin('7477');
-                  setNewUserBalance('0');
-                  setNewUserChatId('');
-                  setAddUserError(null);
-                  setCreatedUserResult(null);
-                  setIsAddUserModalOpen(true);
-                }}
-                className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs rounded-xl shadow-lg transition active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer"
-              >
-                <PlusCircle className="h-4 w-4" />
-                <span>+ Add / Create User</span>
-              </button>
+              {isMasterOwner && (
+                <button
+                  type="button"
+                  id="admin-open-add-user-modal-btn"
+                  onClick={() => {
+                    setNewUserName('');
+                    setNewUserMobile('');
+                    setNewUserEmail('');
+                    setNewUserPassword('123456');
+                    setNewUserRpin('7477');
+                    setNewUserBalance('0');
+                    setNewUserChatId('');
+                    setAddUserError(null);
+                    setCreatedUserResult(null);
+                    setIsAddUserModalOpen(true);
+                  }}
+                  className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs rounded-xl shadow-lg transition active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer"
+                >
+                  <PlusCircle className="h-4 w-4" />
+                  <span>+ Add / Create User</span>
+                </button>
+              )}
 
               <div className="relative sm:w-72">
                 <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
@@ -1368,91 +1586,98 @@ export const AdminPortal: React.FC = () => {
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0 flex-wrap sm:flex-nowrap">
-                        {/* Edit User Credentials */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedUserForModal(user);
-                            setCredsForm({
-                              full_name: user.full_name || '',
-                              password: user.password || '',
-                              rpin: user.rpin || '1234',
-                              telegram_chat_id: user.telegram_chat_id || '',
-                              telegram_id: user.telegram_id || '',
-                              mobile: user.mobile || '',
-                              email: user.email || '',
-                              status: user.status,
-                            });
-                            setAdminActionModal('EDIT_CREDS');
-                          }}
-                          className="px-2.5 py-1.5 bg-violet-600/30 hover:bg-violet-600/60 text-violet-200 border border-violet-500/40 font-bold rounded-xl text-xs flex items-center gap-1 transition active:scale-95 shadow-md"
-                          title="View & Edit User Password, R-PIN & Telegram Chat ID"
-                        >
-                          <Edit3 className="h-3.5 w-3.5" />
-                          <span>Credentials</span>
-                        </button>
+                        {isMasterOwner && (
+                          <>
+                            {/* Edit User Credentials */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedUserForModal(user);
+                                setCredsForm({
+                                  full_name: user.full_name || '',
+                                  password: user.password || '',
+                                  rpin: user.rpin || '1234',
+                                  telegram_chat_id: user.telegram_chat_id || '',
+                                  telegram_id: user.telegram_id || '',
+                                  mobile: user.mobile || '',
+                                  email: user.email || '',
+                                  status: user.status,
+                                });
+                                setAdminActionModal('EDIT_CREDS');
+                              }}
+                              className="px-2.5 py-1.5 bg-violet-600/30 hover:bg-violet-600/60 text-violet-200 border border-violet-500/40 font-bold rounded-xl text-xs flex items-center gap-1 transition active:scale-95 shadow-md cursor-pointer"
+                              title="View & Edit User Password, R-PIN & Telegram Chat ID"
+                            >
+                              <Edit3 className="h-3.5 w-3.5" />
+                              <span>Credentials</span>
+                            </button>
 
-                        <button
-                          onClick={() => {
-                            setSelectedUserForModal(user);
-                            setAdminActionModal('ADD_BAL');
-                          }}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1 transition active:scale-95 shadow-md"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                          <span>Add</span>
-                        </button>
+                            <button
+                              onClick={() => {
+                                setSelectedUserForModal(user);
+                                setAdminActionModal('ADD_BAL');
+                              }}
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1 transition active:scale-95 shadow-md cursor-pointer"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              <span>Add</span>
+                            </button>
 
-                        <button
-                          onClick={() => {
-                            setSelectedUserForModal(user);
-                            setAdminActionModal('CUT_BAL');
-                          }}
-                          className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1 transition active:scale-95 shadow-md"
-                        >
-                          <Minus className="h-3.5 w-3.5" />
-                          <span>Cut</span>
-                        </button>
+                            <button
+                              onClick={() => {
+                                setSelectedUserForModal(user);
+                                setAdminActionModal('CUT_BAL');
+                              }}
+                              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1 transition active:scale-95 shadow-md cursor-pointer"
+                            >
+                              <Minus className="h-3.5 w-3.5" />
+                              <span>Cut</span>
+                            </button>
 
-                        {/* Set Daily HTTPS Request Limit */}
-                        <button
-                          onClick={() => {
-                            setSelectedUserForModal(user);
-                            setUserQuotaLimitInput(user.daily_api_requests_limit || 10);
-                            setAdminActionModal('SET_LIMIT');
-                          }}
-                          className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs flex items-center gap-1 transition active:scale-95 shadow-md"
-                          title="Change Daily HTTPS Request Limit"
-                        >
-                          <Gauge className="h-3.5 w-3.5" />
-                          <span>Limit ({user.daily_api_requests_limit || 10})</span>
-                        </button>
+                            {/* Set Daily HTTPS Request Limit */}
+                            <button
+                              onClick={() => {
+                                setSelectedUserForModal(user);
+                                setUserQuotaLimitInput(user.daily_api_requests_limit || 10);
+                                setAdminActionModal('SET_LIMIT');
+                              }}
+                              className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs flex items-center gap-1 transition active:scale-95 shadow-md cursor-pointer"
+                              title="Change Daily HTTPS Request Limit"
+                            >
+                              <Gauge className="h-3.5 w-3.5" />
+                              <span>Limit ({user.daily_api_requests_limit || 10})</span>
+                            </button>
 
-                        {/* Instant Quota Reset / Unlock */}
-                        <button
-                          onClick={() => handleAdminResetQuotaCount(user)}
-                          className="px-2 py-1.5 bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-300 border border-cyan-500/40 font-bold rounded-xl text-xs flex items-center gap-1 transition active:scale-95"
-                          title="Reset Today's Request Counter to 0 (Instant Unlock)"
-                        >
-                          <RotateCcw className="h-3 w-3" />
-                          <span>Reset</span>
-                        </button>
+                            {/* Instant Quota Reset / Unlock */}
+                            <button
+                              onClick={() => handleAdminResetQuotaCount(user)}
+                              className="px-2 py-1.5 bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-300 border border-cyan-500/40 font-bold rounded-xl text-xs flex items-center gap-1 transition active:scale-95 cursor-pointer"
+                              title="Reset Today's Request Counter to 0 (Instant Unlock)"
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                              <span>Reset</span>
+                            </button>
+                          </>
+                        )}
 
+                        {/* Ban / Unban User Account (Sub-Admin & Owner both have access) */}
                         {user.status === 'ACTIVE' ? (
                           <button
-                            onClick={() => banUser(user.id, 'Admin manual account restriction')}
-                            className="p-1.5 bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 rounded-xl transition border border-rose-500/30"
-                            title="Ban User Account"
+                            onClick={() => banUser(user.id, `${isSubAdmin ? 'Sub-Admin Staff' : 'Master Owner'} manual account restriction`)}
+                            className="p-1.5 bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 rounded-xl transition border border-rose-500/30 cursor-pointer flex items-center gap-1 text-xs font-bold px-2.5"
+                            title="Ban / Suspend User Account"
                           >
-                            <Ban className="h-4 w-4" />
+                            <Ban className="h-3.5 w-3.5" />
+                            <span>Ban User</span>
                           </button>
                         ) : (
                           <button
                             onClick={() => unbanUser(user.id)}
-                            className="p-1.5 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 rounded-xl transition border border-emerald-500/30"
-                            title="Unban User Account"
+                            className="p-1.5 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 rounded-xl transition border border-emerald-500/30 cursor-pointer flex items-center gap-1 text-xs font-bold px-2.5"
+                            title="Unban / Restore User Account"
                           >
-                            <RotateCcw className="h-4 w-4" />
+                            <RotateCcw className="h-3.5 w-3.5" />
+                            <span>Unban User</span>
                           </button>
                         )}
                       </div>
@@ -1541,22 +1766,29 @@ export const AdminPortal: React.FC = () => {
                   </div>
 
                   {dep.status === 'PENDING' ? (
-                    <div className="flex gap-2 justify-end pt-2">
-                      <button
-                        onClick={() => {
-                          setRejectDepositId(dep.id);
-                        }}
-                        className="px-4 py-2 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 rounded-xl font-bold transition"
-                      >
-                        Reject
-                      </button>
-                      <button
-                        onClick={() => handleDepositApprove(dep.id)}
-                        className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl transition shadow-lg shadow-emerald-500/20 active:scale-95"
-                      >
-                        Approve & Credit Wallet ⚡
-                      </button>
-                    </div>
+                    isMasterOwner ? (
+                      <div className="flex gap-2 justify-end pt-2">
+                        <button
+                          onClick={() => {
+                            setRejectDepositId(dep.id);
+                          }}
+                          className="px-4 py-2 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 rounded-xl font-bold transition cursor-pointer"
+                        >
+                          Reject
+                        </button>
+                        <button
+                          onClick={() => handleDepositApprove(dep.id)}
+                          className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl transition shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer"
+                        >
+                          Approve & Credit Wallet ⚡
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 py-2 px-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-300 text-xs font-semibold justify-end mt-2">
+                        <Lock className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                        <span>Master Owner Approval Only (Sub-Admin Read-Only Verification Mode)</span>
+                      </div>
+                    )
                   ) : (
                     <div className="text-right text-[11px] font-bold">
                       Status:{' '}
@@ -1631,30 +1863,37 @@ export const AdminPortal: React.FC = () => {
                   </div>
 
                   {wd.status === 'PENDING' || wd.status === 'APPROVED' ? (
-                    <div className="flex flex-wrap gap-2 justify-end pt-2">
-                      <button
-                        onClick={() => setRejectWithdrawalId(wd.id)}
-                        className="px-3.5 py-2 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 rounded-xl font-bold transition"
-                      >
-                        Reject
-                      </button>
-
-                      {wd.status === 'PENDING' && (
+                    isMasterOwner ? (
+                      <div className="flex flex-wrap gap-2 justify-end pt-2">
                         <button
-                          onClick={() => handleWithdrawalApprove(wd.id)}
-                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-xl transition shadow-md"
+                          onClick={() => setRejectWithdrawalId(wd.id)}
+                          className="px-3.5 py-2 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 rounded-xl font-bold transition cursor-pointer"
                         >
-                          Authorize Payout
+                          Reject
                         </button>
-                      )}
 
-                      <button
-                        onClick={() => setMarkPaidWithdrawalId(wd.id)}
-                        className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl transition shadow-lg shadow-emerald-500/20 active:scale-95"
-                      >
-                        Mark Paid (Enter UTR) 💸
-                      </button>
-                    </div>
+                        {wd.status === 'PENDING' && (
+                          <button
+                            onClick={() => handleWithdrawalApprove(wd.id)}
+                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-xl transition shadow-md cursor-pointer"
+                          >
+                            Authorize Payout
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => setMarkPaidWithdrawalId(wd.id)}
+                          className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl transition shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer"
+                        >
+                          Mark Paid (Enter UTR) 💸
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 py-2 px-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-300 text-xs font-semibold justify-end mt-2">
+                        <Lock className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                        <span>Master Owner Payout Authorization Required (Sub-Admin Read-Only Mode)</span>
+                      </div>
+                    )
                   ) : (
                     <div className="text-right text-[11px] font-bold">
                       Status:{' '}
@@ -2097,6 +2336,585 @@ export const AdminPortal: React.FC = () => {
         );
       })()}
 
+      {/* TAB: SUB-ADMIN & STAFF MANAGEMENT (OWNER ONLY) */}
+      {activeAdminTab === 'SUB_ADMINS' && isMasterOwner && (
+        <div className="space-y-6">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-amber-950/40 via-yellow-950/20 to-slate-900 border border-amber-500/30 rounded-[2rem] p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+              <div className="space-y-2 max-w-2xl">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-mono font-bold border border-amber-500/30">
+                  <UserCog className="h-3.5 w-3.5" />
+                  <span>Sub-Admin & Staff Operator Hub</span>
+                </div>
+                <h3 className="text-2xl font-black text-white tracking-tight">
+                  Staff Sub-Admins Management & Security Controls
+                </h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Manage subordinate administrative accounts, reset passwords & 4-digit R-PINs, toggle instant account bans, and audit staff activities. Sub-admins can verify transactions and assist users without accessing gateway banking credentials.
+                </p>
+              </div>
+
+              <div className="shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddSubAdminError(null);
+                    setIsAddSubAdminModalOpen(true);
+                  }}
+                  className="px-5 py-3 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-amber-500/20 transition active:scale-95"
+                >
+                  <PlusCircle className="h-4 w-4" />
+                  <span>Create New Sub-Admin ⚡</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Metric Counters */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-amber-500/20">
+              <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4">
+                <div className="text-[11px] font-mono text-slate-400 uppercase font-bold">Total Staff Sub-Admins</div>
+                <div className="text-2xl font-black text-white mt-1">{subAdminList.length}</div>
+              </div>
+              <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4">
+                <div className="text-[11px] font-mono text-emerald-400 uppercase font-bold">Active Operators</div>
+                <div className="text-2xl font-black text-emerald-300 mt-1">
+                  {subAdminList.filter((a) => a.status !== 'BANNED').length}
+                </div>
+              </div>
+              <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4">
+                <div className="text-[11px] font-mono text-rose-400 uppercase font-bold">Banned Accounts</div>
+                <div className="text-2xl font-black text-rose-300 mt-1">
+                  {subAdminList.filter((a) => a.status === 'BANNED').length}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Sub-Admins Table Card */}
+          <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-base font-black text-white flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-amber-400" />
+                <span>Authorized Sub-Admin Operators List</span>
+              </h4>
+              <button
+                type="button"
+                onClick={fetchSubAdmins}
+                disabled={isLoadingSubAdmins}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono font-bold rounded-xl flex items-center gap-1.5 transition"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isLoadingSubAdmins ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </button>
+            </div>
+
+            {subAdminList.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 font-mono text-xs">
+                No Sub-Admin operators found. Click &quot;Create New Sub-Admin&quot; to add staff.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px]">
+                      <th className="py-3 px-3">Operator ID / Name</th>
+                      <th className="py-3 px-3">Contact</th>
+                      <th className="py-3 px-3">Status</th>
+                      <th className="py-3 px-3">Staff Password</th>
+                      <th className="py-3 px-3">Security R-PIN</th>
+                      <th className="py-3 px-3">Telegram Alerts</th>
+                      <th className="py-3 px-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {subAdminList.map((admin) => {
+                      const isPwdVisible = showAdminPasswords[admin.id];
+                      const isPinVisible = showAdminRpins[admin.id];
+                      const isBanned = admin.status === 'BANNED';
+
+                      return (
+                        <tr key={admin.id} className="hover:bg-slate-800/40 transition">
+                          {/* 1. ID & Name */}
+                          <td className="py-3 px-3">
+                            <div className="font-black text-white text-sm">{admin.full_name}</div>
+                            <div className="text-[11px] text-amber-400 font-mono flex items-center gap-1 mt-0.5">
+                              <span>{admin.user_custom_id || admin.id}</span>
+                              <button
+                                type="button"
+                                onClick={() => copyToClipboard(admin.user_custom_id || admin.id, `ID-${admin.id}`)}
+                                title="Copy Admin ID"
+                                className="text-slate-400 hover:text-white"
+                              >
+                                {copiedField === `ID-${admin.id}` ? (
+                                  <Check className="h-3 w-3 text-emerald-400" />
+                                ) : (
+                                  <Copy className="h-3 w-3" />
+                                )}
+                              </button>
+                            </div>
+                          </td>
+
+                          {/* 2. Contact */}
+                          <td className="py-3 px-3 space-y-0.5">
+                            <div className="text-slate-200">{admin.mobile}</div>
+                            <div className="text-[10px] text-slate-400">{admin.email}</div>
+                          </td>
+
+                          {/* 3. Status */}
+                          <td className="py-3 px-3">
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold border flex items-center gap-1 w-fit ${
+                                isBanned
+                                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                                  : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                              }`}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full ${isBanned ? 'bg-rose-400' : 'bg-emerald-400'}`} />
+                              <span>{isBanned ? 'BANNED 🚫' : 'ACTIVE 🟢'}</span>
+                            </span>
+                          </td>
+
+                          {/* 4. Password */}
+                          <td className="py-3 px-3">
+                            <div className="inline-flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-800">
+                              <span className="font-mono text-slate-300">
+                                {isPwdVisible ? admin.password || 'Staff@123' : '••••••••'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setShowAdminPasswords((prev) => ({ ...prev, [admin.id]: !prev[admin.id] }))
+                                }
+                                className="text-slate-400 hover:text-white"
+                                title={isPwdVisible ? 'Hide' : 'Show'}
+                              >
+                                {isPwdVisible ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => copyToClipboard(admin.password || 'Staff@123', `PWD-${admin.id}`)}
+                                className="text-slate-400 hover:text-white"
+                                title="Copy Password"
+                              >
+                                {copiedField === `PWD-${admin.id}` ? (
+                                  <Check className="h-3 w-3 text-emerald-400" />
+                                ) : (
+                                  <Copy className="h-3 w-3" />
+                                )}
+                              </button>
+                            </div>
+                          </td>
+
+                          {/* 5. R-PIN */}
+                          <td className="py-3 px-3">
+                            <div className="inline-flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-800">
+                              <span className="font-mono text-amber-300 font-bold">
+                                {isPinVisible ? admin.rpin || '1234' : '••••'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setShowAdminRpins((prev) => ({ ...prev, [admin.id]: !prev[admin.id] }))}
+                                className="text-slate-400 hover:text-white"
+                                title={isPinVisible ? 'Hide' : 'Show'}
+                              >
+                                {isPinVisible ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => copyToClipboard(admin.rpin || '1234', `PIN-${admin.id}`)}
+                                className="text-slate-400 hover:text-white"
+                                title="Copy PIN"
+                              >
+                                {copiedField === `PIN-${admin.id}` ? (
+                                  <Check className="h-3 w-3 text-emerald-400" />
+                                ) : (
+                                  <Copy className="h-3 w-3" />
+                                )}
+                              </button>
+                            </div>
+                          </td>
+
+                          {/* 6. Telegram Alert */}
+                          <td className="py-3 px-3 text-[11px] text-slate-300">
+                            {admin.telegram_chat_id ? (
+                              <span className="text-emerald-400">ID: {admin.telegram_chat_id}</span>
+                            ) : admin.telegram_id ? (
+                              <span className="text-indigo-300">{admin.telegram_id}</span>
+                            ) : (
+                              <span className="text-slate-500">Not configured</span>
+                            )}
+                          </td>
+
+                          {/* 7. Actions */}
+                          <td className="py-3 px-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* Edit Modal Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditSubAdmin(admin)}
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition"
+                                title="Edit Password & Credentials"
+                              >
+                                <Edit3 className="h-3.5 w-3.5" />
+                              </button>
+
+                              {/* Toggle Ban Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleToggleSubAdminBan(admin)}
+                                className={`p-1.5 rounded-lg transition ${
+                                  isBanned
+                                    ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300'
+                                    : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300'
+                                }`}
+                                title={isBanned ? 'Unban Sub-Admin' : 'Ban Sub-Admin'}
+                              >
+                                {isBanned ? <UserCheck className="h-3.5 w-3.5" /> : <ShieldOff className="h-3.5 w-3.5" />}
+                              </button>
+
+                              {/* Delete Admin Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSubAdmin(admin)}
+                                className="p-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 transition"
+                                title="Remove Sub-Admin"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Live Sub-Admin Staff Activity Log & Tracker for Owner */}
+            <div className="mt-8 pt-6 border-t border-slate-800 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400">
+                    <ShieldAlert className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-black text-white">Sub-Admin Live Activity Tracker (सब-एडमिन लाइव कार्य ट्रैकर)</h4>
+                    <p className="text-xs text-slate-400">All actions performed by Sub-Admin staff appear here instantly for Owner oversight</p>
+                  </div>
+                </div>
+                <span className="text-xs font-mono font-bold px-3 py-1 bg-slate-950 border border-slate-800 text-amber-300 rounded-full w-fit">
+                  {auditLogs.filter((l) => l.admin_id !== 'owner-001' && l.admin_id !== 'SR-OWNER-01').length} Sub-Admin Actions Logged
+                </span>
+              </div>
+
+              {auditLogs.filter((l) => l.admin_id !== 'owner-001' && l.admin_id !== 'SR-OWNER-01').length === 0 ? (
+                <div className="p-6 bg-slate-950/60 border border-slate-800 rounded-2xl text-center text-slate-400 text-xs font-mono">
+                  No Sub-Admin staff actions recorded yet. When a Sub-Admin bans, unbans, or updates any account, it will appear here in real time.
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/80">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead className="bg-slate-900/90 text-slate-400 uppercase text-[10px] border-b border-slate-800">
+                      <tr>
+                        <th className="py-3 px-3">Sub-Admin Staff</th>
+                        <th className="py-3 px-3">Action Type</th>
+                        <th className="py-3 px-3">Target User</th>
+                        <th className="py-3 px-3">Reason / Details</th>
+                        <th className="py-3 px-3 text-right">Timestamp</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {auditLogs
+                        .filter((l) => l.admin_id !== 'owner-001' && l.admin_id !== 'SR-OWNER-01')
+                        .map((log) => (
+                          <tr key={log.id} className="hover:bg-slate-800/30 transition">
+                            <td className="py-2.5 px-3">
+                              <div className="font-bold text-white text-xs">{log.admin_name || 'Staff Sub-Admin'}</div>
+                              <div className="text-[10px] text-amber-400">{log.admin_id}</div>
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                log.action === 'USER_BANNED' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' :
+                                log.action === 'USER_UNBANNED' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                                'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                              }`}>
+                                {log.action}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <div className="text-white font-bold">{log.target_user_name || 'N/A'}</div>
+                              <div className="text-[10px] text-slate-400">{log.target_user_id || '-'}</div>
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-300 max-w-xs truncate">
+                              {log.reason}
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-[10px] text-slate-400 whitespace-nowrap">
+                              {new Date(log.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Modal: Add New Sub-Admin */}
+          {isAddSubAdminModalOpen && (
+            <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-amber-500/40 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5 text-white">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
+                      <UserCog className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-lg text-white">Create New Sub-Admin Operator</h4>
+                      <p className="text-xs text-slate-400">Add subordinate staff with custom password and 4-digit R-PIN</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddSubAdminModalOpen(false)}
+                    className="p-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {addSubAdminError && (
+                  <div className="p-3 bg-rose-500/20 border border-rose-500/30 rounded-xl text-xs text-rose-300 font-mono">
+                    {addSubAdminError}
+                  </div>
+                )}
+
+                <form onSubmit={handleCreateSubAdmin} className="space-y-4 text-xs font-mono">
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">Full Name *</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Arun Support Staff"
+                      value={newAdminFullName}
+                      onChange={(e) => setNewAdminFullName(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2.5 text-white"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1">Mobile Number *</label>
+                      <input
+                        type="text"
+                        placeholder="10-digit mobile"
+                        value={newAdminMobile}
+                        onChange={(e) => setNewAdminMobile(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2.5 text-white"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1">Email Address (Optional)</label>
+                      <input
+                        type="email"
+                        placeholder="staff@srgateway.in"
+                        value={newAdminEmail}
+                        onChange={(e) => setNewAdminEmail(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2.5 text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1">Staff Password</label>
+                      <input
+                        type="text"
+                        placeholder="Staff@123"
+                        value={newAdminPassword}
+                        onChange={(e) => setNewAdminPassword(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2.5 text-white"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1">Staff 4-Digit R-PIN</label>
+                      <input
+                        type="text"
+                        maxLength={4}
+                        placeholder="1234"
+                        value={newAdminRpin}
+                        onChange={(e) => setNewAdminRpin(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2.5 text-amber-300 font-bold"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">Telegram Chat ID (Optional for alerts)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 5629192931"
+                      value={newAdminTelegramChatId}
+                      onChange={(e) => setNewAdminTelegramChatId(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2.5 text-white"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddSubAdminModalOpen(false)}
+                      className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmittingAdmin}
+                      className="flex-1 py-3 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 rounded-xl font-black transition disabled:opacity-60 flex items-center justify-center gap-2"
+                    >
+                      {isSubmittingAdmin ? <RefreshCw className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />}
+                      <span>{isSubmittingAdmin ? 'Creating...' : 'Create Sub-Admin ⚡'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Modal: Edit Sub-Admin Credentials */}
+          {selectedAdminForEdit && (
+            <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-indigo-500/40 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5 text-white">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400">
+                      <Edit3 className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-lg text-white">
+                        Edit Credentials: {selectedAdminForEdit.full_name}
+                      </h4>
+                      <p className="text-xs text-slate-400 font-mono">{selectedAdminForEdit.user_custom_id}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAdminForEdit(null)}
+                    className="p-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveSubAdminEdit} className="space-y-4 text-xs font-mono">
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">Full Name</label>
+                    <input
+                      type="text"
+                      value={editAdminForm.full_name}
+                      onChange={(e) => setEditAdminForm((prev) => ({ ...prev, full_name: e.target.value }))}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1">Mobile</label>
+                      <input
+                        type="text"
+                        value={editAdminForm.mobile}
+                        onChange={(e) => setEditAdminForm((prev) => ({ ...prev, mobile: e.target.value }))}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1">Email</label>
+                      <input
+                        type="email"
+                        value={editAdminForm.email}
+                        onChange={(e) => setEditAdminForm((prev) => ({ ...prev, email: e.target.value }))}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-amber-300 font-bold mb-1">Change Password 🔑</label>
+                      <input
+                        type="text"
+                        value={editAdminForm.password}
+                        onChange={(e) => setEditAdminForm((prev) => ({ ...prev, password: e.target.value }))}
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 text-white font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-amber-300 font-bold mb-1">Change R-PIN (4-Digit) 🔐</label>
+                      <input
+                        type="text"
+                        maxLength={4}
+                        value={editAdminForm.rpin}
+                        onChange={(e) => setEditAdminForm((prev) => ({ ...prev, rpin: e.target.value }))}
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 text-amber-300 font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1">Account Status</label>
+                      <select
+                        value={editAdminForm.status}
+                        onChange={(e) => setEditAdminForm((prev) => ({ ...prev, status: e.target.value as any }))}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white"
+                      >
+                        <option value="ACTIVE">ACTIVE 🟢</option>
+                        <option value="BANNED">BANNED 🚫</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1">Telegram Chat ID</label>
+                      <input
+                        type="text"
+                        value={editAdminForm.telegram_chat_id}
+                        onChange={(e) => setEditAdminForm((prev) => ({ ...prev, telegram_chat_id: e.target.value }))}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAdminForEdit(null)}
+                      className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSavingAdminEdit}
+                      className="flex-1 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl font-black transition disabled:opacity-60 flex items-center justify-center gap-2"
+                    >
+                      {isSavingAdminEdit ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                      <span>{isSavingAdminEdit ? 'Saving...' : 'Save Credentials 💾'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* TAB 6: EXTRA CONTROLS & SYSTEM SETTINGS */}
       {activeAdminTab === 'SETTINGS' && (
         <form onSubmit={saveSystemSettings} className="space-y-6">
@@ -2104,14 +2922,34 @@ export const AdminPortal: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <h3 className="text-lg font-black text-white flex items-center gap-2">
                 <Settings className="h-5 w-5 text-indigo-400" />
-                <span>System Extra Controls & Financial Rules</span>
+                <span>{isSubAdmin ? 'Gateway Charges & UPI Parameters (Fixed View)' : 'System Extra Controls & Financial Rules'}</span>
               </h3>
-              {isSettingsDirty && (
+              {isSettingsDirty && !isSubAdmin && (
                 <div className="px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 animate-pulse">
                   <span>⚠️ Unsaved Changes — Click Save to apply</span>
                 </div>
               )}
             </div>
+
+            {/* SUB-ADMIN FIXED NOTICE BANNER */}
+            {isSubAdmin && (
+              <div className="p-4 rounded-2xl bg-amber-950/40 border-2 border-amber-500/50 text-amber-200 shadow-xl flex items-start gap-3">
+                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
+                  <Lock className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="font-extrabold text-sm text-white flex items-center gap-2">
+                    <span>🔒 FIXED GATEWAY CHARGES &amp; BANKING PARAMETERS (फिक्स्ड गेटवे चार्ज)</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono font-bold border border-amber-500/30">
+                      LOCKED BY OWNER
+                    </span>
+                  </div>
+                  <p className="text-xs text-amber-200/90 mt-1 leading-relaxed">
+                    All UPI gateway IDs, bank account details, deposit fee %, withdrawal charge %, and transaction limits are fixed by Master Owner (SR-OWNER-01). Sub-Admin personnel have read-only visibility for transaction tracking, but cannot alter or override them.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* MAINTENANCE MODE CONTROLS (USER PANEL LOCK) */}
             <div className={`p-6 rounded-3xl border-2 transition-all space-y-4 ${
@@ -3244,20 +4082,27 @@ export const AdminPortal: React.FC = () => {
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={isSavingSettings}
-              className="w-full py-3.5 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-black text-sm rounded-2xl transition shadow-xl shadow-rose-600/25 active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
-            >
-              {isSavingSettings ? (
-                <>
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                  <span>Saving & Synchronizing Settings...</span>
-                </>
-              ) : (
-                <span>Save All System Configuration Settings 💾</span>
-              )}
-            </button>
+            {isSubAdmin ? (
+              <div className="p-4 rounded-2xl bg-slate-950 border-2 border-amber-500/40 text-amber-300 text-center font-mono text-xs flex items-center justify-center gap-2 shadow-lg">
+                <Lock className="h-4 w-4 text-amber-400 shrink-0" />
+                <span>Fixed Gateway Configuration: All UPI IDs, banking credentials and charges are fixed &amp; locked by Master Owner (SR-OWNER-01). Sub-Admin modifications are restricted.</span>
+              </div>
+            ) : (
+              <button
+                type="submit"
+                disabled={isSavingSettings}
+                className="w-full py-3.5 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-black text-sm rounded-2xl transition shadow-xl shadow-rose-600/25 active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {isSavingSettings ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span>Saving & Synchronizing Settings...</span>
+                  </>
+                ) : (
+                  <span>Save All System Configuration Settings 💾</span>
+                )}
+              </button>
+            )}
           </div>
         </form>
       )}

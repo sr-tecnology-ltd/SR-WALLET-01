@@ -53,12 +53,14 @@ export const Header: React.FC<{
               </span>
               <span
                 className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${
-                  activeRole === 'ADMIN'
+                  activeRole === 'OWNER'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse'
+                    : activeRole === 'ADMIN'
                     ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse'
                     : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
                 }`}
               >
-                {activeRole === 'ADMIN' ? '🛡️ Super Admin' : 'VPA Gateway'}
+                {activeRole === 'OWNER' ? '👑 Master Owner' : activeRole === 'ADMIN' ? '🛡️ Sub-Admin Staff' : 'VPA Gateway'}
               </span>
             </div>
             <p className="text-[10px] text-slate-400 hidden sm:block font-mono">
@@ -86,14 +88,14 @@ export const Header: React.FC<{
 
         {/* Right Controls */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Show Exit Admin Button ONLY when currently in Admin Portal */}
-          {activeRole === 'ADMIN' && (
+          {/* Show Exit Admin/Owner Button ONLY when currently in Admin or Owner Portal */}
+          {(activeRole === 'ADMIN' || activeRole === 'OWNER') && (
             <button
               onClick={toggleRoleMode}
               className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-all shadow-md active:scale-95 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white shadow-rose-600/20 cursor-pointer"
             >
               <ShieldCheck className="h-3.5 w-3.5" />
-              <span>Exit Admin Portal</span>
+              <span>Exit {activeRole === 'OWNER' ? 'Owner' : 'Admin'} Portal</span>
             </button>
           )}
 
