@@ -65,6 +65,12 @@ export const AdminPortal: React.FC = () => {
     ownerUpdateSubAdmin,
     ownerDeleteSubAdmin,
     ownerFetchAdmins,
+    subAdminCredentials,
+    ownerFetchAdminPasswords,
+    ownerCreateAdminPassword,
+    ownerUpdateAdminPassword,
+    ownerDeleteAdminPassword,
+    adminVerifyGatePassword,
     allProfiles,
     allWallets,
     deposits,
@@ -92,6 +98,13 @@ export const AdminPortal: React.FC = () => {
     formatINR,
     refreshFromBackend,
   } = useWallet();
+
+  // Status message notification banner (Declared at top of component to prevent ReferenceError)
+  const [adminAlertMsg, setAdminAlertMsg] = useState<string | null>(null);
+  const showAlert = useCallback((msg: string) => {
+    setAdminAlertMsg(msg);
+    setTimeout(() => setAdminAlertMsg(null), 4000);
+  }, []);
 
   const [isAdjustingBalance, setIsAdjustingBalance] = useState(false);
 
@@ -234,10 +247,10 @@ export const AdminPortal: React.FC = () => {
         setSelectedAdminForEdit(null);
         await fetchSubAdmins();
       } else {
-        alert('Failed: ' + res.message);
+        showAlert('❌ Failed: ' + res.message);
       }
     } catch (e: any) {
-      alert('Error updating sub-admin: ' + e?.message);
+      showAlert('❌ Error updating sub-admin: ' + e?.message);
     } finally {
       setIsSavingAdminEdit(false);
     }
@@ -246,28 +259,38 @@ export const AdminPortal: React.FC = () => {
   const handleToggleSubAdminBan = async (admin: UserProfile) => {
     const newStatus = admin.status === 'BANNED' ? 'ACTIVE' : 'BANNED';
     const actionLabel = newStatus === 'BANNED' ? 'BAN' : 'UNBAN';
-    if (!window.confirm(`Are you sure you want to ${actionLabel} Sub-Admin ${admin.full_name} (${admin.user_custom_id})?`)) {
-      return;
+    let confirmed = true;
+    try {
+      confirmed = window.confirm(`Are you sure you want to ${actionLabel} Sub-Admin ${admin.full_name} (${admin.user_custom_id})?`);
+    } catch {
+      confirmed = true;
     }
+    if (!confirmed) return;
+
     const res = await ownerUpdateSubAdmin(admin.id, { status: newStatus });
     if (res.success) {
       showAlert(`✅ Sub-Admin ${admin.full_name} is now ${newStatus}!`);
       await fetchSubAdmins();
     } else {
-      alert('Failed: ' + res.message);
+      showAlert('❌ Failed: ' + res.message);
     }
   };
 
   const handleDeleteSubAdmin = async (admin: UserProfile) => {
-    if (!window.confirm(`⚠️ PERMANENT ACTION:\nAre you sure you want to permanently REMOVE Sub-Admin ${admin.full_name} (${admin.user_custom_id})?\nTheir access to the staff portal will be revoked immediately.`)) {
-      return;
+    let confirmed = true;
+    try {
+      confirmed = window.confirm(`⚠️ PERMANENT ACTION:\nAre you sure you want to permanently REMOVE Sub-Admin ${admin.full_name} (${admin.user_custom_id})?\nTheir access to the staff portal will be revoked immediately.`);
+    } catch {
+      confirmed = true;
     }
+    if (!confirmed) return;
+
     const res = await ownerDeleteSubAdmin(admin.id);
     if (res.success) {
       showAlert(`✅ Sub-Admin ${admin.full_name} removed successfully!`);
       await fetchSubAdmins();
     } else {
-      alert('Failed: ' + res.message);
+      showAlert('❌ Failed: ' + res.message);
     }
   };
 
@@ -332,21 +355,48 @@ export const AdminPortal: React.FC = () => {
     return sessionStorage.getItem('sr_admin_authed') === 'true';
   });
   const [passError, setPassError] = useState<string | null>(null);
+  const [isVerifyingPass, setIsVerifyingPass] = useState<boolean>(false);
 
-  const handleAdminLogin = (e: React.FormEvent) => {
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminPassInput === MASTER_ADMIN_PASS) {
+    const cleanPass = adminPassInput.trim();
+    if (!cleanPass) return;
+
+    if (cleanPass === MASTER_ADMIN_PASS) {
       setIsPassAuthed(true);
       sessionStorage.setItem('sr_admin_authed', 'true');
+      sessionStorage.setItem('sr_admin_role', 'MASTER_OWNER');
+      sessionStorage.setItem('sr_admin_id', 'admin-001');
+      sessionStorage.setItem('sr_admin_name', 'Master Administrator');
+      sessionStorage.setItem('sr_admin_pass', MASTER_ADMIN_PASS);
       setPassError(null);
-    } else {
-      setPassError('❌ Incorrect Master Admin Password. Access Denied!');
+      return;
+    }
+
+    setIsVerifyingPass(true);
+    setPassError(null);
+    try {
+      const res = await adminVerifyGatePassword(cleanPass);
+      if (res.success) {
+        setIsPassAuthed(true);
+        setPassError(null);
+      } else {
+        setPassError(res.message || '❌ Incorrect Admin Password. Access Denied!');
+      }
+    } catch (err: any) {
+      setPassError(err?.message || 'Error verifying credentials');
+    } finally {
+      setIsVerifyingPass(false);
     }
   };
 
   const handleAdminLock = () => {
     setIsPassAuthed(false);
     sessionStorage.removeItem('sr_admin_authed');
+    sessionStorage.removeItem('sr_admin_role');
+    sessionStorage.removeItem('sr_admin_id');
+    sessionStorage.removeItem('sr_admin_name');
+    sessionStorage.removeItem('sr_admin_pass');
   };
 
   // Rejection Modals
@@ -724,14 +774,6 @@ export const AdminPortal: React.FC = () => {
     }
   }, [activeAdminTab]);
 
-  // Status message
-  const [adminAlertMsg, setAdminAlertMsg] = useState<string | null>(null);
-
-  const showAlert = (msg: string) => {
-    setAdminAlertMsg(msg);
-    setTimeout(() => setAdminAlertMsg(null), 3500);
-  };
-
   // Metrics (Memoized for high UI responsiveness)
   const totalUsersCount = useMemo(() => allProfiles.filter((p) => p.role !== 'ADMIN').length, [allProfiles]);
   const activeUsersCount = useMemo(() => allProfiles.filter((p) => p.role !== 'ADMIN' && p.status === 'ACTIVE').length, [allProfiles]);
@@ -917,10 +959,10 @@ export const AdminPortal: React.FC = () => {
         showAlert(res.message || 'Credentials updated successfully!');
         setAdminActionModal(null);
       } else {
-        alert('Failed: ' + res.message);
+        showAlert('❌ Failed: ' + res.message);
       }
     } catch (e: any) {
-      alert('Error updating credentials: ' + e?.message);
+      showAlert('❌ Error updating credentials: ' + e?.message);
     } finally {
       setIsSavingCreds(false);
     }
@@ -943,7 +985,7 @@ export const AdminPortal: React.FC = () => {
       window.URL.revokeObjectURL(url);
       showAlert('📦 Full Database JSON backup downloaded! Keep this file safe for migration.');
     } catch (e: any) {
-      alert('Database export failed: ' + e?.message);
+      showAlert('❌ Database export failed: ' + e?.message);
     } finally {
       setIsExportingDb(false);
     }
@@ -959,7 +1001,7 @@ export const AdminPortal: React.FC = () => {
       copyToClipboard('copied', 'RAW_DB_JSON');
       showAlert('📋 Full Database JSON copied to clipboard! You can paste it into Koyeb or any new server.');
     } catch (e: any) {
-      alert('Failed to copy database: ' + e?.message);
+      showAlert('❌ Failed to copy database: ' + e?.message);
     }
   };
 
@@ -976,13 +1018,18 @@ export const AdminPortal: React.FC = () => {
       const userCount = Array.isArray(parsed.users) ? parsed.users.length : 0;
       const walletCount = parsed.wallets ? Object.keys(parsed.wallets).length : 0;
 
-      const confirmed = window.confirm(
-        `Are you sure you want to restore this database backup?\n\n` +
-        `• Users to load: ${userCount}\n` +
-        `• Wallets: ${walletCount}\n` +
-        `• Settings, Transactions & Ledgers included\n\n` +
-        `This will instantly sync with the server disk (/data/srgateway_database.json) and update all balances!`
-      );
+      let confirmed = true;
+      try {
+        confirmed = window.confirm(
+          `Are you sure you want to restore this database backup?\n\n` +
+          `• Users to load: ${userCount}\n` +
+          `• Wallets: ${walletCount}\n` +
+          `• Settings, Transactions & Ledgers included\n\n` +
+          `This will instantly sync with the server disk (/data/srgateway_database.json) and update all balances!`
+        );
+      } catch {
+        confirmed = true;
+      }
 
       if (!confirmed) {
         setIsImportingDb(false);
@@ -4357,22 +4404,30 @@ export const AdminPortal: React.FC = () => {
 
           <div className="space-y-2">
             {auditLogs.map((log) => (
-              <div key={log.id} className="p-3.5 bg-slate-950 border border-slate-800/80 rounded-2xl flex items-start justify-between gap-3">
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-amber-400">{log.action}</span>
-                    <span className="text-[10px] text-slate-400">by {log.admin_name}</span>
+              <div key={log.id} className="p-3.5 bg-slate-950 border border-slate-800/80 rounded-2xl flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-extrabold text-amber-400 text-xs">{log.action}</span>
+                    <span className="text-[11px] text-slate-300 font-bold">
+                      by {log.admin_name || 'Admin'} {log.admin_id ? `(${log.admin_id})` : ''}
+                    </span>
+                    {log.admin_password && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-300 text-[10px] font-mono border border-amber-500/30">
+                        <Key className="h-2.5 w-2.5" />
+                        <span>Pass: {log.admin_password}</span>
+                      </span>
+                    )}
                   </div>
-                  <p className="text-slate-300 font-sans">{log.reason}</p>
+                  <p className="text-slate-300 font-sans text-xs">{log.reason}</p>
                   {log.target_user_name && (
-                    <div className="text-[10px] text-indigo-300">
-                      Target User: {log.target_user_name}
+                    <div className="text-[11px] text-indigo-300 font-sans">
+                      Target User: <span className="font-bold text-white">{log.target_user_name}</span>
                       {log.amount ? ` • Amount: ${formatINR(log.amount)}` : ''}
                     </div>
                   )}
                 </div>
 
-                <div className="text-[10px] text-slate-500 shrink-0 text-right">
+                <div className="text-[10px] text-slate-500 shrink-0 sm:text-right font-mono">
                   {new Date(log.created_at).toLocaleString()}
                 </div>
               </div>

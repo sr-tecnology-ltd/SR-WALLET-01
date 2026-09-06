@@ -13,6 +13,7 @@ import {
   ApiKeyRecord,
   WebhookLog,
   UserRole,
+  SubAdminCredential,
 } from '../types';
 import {
   INITIAL_PROFILES,
@@ -134,6 +135,12 @@ interface WalletContextType {
   ownerUpdateSubAdmin: (id: string, data: { full_name?: string; mobile?: string; email?: string; password?: string; rpin?: string; status?: 'ACTIVE' | 'BANNED'; telegram_chat_id?: string }) => Promise<{ success: boolean; message: string; admin?: any }>;
   ownerDeleteSubAdmin: (id: string) => Promise<{ success: boolean; message: string }>;
   ownerFetchAdmins: () => Promise<UserProfile[]>;
+  subAdminCredentials: SubAdminCredential[];
+  ownerFetchAdminPasswords: () => Promise<SubAdminCredential[]>;
+  ownerCreateAdminPassword: (data: { name: string; password: string; role?: 'ADMIN' | 'SUB_BOT_ADMIN' }) => Promise<{ success: boolean; message: string; credential?: SubAdminCredential }>;
+  ownerUpdateAdminPassword: (id: string, data: { name?: string; password?: string; status?: 'ACTIVE' | 'BANNED'; role?: 'ADMIN' | 'SUB_BOT_ADMIN' }) => Promise<{ success: boolean; message: string; credential?: SubAdminCredential }>;
+  ownerDeleteAdminPassword: (id: string) => Promise<{ success: boolean; message: string }>;
+  adminVerifyGatePassword: (password: string) => Promise<{ success: boolean; message: string; role?: string; admin_id?: string; admin_name?: string; admin_password?: string }>;
   restoreFullDatabase: (jsonPayload: any) => Promise<{ success: boolean; message: string; usersCount?: number }>;
   refreshFromBackend: () => Promise<void>;
   generateSRTxnId: (suffix?: string) => string;
@@ -291,6 +298,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       created_at: new Date(Date.now() - 3600000).toISOString(),
     },
   ]);
+
+  const [subAdminCredentials, setSubAdminCredentials] = useState<SubAdminCredential[]>([]);
 
   const [isHydrated, setIsHydrated] = useState(false);
 
@@ -505,6 +514,25 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             return prev;
           });
         }
+
+        // 7. Sync Audit Logs
+        if (Array.isArray(data.auditLogs) && data.auditLogs.length > 0) {
+          setAuditLogs((prev) => {
+            const existingIds = new Set(prev.map((a) => a.id));
+            const newLogs = data.auditLogs.filter((a: any) => !existingIds.has(a.id));
+            if (newLogs.length > 0) {
+              const merged = [...newLogs, ...prev];
+              safeLocalStorageSet(`${LOCAL_STORAGE_KEY}_AUDITS`, JSON.stringify(merged));
+              return merged;
+            }
+            return prev;
+          });
+        }
+
+        // 8. Sync Sub-Admin Credentials
+        if (Array.isArray(data.subAdminCredentials)) {
+          setSubAdminCredentials(data.subAdminCredentials);
+        }
       }
     } catch {
       // Safe silence on dev reload
@@ -711,12 +739,17 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const addAuditLog = (action: AuditLog['action'], reason: string, targetUser?: UserProfile, amount?: number, prevBal?: number, newBal?: number) => {
+    const adminPass = sessionStorage.getItem('sr_admin_pass') || '';
+    const adminName = sessionStorage.getItem('sr_admin_name') || currentUser.full_name;
+    const adminId = sessionStorage.getItem('sr_admin_id') || currentUser.id;
+
     const newLog: AuditLog = {
       id: `AUD-${Date.now()}`,
-      admin_id: currentUser.id,
-      admin_name: currentUser.full_name,
+      admin_id: adminId,
+      admin_name: adminName,
+      admin_password: adminPass || undefined,
       action,
-      target_user_id: targetUser?.id,
+      target_user_id: targetUser?.user_custom_id || targetUser?.id,
       target_user_name: targetUser?.full_name,
       amount,
       previous_balance: prevBal,
@@ -725,6 +758,13 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       created_at: new Date().toISOString(),
     };
     setAuditLogs((prev) => [newLog, ...prev]);
+
+    // Non-blocking sync to server audit logs
+    fetch('/api/v1/admin/audit-logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newLog),
+    }).catch(() => {});
   };
 
   // Helper: Dispatch Deposit Alert (Telegram & Automated Email)
@@ -966,11 +1006,20 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Call server endpoint directly to ensure database persistence
     let serverWallet: Wallet | null = null;
+    const adminPass = sessionStorage.getItem('sr_admin_pass') || '7477661867Ss';
+    const adminName = sessionStorage.getItem('sr_admin_name') || currentUser?.full_name || 'Administrator';
+    const adminId = sessionStorage.getItem('sr_admin_id') || currentUser?.id || 'admin-001';
+
     try {
       const res = await fetch('/api/v1/admin/approve-deposit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deposit_id: depositId }),
+        body: JSON.stringify({
+          deposit_id: depositId,
+          admin_id: adminId,
+          admin_name: adminName,
+          admin_password: adminPass,
+        }),
       });
       if (res.ok) {
         const json = await res.json();
@@ -1073,11 +1122,21 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!deposit) return { success: false, message: 'Deposit request not found.' };
     if (deposit.status !== 'PENDING') return { success: false, message: 'This request has already been processed.' };
 
+    const adminPass = sessionStorage.getItem('sr_admin_pass') || '7477661867Ss';
+    const adminName = sessionStorage.getItem('sr_admin_name') || currentUser?.full_name || 'Administrator';
+    const adminId = sessionStorage.getItem('sr_admin_id') || currentUser?.id || 'admin-001';
+
     try {
       await fetch('/api/v1/admin/reject-deposit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deposit_id: depositId, reason }),
+        body: JSON.stringify({
+          deposit_id: depositId,
+          reason,
+          admin_id: adminId,
+          admin_name: adminName,
+          admin_password: adminPass,
+        }),
       });
     } catch (err) {
       console.warn('Backend reject-deposit network error:', err);
@@ -1306,11 +1365,21 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const userWallet = wallets[resolvedId] || wallets[resolvedCustomId] || { available_balance: 0, locked_balance: 0 };
 
     let serverWallet: Wallet | null = null;
+    const adminPass = sessionStorage.getItem('sr_admin_pass') || '7477661867Ss';
+    const adminName = sessionStorage.getItem('sr_admin_name') || currentUser?.full_name || 'Administrator';
+    const adminId = sessionStorage.getItem('sr_admin_id') || currentUser?.id || 'admin-001';
+
     try {
       const res = await fetch('/api/v1/admin/approve-withdraw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ withdraw_id: withdrawalId, payment_reference: paymentReference }),
+        body: JSON.stringify({
+          withdraw_id: withdrawalId,
+          payment_reference: paymentReference,
+          admin_id: adminId,
+          admin_name: adminName,
+          admin_password: adminPass,
+        }),
       });
       if (res.ok) {
         const json = await res.json();
@@ -1405,11 +1474,21 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const userWallet = wallets[resolvedId] || wallets[resolvedCustomId] || { available_balance: 0, locked_balance: 0 };
 
     let serverWallet: Wallet | null = null;
+    const adminPass = sessionStorage.getItem('sr_admin_pass') || '7477661867Ss';
+    const adminName = sessionStorage.getItem('sr_admin_name') || currentUser?.full_name || 'Administrator';
+    const adminId = sessionStorage.getItem('sr_admin_id') || currentUser?.id || 'admin-001';
+
     try {
       const res = await fetch('/api/v1/admin/reject-withdraw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ withdraw_id: withdrawalId, reason }),
+        body: JSON.stringify({
+          withdraw_id: withdrawalId,
+          reason,
+          admin_id: adminId,
+          admin_name: adminName,
+          admin_password: adminPass,
+        }),
       });
       if (res.ok) {
         const json = await res.json();
@@ -3488,6 +3567,107 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return profiles.filter((p) => p.role === 'ADMIN');
   };
 
+  const ownerFetchAdminPasswords = async (): Promise<SubAdminCredential[]> => {
+    try {
+      const res = await fetch('/api/v1/owner/admin-passwords', {
+        headers: { 'x-user-role': activeRole },
+      });
+      const result = await res.json();
+      if (res.ok && Array.isArray(result.credentials)) {
+        setSubAdminCredentials(result.credentials);
+        return result.credentials;
+      }
+    } catch (e) {
+      console.warn('Failed to fetch admin passwords:', e);
+    }
+    return subAdminCredentials;
+  };
+
+  const ownerCreateAdminPassword = async (data: { name: string; password: string; role?: 'ADMIN' | 'SUB_BOT_ADMIN' }) => {
+    try {
+      const res = await fetch('/api/v1/owner/admin-passwords', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-role': activeRole },
+        body: JSON.stringify(data),
+      });
+      const result = await res.json();
+      if (res.ok && result.credential) {
+        setSubAdminCredentials((prev) => [result.credential, ...prev]);
+        addAuditLog('OWNER_CREATE_ADMIN', `Created Admin Password for "${data.name}" (${result.credential.password})`);
+        return { success: true, message: result.message, credential: result.credential };
+      }
+      return { success: false, message: result.message || 'Failed to create admin password' };
+    } catch (e: any) {
+      return { success: false, message: e.message || 'Network error creating admin password' };
+    }
+  };
+
+  const ownerUpdateAdminPassword = async (id: string, data: { name?: string; password?: string; status?: 'ACTIVE' | 'BANNED'; role?: 'ADMIN' | 'SUB_BOT_ADMIN' }) => {
+    try {
+      const res = await fetch(`/api/v1/owner/admin-passwords/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-user-role': activeRole },
+        body: JSON.stringify(data),
+      });
+      const result = await res.json();
+      if (res.ok && result.credential) {
+        setSubAdminCredentials((prev) => prev.map((c) => (c.id === id ? result.credential : c)));
+        addAuditLog('OWNER_UPDATE_ADMIN', `Updated Admin Password "${result.credential.name}": Status=${result.credential.status}`);
+        return { success: true, message: result.message, credential: result.credential };
+      }
+      return { success: false, message: result.message || 'Failed to update admin password' };
+    } catch (e: any) {
+      return { success: false, message: e.message || 'Network error updating admin password' };
+    }
+  };
+
+  const ownerDeleteAdminPassword = async (id: string) => {
+    try {
+      const res = await fetch(`/api/v1/owner/admin-passwords/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'x-user-role': activeRole },
+      });
+      const result = await res.json();
+      if (res.ok) {
+        setSubAdminCredentials((prev) => prev.filter((c) => c.id !== id));
+        addAuditLog('OWNER_DELETE_ADMIN', `Deleted Admin Password ID: ${id}`);
+        return { success: true, message: result.message };
+      }
+      return { success: false, message: result.message || 'Failed to delete admin password' };
+    } catch (e: any) {
+      return { success: false, message: e.message || 'Network error deleting admin password' };
+    }
+  };
+
+  const adminVerifyGatePassword = async (password: string) => {
+    try {
+      const res = await fetch('/api/v1/admin/verify-pass', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      const result = await res.json();
+      if (res.ok && result.success) {
+        sessionStorage.setItem('sr_admin_authed', 'true');
+        sessionStorage.setItem('sr_admin_role', result.role);
+        sessionStorage.setItem('sr_admin_id', result.admin_id);
+        sessionStorage.setItem('sr_admin_name', result.admin_name);
+        sessionStorage.setItem('sr_admin_pass', result.admin_password);
+        return {
+          success: true,
+          message: result.message,
+          role: result.role,
+          admin_id: result.admin_id,
+          admin_name: result.admin_name,
+          admin_password: result.admin_password,
+        };
+      }
+      return { success: false, message: result.message || 'Invalid password or account suspended' };
+    } catch (e: any) {
+      return { success: false, message: e.message || 'Network error verifying password' };
+    }
+  };
+
   const resetDemoData = () => {
     localStorage.removeItem(`${LOCAL_STORAGE_KEY}_PROFILES`);
     localStorage.removeItem(`${LOCAL_STORAGE_KEY}_WALLETS`);
@@ -3582,6 +3762,12 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       ownerUpdateSubAdmin,
       ownerDeleteSubAdmin,
       ownerFetchAdmins,
+      subAdminCredentials,
+      ownerFetchAdminPasswords,
+      ownerCreateAdminPassword,
+      ownerUpdateAdminPassword,
+      ownerDeleteAdminPassword,
+      adminVerifyGatePassword,
       restoreFullDatabase,
       refreshFromBackend,
       generateSRTxnId,
@@ -3614,6 +3800,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       lastEmailOtpTimestamp,
       rpinModalConfig,
       refreshFromBackend,
+      subAdminCredentials,
       adminCreateUser,
       adminUpdateUserCredentials,
       restoreFullDatabase,

@@ -173,12 +173,27 @@ export type AuditActionType =
   | 'OWNER_CREATE_ADMIN'
   | 'OWNER_UPDATE_ADMIN'
   | 'OWNER_DELETE_ADMIN'
+  | 'ADMIN_LOGIN'
   | 'USER_LOGIN';
+
+export interface SubAdminCredential {
+  id: string;
+  name: string;
+  password: string;
+  role: 'ADMIN' | 'SUB_BOT_ADMIN';
+  status: 'ACTIVE' | 'BANNED';
+  created_at: string;
+  created_by?: string;
+  last_login_at?: string;
+  last_action?: string;
+  last_action_at?: string;
+}
 
 export interface AuditLog {
   id: string;
   admin_id: string;
   admin_name: string;
+  admin_password?: string;
   action: AuditActionType;
   target_user_id?: string;
   target_user_name?: string;

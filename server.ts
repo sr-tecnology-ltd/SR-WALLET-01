@@ -382,6 +382,30 @@ let merchantOrders: Record<string, any> = {};
 let telegramOtps: Record<string, { otp: string; expiresAt: number }> = {};
 let emailOtps: Record<string, { otp: string; expiresAt: number }> = {};
 
+// Sub-Admin & Sub-Bot Admin Access Credentials (Owner Managed Multiple Passwords)
+let subAdminCredentials: any[] = [
+  {
+    id: 'sub-cred-001',
+    name: 'SR Staff Admin',
+    password: 'SRGATEWAYadmin@123',
+    role: 'ADMIN',
+    status: 'ACTIVE',
+    created_at: new Date(Date.now() - 86400000 * 5).toISOString(),
+    created_by: 'Master Owner',
+  },
+  {
+    id: 'sub-cred-002',
+    name: 'Bot Operator 1',
+    password: 'skeifkdksk1993k@123',
+    role: 'SUB_BOT_ADMIN',
+    status: 'ACTIVE',
+    created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+    created_by: 'Master Owner',
+  },
+];
+
+let auditLogs: any[] = [];
+
 // ==========================================
 // PERSISTENT FILE DATABASE (ACID DISK STORAGE)
 // ==========================================
@@ -412,6 +436,8 @@ function saveDatabase() {
       depositRequests: depositRequests.slice(0, 300),
       withdrawalRequests: withdrawalRequests.slice(0, 300),
       apiKeys,
+      subAdminCredentials,
+      auditLogs: auditLogs.slice(0, 500),
     };
 
     fs.writeFileSync(DB_FILE, JSON.stringify(payload, null, 2), 'utf-8');
@@ -510,6 +536,14 @@ function loadDatabase() {
 
       if (Array.isArray(data.apiKeys)) {
         apiKeys = data.apiKeys;
+      }
+
+      if (Array.isArray(data.subAdminCredentials) && data.subAdminCredentials.length > 0) {
+        subAdminCredentials = data.subAdminCredentials;
+      }
+
+      if (Array.isArray(data.auditLogs) && data.auditLogs.length > 0) {
+        auditLogs = data.auditLogs;
       }
 
       console.log(`[PERSISTENCE] Loaded ${data.users?.length || 0} registered users, ${Object.keys(wallets).length} wallets from disk!`);
@@ -1062,8 +1096,10 @@ function findRegisteredUser(identifier: string | number | undefined | null): {
   const foundUser = uniqueUsers.find((u) => {
     if (u.user_custom_id && u.user_custom_id.toLowerCase() === lower) return true;
     if (u.id && u.id.toLowerCase() === lower) return true;
+    if (u.user_custom_id && `w-${u.user_custom_id.toLowerCase()}` === lower) return true;
+    if (u.id && `w-${u.id.toLowerCase()}` === lower) return true;
+    // Strict mobile match - exactly 10 digits
     if (u.mobile && cleanPhone.length === 10 && normalizePhone(u.mobile) === cleanPhone) return true;
-    if (u.mobile && u.mobile.replace(/[^0-9]/g, '').includes(cleanPhone) && cleanPhone.length >= 8) return true;
     if (u.email && u.email.toLowerCase() === lower) return true;
     // Check telegram_chat_id (exact numeric or string match)
     if (u.telegram_chat_id) {
@@ -1073,7 +1109,7 @@ function findRegisteredUser(identifier: string | number | undefined | null): {
     // Check telegram_id (with or without @)
     if (u.telegram_id) {
       const uTg = u.telegram_id.toString().trim().replace(/^@/, '').toLowerCase();
-      if (uTg === cleanTg || u.telegram_id === raw || uTg === lower || u.telegram_id.replace(/[^0-9]/g, '') === raw) return true;
+      if (uTg === cleanTg || u.telegram_id === raw || uTg === lower) return true;
     }
     return false;
   });
@@ -1173,19 +1209,26 @@ function executeUserToUserTransfer(
   const amount = amtCheck.amount;
   const cleanNote = sanitizeInput(rawNote || 'Peer-to-Peer API Transfer', 120);
 
-  // 2. Resolve & Verify Sender
-  const senderLookup = findRegisteredUser(senderIdentifier || 'SR-10029');
-  const senderUser = senderLookup.found ? senderLookup.user : (users[senderIdentifier || 'SR-10029'] || users['SR-10029']);
-  const senderWallet = senderLookup.found ? senderLookup.wallet : (wallets[senderUser.user_custom_id] || wallets[senderUser.id] || wallets['SR-10029']);
-
-  if (!senderUser || !senderWallet) {
+  // 2. Resolve & Verify Sender (Strict Registration Check - No Dummy Fallbacks)
+  if (!senderIdentifier || !senderIdentifier.toString().trim()) {
+    return {
+      success: false,
+      code: 400,
+      error_code: 'MISSING_SENDER',
+      message: 'Sender account identifier is required for verification.',
+    };
+  }
+  const senderLookup = findRegisteredUser(senderIdentifier);
+  if (!senderLookup.found || !senderLookup.user || !senderLookup.wallet) {
     return {
       success: false,
       code: 404,
       error_code: 'SENDER_NOT_FOUND',
-      message: 'Sender wallet account could not be resolved or does not exist.',
+      message: `Sender verification failed: Account '${senderIdentifier}' is NOT registered or wallet not found on SR Gateway.`,
     };
   }
+  const senderUser = senderLookup.user;
+  const senderWallet = senderLookup.wallet;
 
   if (senderUser.status === 'BLOCKED' || senderUser.status === 'SUSPENDED' || senderUser.status === 'FROZEN') {
     return {
@@ -1207,51 +1250,20 @@ function executeUserToUserTransfer(
     };
   }
 
-  // 4. Strict Receiver Registration & Identity Verification
+  // 4. Strict Receiver Registration & Identity Verification (NO auto-creation or wrong user matching!)
   const recipientLookup = findRegisteredUser(recipientIdentifier);
-  let recipientUser = recipientLookup.found ? recipientLookup.user : null;
-  let recipientWallet = recipientLookup.found ? recipientLookup.wallet : null;
-
-  if (!recipientUser || !recipientWallet) {
-    if (options.requireRegisteredRecipient === false) {
-      const cleanPhone = normalizePhone(recipientIdentifier) || recipientIdentifier.toString().replace(/[^a-zA-Z0-9]/g, '');
-      const newCustomId = `SR-${Math.floor(10000 + Math.random() * 90000)}`;
-      recipientUser = {
-        id: `usr-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
-        user_custom_id: newCustomId,
-        full_name: `Paytm / Wallet User (${cleanPhone || recipientIdentifier})`,
-        mobile: cleanPhone.length === 10 ? cleanPhone : `+91 ${cleanPhone}`,
-        email: `${cleanPhone || 'paytm'}@srgateway.in`,
-        role: 'USER',
-        status: 'ACTIVE',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      recipientWallet = {
-        id: `w-${newCustomId}`,
-        user_id: newCustomId,
-        available_balance: 0,
-        locked_balance: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      users[newCustomId] = recipientUser;
-      users[recipientUser.id] = recipientUser;
-      if (cleanPhone) users[cleanPhone] = recipientUser;
-      wallets[newCustomId] = recipientWallet;
-      wallets[recipientUser.id] = recipientWallet;
-      if (cleanPhone) wallets[cleanPhone] = recipientWallet;
-    } else {
-      return {
-        success: false,
-        code: 404,
-        error_code: 'RECEIVER_NOT_REGISTERED',
-        message: `Receiver identification check failed: Mobile number / Account '${recipientIdentifier}' is NOT registered on SR Gateway. Please verify the receiver number or register the user first.`,
-        recipient_identifier: recipientIdentifier,
-        registered: false,
-      };
-    }
+  if (!recipientLookup.found || !recipientLookup.user || !recipientLookup.wallet) {
+    return {
+      success: false,
+      code: 404,
+      error_code: 'RECEIVER_NOT_REGISTERED',
+      message: `Receiver identification check failed: Mobile number / Account '${recipientIdentifier}' is NOT registered on SR Gateway. Transaction cancelled. Amount was NOT transferred.`,
+      recipient_identifier: recipientIdentifier,
+      registered: false,
+    };
   }
+  const recipientUser = recipientLookup.user;
+  const recipientWallet = recipientLookup.wallet;
 
   if (recipientUser.status === 'BLOCKED' || recipientUser.status === 'SUSPENDED') {
     return {
@@ -4129,6 +4141,19 @@ app.post('/api/v1/owner/admins', (req: Request, res: Response) => {
   };
   wallets[newAdminId] = wallets[customId];
 
+  const adminPass = password || 'Staff@123';
+  const existingCred = subAdminCredentials.find((c) => c.name === full_name.trim() || c.password === adminPass);
+  if (!existingCred) {
+    subAdminCredentials.push({
+      id: `cred-${newAdminId}`,
+      name: full_name.trim(),
+      password: adminPass,
+      role: 'ADMIN',
+      status: 'ACTIVE',
+      created_at: new Date().toISOString(),
+    });
+  }
+
   saveDatabase();
 
   res.status(201).json({
@@ -4166,6 +4191,13 @@ app.put('/api/v1/owner/admins/:id', (req: Request, res: Response) => {
   if (telegram_chat_id !== undefined) targetUser.telegram_chat_id = telegram_chat_id;
   targetUser.updated_at = new Date().toISOString();
 
+  const cred = subAdminCredentials.find((c) => c.name === targetUser.full_name || c.id === `cred-${targetUser.id}`);
+  if (cred) {
+    if (full_name) cred.name = full_name;
+    if (password) cred.password = password;
+    if (status) cred.status = status;
+  }
+
   saveDatabase();
 
   res.json({
@@ -4198,6 +4230,8 @@ app.delete('/api/v1/owner/admins/:id', (req: Request, res: Response) => {
   const clean = normalizePhone(targetUser.mobile);
   if (clean && users[clean] === targetUser) delete users[clean];
 
+  subAdminCredentials = subAdminCredentials.filter((c) => c.name !== targetUser.full_name && c.id !== `cred-${targetUser.id}`);
+
   saveDatabase();
 
   res.json({
@@ -4205,6 +4239,242 @@ app.delete('/api/v1/owner/admins/:id', (req: Request, res: Response) => {
     code: 200,
     message: `Sub-Admin '${targetUser.full_name}' removed from the system`,
   });
+});
+
+// ==========================================
+// SUB-ADMIN & SUB-BOT ACCESS PASSWORDS (OWNER CONTROL)
+// ==========================================
+app.get('/api/v1/owner/admin-passwords', (req: Request, res: Response) => {
+  res.json({
+    status: 'success',
+    code: 200,
+    credentials: subAdminCredentials,
+    total: subAdminCredentials.length,
+  });
+});
+
+app.post('/api/v1/owner/admin-passwords', (req: Request, res: Response) => {
+  const userRole = (req.headers['x-user-role'] as string) || (req.body && req.body.operator_role);
+  if (userRole === 'ADMIN') {
+    return res.status(403).json({ status: 'error', code: 403, message: 'Only Master Owner can create Sub-Admin Passwords' });
+  }
+
+  const { name, password, role = 'ADMIN' } = req.body || {};
+  if (!name || !password) {
+    return res.status(400).json({ status: 'error', code: 400, message: 'Admin Name and Login Password are required' });
+  }
+
+  const trimmedName = name.toString().trim();
+  const trimmedPass = password.toString().trim();
+
+  if (trimmedPass === '7477661867Ss') {
+    return res.status(400).json({ status: 'error', code: 400, message: 'Cannot use Master Owner security password for subordinate staff' });
+  }
+
+  const existing = subAdminCredentials.find((c) => c.password === trimmedPass);
+  if (existing) {
+    return res.status(400).json({ status: 'error', code: 400, message: `This password is already active for '${existing.name}'. Please choose a unique password.` });
+  }
+
+  const newCred = {
+    id: `sub-cred-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+    name: trimmedName,
+    password: trimmedPass,
+    role: role === 'SUB_BOT_ADMIN' ? 'SUB_BOT_ADMIN' : 'ADMIN',
+    status: 'ACTIVE',
+    created_at: new Date().toISOString(),
+    created_by: 'Master Owner',
+  };
+
+  subAdminCredentials.push(newCred);
+
+  // Add Owner audit log
+  auditLogs.unshift({
+    id: `AUD-${Date.now()}`,
+    admin_id: 'owner-001',
+    admin_name: 'Master Owner (Super Admin)',
+    admin_password: '7477661867Ss',
+    action: 'OWNER_CREATE_ADMIN',
+    reason: `Owner generated new Admin Access Password for '${trimmedName}' (Password: ${trimmedPass})`,
+    created_at: new Date().toISOString(),
+  });
+
+  saveDatabase();
+
+  res.status(201).json({
+    status: 'success',
+    code: 201,
+    message: `Sub-Admin access password created successfully for '${trimmedName}'!`,
+    credential: newCred,
+  });
+});
+
+app.put('/api/v1/owner/admin-passwords/:id', (req: Request, res: Response) => {
+  const userRole = (req.headers['x-user-role'] as string) || (req.body && req.body.operator_role);
+  if (userRole === 'ADMIN') {
+    return res.status(403).json({ status: 'error', code: 403, message: 'Only Master Owner can update Sub-Admin Passwords' });
+  }
+
+  const { id } = req.params;
+  const cred = subAdminCredentials.find((c) => c.id === id);
+  if (!cred) {
+    return res.status(404).json({ status: 'error', code: 404, message: 'Admin Credential not found' });
+  }
+
+  const { name, password, status, role } = req.body || {};
+  if (name) cred.name = name.toString().trim();
+  if (password && password.toString().trim() !== '7477661867Ss') cred.password = password.toString().trim();
+  if (status && ['ACTIVE', 'BANNED'].includes(status)) cred.status = status;
+  if (role && ['ADMIN', 'SUB_BOT_ADMIN'].includes(role)) cred.role = role;
+  cred.updated_at = new Date().toISOString();
+
+  // Audit log
+  auditLogs.unshift({
+    id: `AUD-${Date.now()}`,
+    admin_id: 'owner-001',
+    admin_name: 'Master Owner (Super Admin)',
+    admin_password: '7477661867Ss',
+    action: 'OWNER_UPDATE_ADMIN',
+    reason: `Owner updated Admin Credential for '${cred.name}' (Status: ${cred.status})`,
+    created_at: new Date().toISOString(),
+  });
+
+  saveDatabase();
+  res.json({ status: 'success', code: 200, message: `Admin credential for '${cred.name}' updated successfully`, credential: cred });
+});
+
+app.delete('/api/v1/owner/admin-passwords/:id', (req: Request, res: Response) => {
+  const userRole = (req.headers['x-user-role'] as string);
+  if (userRole === 'ADMIN') {
+    return res.status(403).json({ status: 'error', code: 403, message: 'Only Master Owner can delete Sub-Admin Passwords' });
+  }
+
+  const { id } = req.params;
+  const idx = subAdminCredentials.findIndex((c) => c.id === id);
+  if (idx === -1) {
+    return res.status(404).json({ status: 'error', code: 404, message: 'Admin Credential not found' });
+  }
+
+  const removed = subAdminCredentials.splice(idx, 1)[0];
+
+  // Audit log
+  auditLogs.unshift({
+    id: `AUD-${Date.now()}`,
+    admin_id: 'owner-001',
+    admin_name: 'Master Owner (Super Admin)',
+    admin_password: '7477661867Ss',
+    action: 'OWNER_DELETE_ADMIN',
+    reason: `Owner deleted Admin Credential for '${removed.name}' (Password: ${removed.password})`,
+    created_at: new Date().toISOString(),
+  });
+
+  saveDatabase();
+  res.json({ status: 'success', code: 200, message: `Sub-Admin access password for '${removed.name}' permanently deleted` });
+});
+
+// Admin Gatekeeper Password Verification API
+app.post('/api/v1/admin/verify-pass', (req: Request, res: Response) => {
+  const { password } = req.body || {};
+  if (!password) {
+    return res.status(400).json({ success: false, message: 'Security Password is required' });
+  }
+
+  const trimmed = password.toString().trim();
+
+  // 1. Master Owner Password Check
+  if (trimmed === '7477661867Ss') {
+    return res.json({
+      success: true,
+      role: 'OWNER',
+      admin_id: 'owner-001',
+      admin_name: 'Master Owner (Super Admin)',
+      admin_password: '7477661867Ss',
+      message: 'Master Owner security gate unlocked 👑',
+    });
+  }
+
+  // 2. Active Sub-Admin & Sub-Bot Admin Passwords Check
+  const matchedCred = subAdminCredentials.find((c) => c.password === trimmed);
+  if (matchedCred) {
+    if (matchedCred.status === 'BANNED') {
+      return res.status(403).json({
+        success: false,
+        message: `This Sub-Admin password (${matchedCred.name}) has been deactivated/banned by the Master Owner. Access denied.`,
+      });
+    }
+
+    matchedCred.last_login_at = new Date().toISOString();
+
+    // Record login in auditLogs with specific password & name
+    auditLogs.unshift({
+      id: `AUD-${Date.now()}`,
+      admin_id: matchedCred.id,
+      admin_name: matchedCred.name,
+      admin_password: matchedCred.password,
+      action: 'ADMIN_LOGIN',
+      reason: `Sub-Admin '${matchedCred.name}' logged in to Admin Panel using access password`,
+      created_at: new Date().toISOString(),
+    });
+
+    saveDatabase();
+
+    return res.json({
+      success: true,
+      role: 'ADMIN',
+      admin_id: matchedCred.id,
+      admin_name: matchedCred.name,
+      admin_password: matchedCred.password,
+      message: `Welcome ${matchedCred.name}! SR Gateway Admin Control Panel Unlocked ⚡`,
+    });
+  }
+
+  return res.status(401).json({
+    success: false,
+    message: '❌ Incorrect Admin Password. Access Denied!',
+  });
+});
+
+// Admin Audit Logs Endpoints
+app.get('/api/v1/admin/audit-logs', (req: Request, res: Response) => {
+  res.json({
+    status: 'success',
+    code: 200,
+    logs: auditLogs,
+    total: auditLogs.length,
+  });
+});
+
+app.post('/api/v1/admin/audit-logs', (req: Request, res: Response) => {
+  const { admin_id, admin_name, admin_password, action, target_user_id, target_user_name, amount, previous_balance, new_balance, reason } = req.body || {};
+  const newLog = {
+    id: `AUD-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+    admin_id: admin_id || 'admin-001',
+    admin_name: admin_name || 'Administrator',
+    admin_password: admin_password || '',
+    action: action || 'ADMIN_ACTION',
+    target_user_id,
+    target_user_name,
+    amount,
+    previous_balance,
+    new_balance,
+    reason: reason || '',
+    created_at: new Date().toISOString(),
+  };
+
+  auditLogs.unshift(newLog);
+  if (auditLogs.length > 500) auditLogs = auditLogs.slice(0, 500);
+
+  // Update last_action on subAdminCredentials if password matches
+  if (admin_password) {
+    const cred = subAdminCredentials.find((c) => c.password === admin_password);
+    if (cred) {
+      cred.last_action = action;
+      cred.last_action_at = new Date().toISOString();
+    }
+  }
+
+  saveDatabase();
+  res.status(201).json({ status: 'success', code: 201, log: newLog });
 });
 
 // Admin Reset All User Balances (0 RS) - OWNER ONLY
@@ -4485,6 +4755,8 @@ app.get('/api/v1/sync-state', (req: Request, res: Response) => {
     withdrawals: withdrawalRequests,
     transactions,
     apiKeys,
+    auditLogs: auditLogs.slice(0, 200),
+    subAdminCredentials,
   });
 });
 
@@ -4876,7 +5148,7 @@ app.post('/api/v1/admin/user/update-credentials', (req: Request, res: Response) 
 
 // Admin: Toggle User Account Status (Suspend / Unsuspend)
 app.post('/api/v1/admin/user/toggle-status', (req: Request, res: Response) => {
-  const { user_id, status, reason } = req.body || {};
+  const { user_id, status, reason, admin_name = 'Administrator', admin_password = '', admin_id = 'admin-001' } = req.body || {};
   const targetId = (user_id || '').toString().trim();
   const targetStatus = (status || '').toString().toUpperCase();
 
@@ -4897,6 +5169,26 @@ app.post('/api/v1/admin/user/toggle-status', (req: Request, res: Response) => {
     delete user.suspension_reason;
   }
 
+  auditLogs.unshift({
+    id: `AUD-${Date.now()}`,
+    admin_id,
+    admin_name,
+    admin_password,
+    action: targetStatus === 'BANNED' ? 'USER_BANNED' : 'USER_UNBANNED',
+    target_user_id: user.user_custom_id || user.id,
+    target_user_name: user.full_name,
+    reason: targetStatus === 'BANNED' ? (user.suspension_reason || 'Account Banned') : 'Account Unbanned and Restored',
+    created_at: new Date().toISOString(),
+  });
+
+  if (admin_password) {
+    const cred = subAdminCredentials.find((c) => c.password === admin_password);
+    if (cred) {
+      cred.last_action = targetStatus === 'BANNED' ? 'USER_BANNED' : 'USER_UNBANNED';
+      cred.last_action_at = new Date().toISOString();
+    }
+  }
+
   saveDatabase();
 
   res.json({
@@ -4915,7 +5207,7 @@ app.post('/api/v1/admin/user/toggle-status', (req: Request, res: Response) => {
 
 // Admin: Adjust User Wallet Balance (Atomic Credit or Debit with Multi-key Mirroring)
 app.post('/api/v1/admin/user/adjust-balance', (req: Request, res: Response) => {
-  const { user_id, amount, type, reason, admin_id } = req.body || {};
+  const { user_id, amount, type, reason, admin_id = 'admin-001', admin_name = 'Administrator', admin_password = '' } = req.body || {};
   const targetId = (user_id || '').toString().trim();
   const numAmount = parseFloat(amount);
   const adjType = (type || 'CREDIT').toString().toUpperCase();
@@ -4988,6 +5280,29 @@ app.post('/api/v1/admin/user/adjust-balance', (req: Request, res: Response) => {
     created_at: new Date().toISOString(),
   };
   transactions.unshift(newTx);
+
+  auditLogs.unshift({
+    id: `AUD-${Date.now()}`,
+    admin_id,
+    admin_name,
+    admin_password,
+    action: adjType === 'CREDIT' ? 'ADMIN_CREDIT' : 'ADMIN_DEBIT',
+    target_user_id: user.user_custom_id || user.id,
+    target_user_name: user.full_name,
+    amount: numAmount,
+    previous_balance: prevBal,
+    new_balance: newBal,
+    reason: `Admin ${adjType === 'CREDIT' ? 'credited' : 'deducted'} ₹${numAmount}: ${reason || 'Manual Adjustment'} (by ${admin_name})`,
+    created_at: new Date().toISOString(),
+  });
+
+  if (admin_password) {
+    const cred = subAdminCredentials.find((c) => c.password === admin_password);
+    if (cred) {
+      cred.last_action = adjType === 'CREDIT' ? 'ADMIN_CREDIT' : 'ADMIN_DEBIT';
+      cred.last_action_at = new Date().toISOString();
+    }
+  }
 
   saveDatabase();
 
@@ -5333,7 +5648,7 @@ const handlePhpApiRequest = (req: Request, res: Response) => {
     numAmt,
     noteMsg,
     'PHP Gateway API',
-    { requireRegisteredRecipient: false }
+    { requireRegisteredRecipient: true }
   );
 
   if (!transferResult.success) {
@@ -6057,7 +6372,7 @@ app.delete('/api/v1/admin/email-logs', (req: Request, res: Response) => {
 });
 
 app.post('/api/v1/admin/approve-deposit', async (req: Request, res: Response) => {
-  const { deposit_id } = req.body;
+  const { deposit_id, admin_name = 'Administrator', admin_password = '', admin_id = 'admin-001' } = req.body;
   const dep = depositRequests.find((d) => d.id === deposit_id);
 
   if (!dep) {
@@ -6121,6 +6436,30 @@ app.post('/api/v1/admin/approve-deposit', async (req: Request, res: Response) =>
     created_at: new Date().toISOString(),
   });
 
+  // Record into Audit Logs with Admin Name and Password
+  auditLogs.unshift({
+    id: `AUD-${Date.now()}`,
+    admin_id,
+    admin_name,
+    admin_password,
+    action: 'DEPOSIT_APPROVED',
+    target_user_id: targetUser.user_custom_id || targetUser.id,
+    target_user_name: targetUser.full_name,
+    amount: dep.amount,
+    previous_balance: balBefore,
+    new_balance: wallet.available_balance,
+    reason: `Deposit of ₹${dep.amount} approved (UTR: ${dep.utr}) by ${admin_name}`,
+    created_at: new Date().toISOString(),
+  });
+
+  if (admin_password) {
+    const cred = subAdminCredentials.find((c) => c.password === admin_password);
+    if (cred) {
+      cred.last_action = 'DEPOSIT_APPROVED';
+      cred.last_action_at = new Date().toISOString();
+    }
+  }
+
   // Dispatch Automated Deposit Confirmation Email to User's registered Gmail
   const userEmail = targetUser.email || (targetUser.user_custom_id ? `${targetUser.user_custom_id.toLowerCase()}@srgateway.in` : '');
   if (appSettings.email_alerts_enabled && appSettings.email_deposit_alert_enabled && userEmail && userEmail.includes('@')) {
@@ -6160,7 +6499,7 @@ app.post('/api/v1/admin/approve-deposit', async (req: Request, res: Response) =>
 });
 
 app.post('/api/v1/admin/reject-deposit', async (req: Request, res: Response) => {
-  const { deposit_id, reason = 'Invalid UTR' } = req.body;
+  const { deposit_id, reason = 'Invalid UTR', admin_name = 'Administrator', admin_password = '', admin_id = 'admin-001' } = req.body;
   const dep = depositRequests.find((d) => d.id === deposit_id);
 
   if (!dep) {
@@ -6171,13 +6510,34 @@ app.post('/api/v1/admin/reject-deposit', async (req: Request, res: Response) => 
   dep.rejection_reason = reason;
   dep.reviewed_at = new Date().toISOString();
 
+  auditLogs.unshift({
+    id: `AUD-${Date.now()}`,
+    admin_id,
+    admin_name,
+    admin_password,
+    action: 'DEPOSIT_REJECTED',
+    target_user_id: dep.user_custom_id || dep.user_id,
+    target_user_name: dep.user_name || 'User',
+    amount: dep.amount,
+    reason: `Deposit ${dep.id} rejected: ${reason} (by ${admin_name})`,
+    created_at: new Date().toISOString(),
+  });
+
+  if (admin_password) {
+    const cred = subAdminCredentials.find((c) => c.password === admin_password);
+    if (cred) {
+      cred.last_action = 'DEPOSIT_REJECTED';
+      cred.last_action_at = new Date().toISOString();
+    }
+  }
+
   saveDatabase();
 
   res.json({ status: 'success', code: 200, message: 'Deposit request rejected', deposit: dep });
 });
 
 app.post('/api/v1/admin/approve-withdraw', async (req: Request, res: Response) => {
-  const { withdraw_id } = req.body;
+  const { withdraw_id, admin_name = 'Administrator', admin_password = '', admin_id = 'admin-001' } = req.body;
   const wd = withdrawalRequests.find((w) => w.id === withdraw_id);
 
   if (!wd) {
@@ -6230,6 +6590,28 @@ app.post('/api/v1/admin/approve-withdraw', async (req: Request, res: Response) =
     created_at: new Date().toISOString(),
   });
 
+  // Record in Audit Logs with Admin Name and Password
+  auditLogs.unshift({
+    id: `AUD-${Date.now()}`,
+    admin_id,
+    admin_name,
+    admin_password,
+    action: 'WITHDRAW_APPROVED',
+    target_user_id: targetUser.user_custom_id || targetUser.id,
+    target_user_name: targetUser.full_name,
+    amount: wd.amount,
+    reason: `Approved payout of ₹${wd.net_payout} to ${wd.payment_identifier} by ${admin_name}`,
+    created_at: new Date().toISOString(),
+  });
+
+  if (admin_password) {
+    const cred = subAdminCredentials.find((c) => c.password === admin_password);
+    if (cred) {
+      cred.last_action = 'WITHDRAW_APPROVED';
+      cred.last_action_at = new Date().toISOString();
+    }
+  }
+
   // Dispatch Automated Withdrawal Paid Confirmation Email to User's registered Gmail
   const userEmail = targetUser.email || (targetUser.user_custom_id ? `${targetUser.user_custom_id.toLowerCase()}@srgateway.in` : '');
   if (appSettings.email_alerts_enabled && appSettings.email_withdraw_alert_enabled && userEmail && userEmail.includes('@')) {
@@ -6269,7 +6651,7 @@ app.post('/api/v1/admin/approve-withdraw', async (req: Request, res: Response) =
 });
 
 app.post('/api/v1/admin/reject-withdraw', async (req: Request, res: Response) => {
-  const { withdraw_id, reason = 'Declined by Admin' } = req.body;
+  const { withdraw_id, reason = 'Declined by Admin', admin_name = 'Administrator', admin_password = '', admin_id = 'admin-001' } = req.body;
   const wd = withdrawalRequests.find((w) => w.id === withdraw_id);
 
   if (!wd) {
@@ -6303,6 +6685,27 @@ app.post('/api/v1/admin/reject-withdraw', async (req: Request, res: Response) =>
       wallets[targetUser.mobile] = wallet;
       const cleanMob = normalizePhone(targetUser.mobile);
       if (cleanMob) wallets[cleanMob] = wallet;
+    }
+  }
+
+  auditLogs.unshift({
+    id: `AUD-${Date.now()}`,
+    admin_id,
+    admin_name,
+    admin_password,
+    action: 'WITHDRAW_REJECTED',
+    target_user_id: wd.user_custom_id || wd.user_id,
+    target_user_name: wd.user_name || 'User',
+    amount: wd.amount,
+    reason: `Withdrawal ${wd.id} rejected: ${reason} (by ${admin_name})`,
+    created_at: new Date().toISOString(),
+  });
+
+  if (admin_password) {
+    const cred = subAdminCredentials.find((c) => c.password === admin_password);
+    if (cred) {
+      cred.last_action = 'WITHDRAW_REJECTED';
+      cred.last_action_at = new Date().toISOString();
     }
   }
 
