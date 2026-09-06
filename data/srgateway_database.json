@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "last_saved": "2026-09-05T15:56:26.621Z",
+  "last_saved": "2026-09-06T00:28:36.133Z",
   "appSettings": {
     "deposit_enabled": true,
     "withdraw_enabled": true,
@@ -28,6 +28,9 @@
     "telegram_channel_name": "SR TECHNOLOGY LTD",
     "telegram_channel_url": "https://t.me/SRTECHNOLOGYLTD1",
     "support_url": "https://t.me/SRGatewaySupportBot",
+    "support_telegram_username": "@SRGatewayBot",
+    "whatsapp_support_number": "+91 7477661867",
+    "whatsapp_support_url": "https://wa.me/917477661867",
     "app_url": "https://sr-gateway-in.up.railway.app",
     "otp_telegram_bot_username": "@SRGatewayBot",
     "otp_telegram_bot_token": "8853576053:AAHQ_USjZRB4zH7J4_p3ceSASQpXC1LN-2c",
@@ -56,6 +59,20 @@
     "auto_suspend_on_limit_exceeded": true
   },
   "users": [
+    {
+      "id": "admin-001",
+      "user_custom_id": "SR-ADMIN-01",
+      "full_name": "SR Gateway System Admin",
+      "mobile": "+91 90000 00000",
+      "email": "",
+      "telegram_id": "",
+      "role": "ADMIN",
+      "status": "ACTIVE",
+      "referral_code": "ADMIN001",
+      "created_at": "2026-07-01T00:00:00.000Z",
+      "updated_at": "2026-08-22T00:00:00.000Z",
+      "telegram_chat_id": ""
+    },
     {
       "id": "user-001",
       "user_custom_id": "SR-10029",
@@ -97,20 +114,6 @@
       "created_at": "2026-08-05T14:15:00Z",
       "updated_at": "2026-08-16T12:43:36.705Z",
       "rpin": "2121"
-    },
-    {
-      "id": "admin-001",
-      "user_custom_id": "SR-ADMIN-01",
-      "full_name": "SR Gateway System Admin",
-      "mobile": "+91 90000 00000",
-      "email": "",
-      "telegram_id": "",
-      "role": "ADMIN",
-      "status": "ACTIVE",
-      "referral_code": "ADMIN001",
-      "created_at": "2026-07-01T00:00:00.000Z",
-      "updated_at": "2026-08-22T00:00:00.000Z",
-      "telegram_chat_id": ""
     },
     {
       "id": "user-964253",

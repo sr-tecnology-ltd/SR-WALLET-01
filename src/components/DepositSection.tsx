@@ -17,6 +17,7 @@ import {
   Image as ImageIcon,
   X,
   FileCheck,
+  RefreshCw,
 } from 'lucide-react';
 
 export const DepositSection: React.FC = () => {
@@ -28,6 +29,7 @@ export const DepositSection: React.FC = () => {
   const [note, setNote] = useState<string>('');
   const [screenshotData, setScreenshotData] = useState<string>('');
   const [screenshotFileName, setScreenshotFileName] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [copiedBank, setCopiedBank] = useState(false);
@@ -65,9 +67,39 @@ export const DepositSection: React.FC = () => {
     setScreenshotFileName(file.name);
     const reader = new FileReader();
     reader.onload = (event) => {
-      if (event.target?.result) {
-        setScreenshotData(event.target.result as string);
-      }
+      const rawData = event.target?.result as string;
+      if (!rawData) return;
+      // High-performance canvas compression: scales large mobile camera screenshots down to max 900px JPEG (~60KB)
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 900;
+        let width = img.width;
+        let height = img.height;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', 0.72);
+          setScreenshotData(compressed);
+        } else {
+          setScreenshotData(rawData.slice(0, 300000));
+        }
+      };
+      img.onerror = () => {
+        setScreenshotData(rawData.slice(0, 300000));
+      };
+      img.src = rawData;
     };
     reader.readAsDataURL(file);
   };
@@ -122,8 +154,9 @@ export const DepositSection: React.FC = () => {
     link.click();
   };
 
-  const handleDepositSubmit = (e: React.FormEvent) => {
+  const handleDepositSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setStatusMsg(null);
 
     if (amount <= 0) {
@@ -139,27 +172,32 @@ export const DepositSection: React.FC = () => {
       return;
     }
 
-    const calculatedFee = (amount * settings.deposit_charge_percent) / 100;
-    const calculatedNet = amount - calculatedFee;
+    setIsSubmitting(true);
+    try {
+      const calculatedFee = (amount * settings.deposit_charge_percent) / 100;
+      const calculatedNet = amount - calculatedFee;
 
-    const res = submitDepositRequest(amount, utr.trim(), paymentMethod, screenshotData, note);
-    if (res.success) {
-      setStatusMsg({ type: 'success', text: res.message });
-      setSubmittedDepositModal({
-        id: `DEP-${Date.now().toString().slice(-6)}`,
-        amount,
-        netAmount: calculatedNet,
-        utr: utr.trim(),
-        method: paymentMethod,
-        status: 'PENDING',
-        date: new Date().toLocaleString(),
-      });
-      setUtr('');
-      setNote('');
-      setScreenshotData('');
-      setScreenshotFileName('');
-    } else {
-      setStatusMsg({ type: 'error', text: res.message });
+      const res = await submitDepositRequest(amount, utr.trim(), paymentMethod, screenshotData, note);
+      if (res.success) {
+        setStatusMsg({ type: 'success', text: res.message });
+        setSubmittedDepositModal({
+          id: res.deposit?.id || `DEP-${Date.now().toString().slice(-6)}`,
+          amount,
+          netAmount: calculatedNet,
+          utr: utr.trim(),
+          method: paymentMethod,
+          status: 'PENDING',
+          date: new Date().toLocaleString(),
+        });
+        setUtr('');
+        setNote('');
+        setScreenshotData('');
+        setScreenshotFileName('');
+      } else {
+        setStatusMsg({ type: 'error', text: res.message });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -432,9 +470,17 @@ export const DepositSection: React.FC = () => {
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-black text-sm rounded-2xl transition shadow-xl shadow-emerald-500/20 active:scale-95"
+              disabled={isSubmitting}
+              className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 disabled:opacity-50 text-slate-950 font-black text-sm rounded-2xl transition shadow-xl shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-2"
             >
-              Submit Deposit Request ⚡
+              {isSubmitting ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <span>Submitting to Server...</span>
+                </>
+              ) : (
+                <span>Submit Deposit Request ⚡</span>
+              )}
             </button>
           </form>
         </div>

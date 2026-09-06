@@ -47,23 +47,23 @@ interface WalletContextType {
 
   // Deposits
   deposits: DepositRequest[];
-  submitDepositRequest: (amount: number, utr: string, paymentMethod: 'UPI' | 'BANK_TRANSFER' | 'QR_CODE' | 'WALLET_GW', screenshotUrl?: string, note?: string) => { success: boolean; message: string };
-  approveDeposit: (depositId: string) => { success: boolean; message: string };
-  rejectDeposit: (depositId: string, reason: string) => { success: boolean; message: string };
+  submitDepositRequest: (amount: number, utr: string, paymentMethod: 'UPI' | 'BANK_TRANSFER' | 'QR_CODE' | 'WALLET_GW', screenshotUrl?: string, note?: string) => Promise<{ success: boolean; message: string; deposit?: DepositRequest }>;
+  approveDeposit: (depositId: string) => Promise<{ success: boolean; message: string }>;
+  rejectDeposit: (depositId: string, reason: string) => Promise<{ success: boolean; message: string }>;
 
   // Withdrawals
   withdrawals: WithdrawalRequest[];
-  submitWithdrawalRequest: (amount: number, paymentIdentifier: string, note?: string) => { success: boolean; message: string };
-  approveWithdrawal: (withdrawalId: string) => { success: boolean; message: string };
-  rejectWithdrawal: (withdrawalId: string, reason: string) => { success: boolean; message: string };
-  markWithdrawalPaid: (withdrawalId: string, paymentReference: string) => { success: boolean; message: string };
+  submitWithdrawalRequest: (amount: number, paymentIdentifier: string, note?: string) => Promise<{ success: boolean; message: string; withdrawal?: WithdrawalRequest }>;
+  approveWithdrawal: (withdrawalId: string) => Promise<{ success: boolean; message: string }>;
+  rejectWithdrawal: (withdrawalId: string, reason: string) => Promise<{ success: boolean; message: string }>;
+  markWithdrawalPaid: (withdrawalId: string, paymentReference: string) => Promise<{ success: boolean; message: string }>;
 
   // Internal Transfer
   transferBalance: (recipientQuery: string, amount: number, note?: string) => { success: boolean; message: string };
 
   // Admin User Operations
-  addBalanceByAdmin: (targetUserId: string, amount: number, reason: string) => { success: boolean; message: string };
-  cutBalanceByAdmin: (targetUserId: string, amount: number, reason: string) => { success: boolean; message: string };
+  addBalanceByAdmin: (targetUserId: string, amount: number, reason: string) => Promise<{ success: boolean; message: string }>;
+  cutBalanceByAdmin: (targetUserId: string, amount: number, reason: string) => Promise<{ success: boolean; message: string }>;
   resetAllUserBalances: () => Promise<{ success: boolean; message: string; usersAffected?: number; totalAmount?: number }>;
   wipeAllUserData: () => Promise<{ success: boolean; message: string; usersCleared?: number }>;
   banUser: (targetUserId: string, reason: string) => void;
@@ -153,6 +153,14 @@ interface WalletContextType {
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_KEY = 'SR_GATEWAY_IN_STATE_V2';
+
+const safeLocalStorageSet = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (err) {
+    console.warn(`[Storage] Failed to save key "${key}" to localStorage:`, err);
+  }
+};
 
 export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Load state from localStorage or initialize
@@ -283,15 +291,15 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     if (!isHydrated) return; // Do not overwrite backend on initial un-hydrated mount
 
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_PROFILES`, JSON.stringify(profiles));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_WALLETS`, JSON.stringify(wallets));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_SETTINGS`, JSON.stringify(settings));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_DEPOSITS`, JSON.stringify(deposits));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_WITHDRAWALS`, JSON.stringify(withdrawals));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_TRANSACTIONS`, JSON.stringify(transactions));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_AUDITS`, JSON.stringify(auditLogs));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_NOTIFS`, JSON.stringify(notifications));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_API_KEYS`, JSON.stringify(apiKeys));
+    safeLocalStorageSet(`${LOCAL_STORAGE_KEY}_PROFILES`, JSON.stringify(profiles));
+    safeLocalStorageSet(`${LOCAL_STORAGE_KEY}_WALLETS`, JSON.stringify(wallets));
+    safeLocalStorageSet(`${LOCAL_STORAGE_KEY}_SETTINGS`, JSON.stringify(settings));
+    safeLocalStorageSet(`${LOCAL_STORAGE_KEY}_DEPOSITS`, JSON.stringify(deposits));
+    safeLocalStorageSet(`${LOCAL_STORAGE_KEY}_WITHDRAWALS`, JSON.stringify(withdrawals));
+    safeLocalStorageSet(`${LOCAL_STORAGE_KEY}_TRANSACTIONS`, JSON.stringify(transactions));
+    safeLocalStorageSet(`${LOCAL_STORAGE_KEY}_AUDITS`, JSON.stringify(auditLogs));
+    safeLocalStorageSet(`${LOCAL_STORAGE_KEY}_NOTIFS`, JSON.stringify(notifications));
+    safeLocalStorageSet(`${LOCAL_STORAGE_KEY}_API_KEYS`, JSON.stringify(apiKeys));
 
     const isAdmin = activeUserId === 'admin-001' || activeUserId === 'SR-ADMIN-01';
 
@@ -308,9 +316,10 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         apiKeys,
         settings,
         isAdmin,
+        forceAdminWalletSync: isAdmin,
       }),
     }).catch(() => {});
-  }, [profiles, wallets, settings, deposits, withdrawals, transactions, auditLogs, notifications, apiKeys, isHydrated]);
+  }, [profiles, wallets, settings, deposits, withdrawals, transactions, auditLogs, notifications, apiKeys, isHydrated, activeUserId]);
 
   // Helper to generate User Requested Transaction ID format like SR-S83F84OT9G3KE
   const generateSRTxnId = (suffix = '') => {
@@ -335,8 +344,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (!res.ok) return;
       const data = await res.json();
       if (data.status === 'success') {
-        // Fast signature check to avoid redundant JSON parsing & state updates
-        const signature = `${JSON.stringify(data.settings || {})}_${(data.profiles || []).length}_${(data.deposits || []).length}_${(data.withdrawals || []).length}_${(data.transactions || []).length}_${JSON.stringify(data.wallets || {})}`;
+        // Precise status-sensitive signature check
+        const depSig = (data.deposits || []).map((d: any) => `${d.id}:${d.status}:${d.amount}`).join(';');
+        const withSig = (data.withdrawals || []).map((w: any) => `${w.id}:${w.status}:${w.amount}`).join(';');
+        const walletSig = Object.entries(data.wallets || {}).map(([k, w]: [string, any]) => `${k}:${w?.available_balance}:${w?.locked_balance}`).join(';');
+        const signature = `${JSON.stringify(data.settings || {})}_${(data.profiles || []).length}_${depSig}_${withSig}_${(data.transactions || []).length}_${walletSig}`;
         if (signature === lastSyncSignatureRef.current) {
           return;
         }
@@ -348,7 +360,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             const hasChanged = JSON.stringify(prev) !== JSON.stringify({ ...prev, ...data.settings });
             if (!hasChanged) return prev;
             const next = { ...prev, ...data.settings };
-            localStorage.setItem(`${LOCAL_STORAGE_KEY}_SETTINGS`, JSON.stringify(next));
+            safeLocalStorageSet(`${LOCAL_STORAGE_KEY}_SETTINGS`, JSON.stringify(next));
             return next;
           });
         }
@@ -375,7 +387,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             });
             if (!hasChanged) return prev;
             const updated = Array.from(map.values());
-            localStorage.setItem(`${LOCAL_STORAGE_KEY}_PROFILES`, JSON.stringify(updated));
+            safeLocalStorageSet(`${LOCAL_STORAGE_KEY}_PROFILES`, JSON.stringify(updated));
             return updated;
           });
         }
@@ -397,7 +409,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             });
             if (!hasChanged && prev.length === map.size) return prev;
             const updated = Array.from(map.values());
-            localStorage.setItem(`${LOCAL_STORAGE_KEY}_DEPOSITS`, JSON.stringify(updated));
+            safeLocalStorageSet(`${LOCAL_STORAGE_KEY}_DEPOSITS`, JSON.stringify(updated));
             return updated;
           });
         }
@@ -419,7 +431,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             });
             if (!hasChanged && prev.length === map.size) return prev;
             const updated = Array.from(map.values());
-            localStorage.setItem(`${LOCAL_STORAGE_KEY}_WITHDRAWALS`, JSON.stringify(updated));
+            safeLocalStorageSet(`${LOCAL_STORAGE_KEY}_WITHDRAWALS`, JSON.stringify(updated));
             return updated;
           });
         }
@@ -431,7 +443,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             const newItems = data.transactions.filter((t: any) => !existingIds.has(t.id));
             if (newItems.length > 0) {
               const merged = [...newItems, ...prev];
-              localStorage.setItem(`${LOCAL_STORAGE_KEY}_TRANSACTIONS`, JSON.stringify(merged));
+              safeLocalStorageSet(`${LOCAL_STORAGE_KEY}_TRANSACTIONS`, JSON.stringify(merged));
               return merged;
             }
             return prev;
@@ -456,8 +468,31 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 }
               }
             });
+
+            // Cross-mirror for all known profiles to guarantee balance synchronization across user_custom_id, id, and mobile
+            profiles.forEach((p) => {
+              const canonical =
+                (p.id && next[p.id]) ||
+                (p.user_custom_id && next[p.user_custom_id]) ||
+                (p.mobile && next[p.mobile]);
+              if (canonical) {
+                if (p.id && (!next[p.id] || next[p.id].available_balance !== canonical.available_balance)) {
+                  next[p.id] = canonical;
+                  changed = true;
+                }
+                if (p.user_custom_id && (!next[p.user_custom_id] || next[p.user_custom_id].available_balance !== canonical.available_balance)) {
+                  next[p.user_custom_id] = canonical;
+                  changed = true;
+                }
+                if (p.mobile && (!next[p.mobile] || next[p.mobile].available_balance !== canonical.available_balance)) {
+                  next[p.mobile] = canonical;
+                  changed = true;
+                }
+              }
+            });
+
             if (changed) {
-              localStorage.setItem(`${LOCAL_STORAGE_KEY}_WALLETS`, JSON.stringify(next));
+              safeLocalStorageSet(`${LOCAL_STORAGE_KEY}_WALLETS`, JSON.stringify(next));
               return next;
             }
             return prev;
@@ -470,9 +505,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       isSyncingRef.current = false;
       setIsHydrated(true);
     }
-  }, []);
+  }, [profiles]);
 
-  // Periodic background poll from backend with visibility optimization (6s interval when active, paused when hidden)
+  // Periodic background poll from backend with visibility optimization (3.5s interval when active, paused when hidden)
   useEffect(() => {
     refreshFromBackend();
 
@@ -486,7 +521,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (document.visibilityState === 'visible') {
         refreshFromBackend();
       }
-    }, 6000);
+    }, 3500);
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleVisibilityChange);
@@ -548,8 +583,15 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [profiles]);
 
   const currentWallet: Wallet = useMemo(() => {
-    if (currentUser.id && (wallets[currentUser.id] || wallets[currentUser.user_custom_id])) {
-      return wallets[currentUser.id] || wallets[currentUser.user_custom_id];
+    const cleanMobile = currentUser.mobile ? currentUser.mobile.replace(/[^0-9]/g, '') : '';
+    const foundWallet =
+      (currentUser.id && wallets[currentUser.id]) ||
+      (currentUser.user_custom_id && wallets[currentUser.user_custom_id]) ||
+      (currentUser.mobile && wallets[currentUser.mobile]) ||
+      (cleanMobile && wallets[cleanMobile]);
+
+    if (foundWallet) {
+      return foundWallet;
     }
     return {
       id: currentUser.id ? `w-${currentUser.id}` : 'w-guest',
@@ -559,7 +601,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-  }, [currentUser.id, currentUser.user_custom_id, wallets]);
+  }, [currentUser.id, currentUser.user_custom_id, currentUser.mobile, wallets]);
 
   const switchUser = (userId: string) => {
     if (profiles.some((p) => p.id === userId)) {
@@ -778,7 +820,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   // Deposit Request Submission
-  const submitDepositRequest = (
+  const submitDepositRequest = async (
     amount: number,
     utr: string,
     paymentMethod: 'UPI' | 'BANK_TRANSFER' | 'QR_CODE' | 'WALLET_GW',
@@ -794,14 +836,42 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (amount < settings.minimum_deposit) {
       return { success: false, message: `Minimum deposit amount is ${formatINR(settings.minimum_deposit)}.` };
     }
-    if (!utr || utr.trim().length < 6) {
+    if (!utr || utr.trim().length < 4) {
       return { success: false, message: 'Please enter a valid Transaction UTR / Reference Number.' };
     }
 
     const fee = (amount * settings.deposit_charge_percent) / 100;
     const netAmount = amount - fee;
 
-    const newDeposit: DepositRequest = {
+    let serverDep: DepositRequest | null = null;
+    try {
+      const res = await fetch('/api/v1/user/deposit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: currentUser.id,
+          user_custom_id: currentUser.user_custom_id,
+          user_name: currentUser.full_name,
+          amount,
+          fee,
+          net_amount: netAmount,
+          utr: utr.trim(),
+          payment_method: paymentMethod,
+          screenshot_url: screenshotUrl || '',
+          note,
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.deposit) {
+          serverDep = json.deposit;
+        }
+      }
+    } catch (err) {
+      console.warn('Backend deposit request network error:', err);
+    }
+
+    const newDeposit: DepositRequest = serverDep || {
       id: `DEP-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`,
       user_id: currentUser.id,
       user_name: currentUser.full_name,
@@ -811,13 +881,13 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       net_amount: netAmount,
       utr: utr.trim(),
       payment_method: paymentMethod,
-      screenshot_url: screenshotUrl || 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=400&q=80',
+      screenshot_url: screenshotUrl || '',
       note,
       status: 'PENDING',
       created_at: new Date().toISOString(),
     };
 
-    setDeposits((prev) => [newDeposit, ...prev]);
+    setDeposits((prev) => [newDeposit, ...prev.filter((d) => d.id !== newDeposit.id)]);
     addNotification(currentUser.id, 'Deposit Request Submitted', `Your deposit request of ${formatINR(amount)} (UTR: ${utr}) is under review.`, 'INFO');
 
     // Trigger Automated Telegram & Email Deposit Alert
@@ -829,6 +899,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       status: 'PENDING',
     });
 
+    setTimeout(() => { refreshFromBackend(); }, 200);
+
     return {
       success: true,
       message: 'Deposit request submitted successfully! Awaiting admin verification.',
@@ -837,7 +909,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   // Approve Deposit (Atomic Server-Side Operation)
-  const approveDeposit = (depositId: string) => {
+  const approveDeposit = async (depositId: string) => {
     const deposit = deposits.find((d) => d.id === depositId);
     if (!deposit) return { success: false, message: 'Deposit request not found.' };
     if (deposit.status !== 'PENDING') return { success: false, message: 'This request has already been processed.' };
@@ -849,28 +921,46 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const userWallet = wallets[resolvedId] || wallets[resolvedCustomId] || { available_balance: 0, locked_balance: 0 };
 
     const prevBal = userWallet.available_balance;
-    const newBal = prevBal + deposit.net_amount;
+    const creditAmt = Number(deposit.net_amount || deposit.amount || 0);
+    const newBal = prevBal + creditAmt;
 
-    // 1. Update wallet balance for both ID and custom_id
-    setWallets((prev) => ({
-      ...prev,
-      [resolvedId]: {
-        ...(prev[resolvedId] || {}),
-        id: `w-${resolvedId}`,
-        user_id: resolvedId,
-        available_balance: newBal,
-        locked_balance: userWallet.locked_balance,
-        updated_at: new Date().toISOString(),
-      },
-      [resolvedCustomId]: {
-        ...(prev[resolvedCustomId] || {}),
-        id: `w-${resolvedId}`,
-        user_id: resolvedId,
-        available_balance: newBal,
-        locked_balance: userWallet.locked_balance,
-        updated_at: new Date().toISOString(),
-      },
-    }));
+    // Call server endpoint directly to ensure database persistence
+    let serverWallet: Wallet | null = null;
+    try {
+      const res = await fetch('/api/v1/admin/approve-deposit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deposit_id: depositId }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.wallet) {
+          serverWallet = json.wallet;
+        }
+      }
+    } catch (err) {
+      console.warn('Backend approve-deposit failed:', err);
+    }
+
+    const updatedWallet: Wallet = serverWallet || {
+      id: `w-${resolvedId}`,
+      user_id: resolvedId,
+      available_balance: newBal,
+      locked_balance: userWallet.locked_balance,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    // 1. Update wallet balance for all user keys
+    setWallets((prev) => {
+      const next = {
+        ...prev,
+        [resolvedId]: updatedWallet,
+        [resolvedCustomId]: updatedWallet,
+      };
+      if (targetUser?.mobile) next[targetUser.mobile] = updatedWallet;
+      return next;
+    });
 
     // 2. Mark deposit SUCCESS
     setDeposits((prev) =>
@@ -894,29 +984,29 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       type: 'DEPOSIT',
       amount: deposit.amount,
       fee: deposit.fee,
-      net_amount: deposit.net_amount,
+      net_amount: creditAmt,
       status: 'SUCCESS',
       reference_id: deposit.id,
       description: `Manual Deposit Verified (UTR: ${deposit.utr})`,
       balance_before: prevBal,
-      balance_after: newBal,
+      balance_after: updatedWallet.available_balance,
       created_at: new Date().toISOString(),
     };
     setTransactions((prev) => [newTx, ...prev]);
 
     // 4. Create Audit Log & Notification
-    addAuditLog('DEPOSIT_APPROVED', `Approved deposit request of ${formatINR(deposit.amount)} (UTR: ${deposit.utr})`, targetUser, deposit.amount, prevBal, newBal);
-    addNotification(resolvedId, 'Deposit Approved! ⚡', `Your wallet has been credited with ${formatINR(deposit.net_amount)}.`, 'SUCCESS');
+    addAuditLog('DEPOSIT_APPROVED', `Approved deposit request of ${formatINR(deposit.amount)} (UTR: ${deposit.utr})`, targetUser, deposit.amount, prevBal, updatedWallet.available_balance);
+    addNotification(resolvedId, 'Deposit Approved! ⚡', `Your wallet has been credited with ${formatINR(creditAmt)}.`, 'SUCCESS');
 
     // 5. Trigger Automated Telegram & Email Deposit Alert
     if (targetUser) {
       dispatchDepositAlert({
         user: targetUser,
         amount: deposit.amount,
-        netAmount: deposit.net_amount,
+        netAmount: creditAmt,
         utr: deposit.utr,
         status: 'SUCCESS',
-        newBalance: newBal,
+        newBalance: updatedWallet.available_balance,
       });
     }
 
@@ -925,21 +1015,33 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       {
         id: `WH-${Date.now()}`,
         event_type: 'deposit.success',
-        payload_summary: `Deposit ${deposit.id} credited ${formatINR(deposit.net_amount)} to ${deposit.user_custom_id}`,
+        payload_summary: `Deposit ${deposit.id} credited ${formatINR(creditAmt)} to ${deposit.user_custom_id}`,
         response_status: 200,
         created_at: new Date().toISOString(),
       },
       ...prev,
     ]);
 
-    return { success: true, message: `Deposit approved! ${formatINR(deposit.net_amount)} credited to ${deposit.user_name}.` };
+    setTimeout(() => { refreshFromBackend(); }, 200);
+
+    return { success: true, message: `Deposit approved! ${formatINR(creditAmt)} credited to ${deposit.user_name}.` };
   };
 
   // Reject Deposit
-  const rejectDeposit = (depositId: string, reason: string) => {
+  const rejectDeposit = async (depositId: string, reason: string) => {
     const deposit = deposits.find((d) => d.id === depositId);
     if (!deposit) return { success: false, message: 'Deposit request not found.' };
     if (deposit.status !== 'PENDING') return { success: false, message: 'This request has already been processed.' };
+
+    try {
+      await fetch('/api/v1/admin/reject-deposit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deposit_id: depositId, reason }),
+      });
+    } catch (err) {
+      console.warn('Backend reject-deposit network error:', err);
+    }
 
     setDeposits((prev) =>
       prev.map((d) =>
@@ -971,11 +1073,13 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
     }
 
+    setTimeout(() => { refreshFromBackend(); }, 200);
+
     return { success: true, message: 'Deposit request rejected.' };
   };
 
   // Withdraw Request Submission (Locking Funds)
-  const submitWithdrawalRequest = (amount: number, paymentIdentifier: string, note?: string) => {
+  const submitWithdrawalRequest = async (amount: number, paymentIdentifier: string, note?: string) => {
     if (isDemoAccount(currentUser)) {
       return { success: false, message: '⚠️ Demo Account Restriction: Withdrawals are strictly disabled on demo accounts.' };
     }
@@ -1008,27 +1112,55 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const newAvailable = Math.max(0, prevAvailable - amount);
     const newLocked = prevLocked + amount;
 
-    setWallets((prev) => ({
-      ...prev,
-      [currentUser.id]: {
-        ...(prev[currentUser.id] || {}),
-        id: `w-${currentUser.id}`,
-        user_id: currentUser.id,
-        available_balance: newAvailable,
-        locked_balance: newLocked,
-        updated_at: new Date().toISOString(),
-      },
-      [currentUser.user_custom_id]: {
-        ...(prev[currentUser.user_custom_id] || {}),
-        id: `w-${currentUser.id}`,
-        user_id: currentUser.id,
-        available_balance: newAvailable,
-        locked_balance: newLocked,
-        updated_at: new Date().toISOString(),
-      },
-    }));
+    let serverWd: WithdrawalRequest | null = null;
+    let serverWallet: Wallet | null = null;
+    let serverTx: Transaction | null = null;
 
-    const newWithdrawal: WithdrawalRequest = {
+    try {
+      const res = await fetch('/api/v1/user/withdraw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: currentUser.id,
+          user_custom_id: currentUser.user_custom_id,
+          user_name: currentUser.full_name,
+          amount,
+          fee,
+          net_payout: netPayout,
+          payment_identifier: paymentIdentifier.trim(),
+          note,
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.withdrawal) serverWd = json.withdrawal;
+        if (json.wallet) serverWallet = json.wallet;
+        if (json.transaction) serverTx = json.transaction;
+      }
+    } catch (err) {
+      console.warn('Backend withdrawal request error:', err);
+    }
+
+    const finalWallet: Wallet = serverWallet || {
+      id: `w-${currentUser.id}`,
+      user_id: currentUser.id,
+      available_balance: newAvailable,
+      locked_balance: newLocked,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    setWallets((prev) => {
+      const next = {
+        ...prev,
+        [currentUser.id]: finalWallet,
+        [currentUser.user_custom_id]: finalWallet,
+      };
+      if (currentUser.mobile) next[currentUser.mobile] = finalWallet;
+      return next;
+    });
+
+    const newWithdrawal: WithdrawalRequest = serverWd || {
       id: `WD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`,
       user_id: currentUser.id,
       user_name: currentUser.full_name,
@@ -1043,10 +1175,10 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       updated_at: new Date().toISOString(),
     };
 
-    setWithdrawals((prev) => [newWithdrawal, ...prev]);
+    setWithdrawals((prev) => [newWithdrawal, ...prev.filter((w) => w.id !== newWithdrawal.id)]);
 
     // Transaction record for pending withdrawal
-    const newTx: Transaction = {
+    const newTx: Transaction = serverTx || {
       id: `TXN-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`,
       user_id: currentUser.id,
       user_name: currentUser.full_name,
@@ -1058,7 +1190,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       reference_id: newWithdrawal.id,
       description: `Withdrawal Request Submitted to ${paymentIdentifier}`,
       balance_before: prevAvailable,
-      balance_after: newAvailable,
+      balance_after: finalWallet.available_balance,
       created_at: new Date().toISOString(),
     };
     setTransactions((prev) => [newTx, ...prev]);
@@ -1072,8 +1204,10 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       netPayout,
       paymentIdentifier: paymentIdentifier.trim(),
       status: 'PENDING',
-      remainingBalance: newAvailable,
+      remainingBalance: finalWallet.available_balance,
     });
+
+    setTimeout(() => { refreshFromBackend(); }, 200);
 
     return {
       success: true,
@@ -1084,7 +1218,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   // Approve Withdrawal
-  const approveWithdrawal = (withdrawalId: string) => {
+  const approveWithdrawal = async (withdrawalId: string) => {
     const wd = withdrawals.find((w) => w.id === withdrawalId);
     if (!wd) return { success: false, message: 'Withdrawal request not found.' };
     if (wd.status !== 'PENDING') return { success: false, message: 'This request is not pending.' };
@@ -1112,11 +1246,13 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
     }
 
+    setTimeout(() => { refreshFromBackend(); }, 200);
+
     return { success: true, message: 'Withdrawal approved for payment processing.' };
   };
 
   // Mark Withdrawal Paid (Releases locked balance)
-  const markWithdrawalPaid = (withdrawalId: string, paymentReference: string) => {
+  const markWithdrawalPaid = async (withdrawalId: string, paymentReference: string) => {
     const wd = withdrawals.find((w) => w.id === withdrawalId);
     if (!wd) return { success: false, message: 'Withdrawal request not found.' };
     if (wd.status === 'SUCCESS' || wd.status === 'REJECTED') {
@@ -1129,27 +1265,41 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const resolvedCustomId = targetUser ? targetUser.user_custom_id : targetUserId;
     const userWallet = wallets[resolvedId] || wallets[resolvedCustomId] || { available_balance: 0, locked_balance: 0 };
 
+    let serverWallet: Wallet | null = null;
+    try {
+      const res = await fetch('/api/v1/admin/approve-withdraw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ withdraw_id: withdrawalId, payment_reference: paymentReference }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.wallet) serverWallet = json.wallet;
+      }
+    } catch (err) {
+      console.warn('Backend approve-withdraw error:', err);
+    }
+
     // 1. Release locked balance
     const newLocked = Math.max(0, (userWallet.locked_balance || 0) - wd.amount);
-    setWallets((prev) => ({
-      ...prev,
-      [resolvedId]: {
-        ...(prev[resolvedId] || {}),
-        id: `w-${resolvedId}`,
-        user_id: resolvedId,
-        available_balance: userWallet.available_balance,
-        locked_balance: newLocked,
-        updated_at: new Date().toISOString(),
-      },
-      [resolvedCustomId]: {
-        ...(prev[resolvedCustomId] || {}),
-        id: `w-${resolvedId}`,
-        user_id: resolvedId,
-        available_balance: userWallet.available_balance,
-        locked_balance: newLocked,
-        updated_at: new Date().toISOString(),
-      },
-    }));
+    const updatedWallet: Wallet = serverWallet || {
+      id: `w-${resolvedId}`,
+      user_id: resolvedId,
+      available_balance: userWallet.available_balance,
+      locked_balance: newLocked,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    setWallets((prev) => {
+      const next = {
+        ...prev,
+        [resolvedId]: updatedWallet,
+        [resolvedCustomId]: updatedWallet,
+      };
+      if (targetUser?.mobile) next[targetUser.mobile] = updatedWallet;
+      return next;
+    });
 
     // 2. Mark withdrawal SUCCESS
     setWithdrawals((prev) =>
@@ -1191,15 +1341,17 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         paymentIdentifier: wd.payment_identifier,
         status: 'SUCCESS',
         utr: paymentReference,
-        remainingBalance: userWallet.available_balance,
+        remainingBalance: updatedWallet.available_balance,
       });
     }
+
+    setTimeout(() => { refreshFromBackend(); }, 200);
 
     return { success: true, message: `Withdrawal marked as PAID. Reference ${paymentReference} recorded.` };
   };
 
   // Reject Withdrawal (Returns locked funds to available)
-  const rejectWithdrawal = (withdrawalId: string, reason: string) => {
+  const rejectWithdrawal = async (withdrawalId: string, reason: string) => {
     const wd = withdrawals.find((w) => w.id === withdrawalId);
     if (!wd) return { success: false, message: 'Withdrawal request not found.' };
     if (wd.status === 'SUCCESS' || wd.status === 'REJECTED') {
@@ -1212,29 +1364,43 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const resolvedCustomId = targetUser ? targetUser.user_custom_id : targetUserId;
     const userWallet = wallets[resolvedId] || wallets[resolvedCustomId] || { available_balance: 0, locked_balance: 0 };
 
+    let serverWallet: Wallet | null = null;
+    try {
+      const res = await fetch('/api/v1/admin/reject-withdraw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ withdraw_id: withdrawalId, reason }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.wallet) serverWallet = json.wallet;
+      }
+    } catch (err) {
+      console.warn('Backend reject-withdraw error:', err);
+    }
+
     // Return locked funds back to available balance
     const restoredAvailable = userWallet.available_balance + wd.amount;
     const restoredLocked = Math.max(0, (userWallet.locked_balance || 0) - wd.amount);
 
-    setWallets((prev) => ({
-      ...prev,
-      [resolvedId]: {
-        ...(prev[resolvedId] || {}),
-        id: `w-${resolvedId}`,
-        user_id: resolvedId,
-        available_balance: restoredAvailable,
-        locked_balance: restoredLocked,
-        updated_at: new Date().toISOString(),
-      },
-      [resolvedCustomId]: {
-        ...(prev[resolvedCustomId] || {}),
-        id: `w-${resolvedId}`,
-        user_id: resolvedId,
-        available_balance: restoredAvailable,
-        locked_balance: restoredLocked,
-        updated_at: new Date().toISOString(),
-      },
-    }));
+    const updatedWallet: Wallet = serverWallet || {
+      id: `w-${resolvedId}`,
+      user_id: resolvedId,
+      available_balance: restoredAvailable,
+      locked_balance: restoredLocked,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    setWallets((prev) => {
+      const next = {
+        ...prev,
+        [resolvedId]: updatedWallet,
+        [resolvedCustomId]: updatedWallet,
+      };
+      if (targetUser?.mobile) next[targetUser.mobile] = updatedWallet;
+      return next;
+    });
 
     setWithdrawals((prev) =>
       prev.map((w) =>
@@ -1267,9 +1433,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         paymentIdentifier: wd.payment_identifier,
         status: 'REJECTED',
         reason: reason || 'Invalid payment identifier or security check failed.',
-        remainingBalance: restoredAvailable,
+        remainingBalance: updatedWallet.available_balance,
       });
     }
+
+    setTimeout(() => { refreshFromBackend(); }, 200);
 
     return { success: true, message: `Withdrawal rejected. ${formatINR(wd.amount)} refunded & restored to user's wallet.` };
   };
@@ -1593,9 +1761,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   // Admin Manual Add Balance
-  const addBalanceByAdmin = (targetUserId: string, amount: number, reason: string) => {
+  const addBalanceByAdmin = async (targetUserId: string, amount: number, reason: string): Promise<{ success: boolean; message: string }> => {
     if (amount <= 0) return { success: false, message: 'Please enter a valid positive amount.' };
-    const targetUser = profiles.find((p) => p.id === targetUserId || p.user_custom_id === targetUserId);
+    const targetUser = profiles.find((p) => p.id === targetUserId || p.user_custom_id === targetUserId || p.mobile === targetUserId);
     if (!targetUser) return { success: false, message: 'Target user not found.' };
     if (isDemoAccount(targetUser)) {
       return { success: false, message: '⚠️ Demo Account Restriction: Balance adjustments are disabled on demo accounts.' };
@@ -1603,29 +1771,38 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const resolvedId = targetUser.id;
     const resolvedCustomId = targetUser.user_custom_id;
-    const userWallet = wallets[resolvedId] || wallets[resolvedCustomId] || { available_balance: 0, locked_balance: 0 };
-    const prevBal = userWallet.available_balance;
+    const cleanMobile = targetUser.mobile ? targetUser.mobile.replace(/[^0-9]/g, '') : '';
+    const userWallet =
+      wallets[resolvedId] ||
+      wallets[resolvedCustomId] ||
+      (targetUser.mobile && wallets[targetUser.mobile]) ||
+      (cleanMobile && wallets[cleanMobile]) ||
+      { available_balance: 0, locked_balance: 0 };
+
+    const prevBal = Number(userWallet.available_balance) || 0;
     const newBal = prevBal + amount;
 
-    setWallets((prev) => ({
-      ...prev,
-      [resolvedId]: {
-        ...(prev[resolvedId] || {}),
-        id: `w-${resolvedId}`,
-        user_id: resolvedId,
-        available_balance: newBal,
-        locked_balance: userWallet.locked_balance || 0,
-        updated_at: new Date().toISOString(),
-      },
-      [resolvedCustomId]: {
-        ...(prev[resolvedCustomId] || {}),
-        id: `w-${resolvedId}`,
-        user_id: resolvedId,
-        available_balance: newBal,
-        locked_balance: userWallet.locked_balance || 0,
-        updated_at: new Date().toISOString(),
-      },
-    }));
+    const updatedWallet = {
+      ...(userWallet || {}),
+      id: `w-${resolvedId}`,
+      user_id: resolvedId,
+      available_balance: newBal,
+      locked_balance: userWallet.locked_balance || 0,
+      updated_at: new Date().toISOString(),
+    };
+
+    // 1. Instant local state & localStorage update for all user lookup keys
+    setWallets((prev) => {
+      const next = {
+        ...prev,
+        [resolvedId]: updatedWallet,
+        [resolvedCustomId]: updatedWallet,
+      };
+      if (targetUser.mobile) next[targetUser.mobile] = updatedWallet;
+      if (cleanMobile) next[cleanMobile] = updatedWallet;
+      safeLocalStorageSet(`${LOCAL_STORAGE_KEY}_WALLETS`, JSON.stringify(next));
+      return next;
+    });
 
     const newTx: Transaction = {
       id: `TXN-ADM-${Date.now()}`,
@@ -1642,18 +1819,57 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       balance_after: newBal,
       created_at: new Date().toISOString(),
     };
-    setTransactions((prev) => [newTx, ...prev]);
+    setTransactions((prev) => {
+      const next = [newTx, ...prev];
+      safeLocalStorageSet(`${LOCAL_STORAGE_KEY}_TRANSACTIONS`, JSON.stringify(next));
+      return next;
+    });
 
     addAuditLog('ADMIN_CREDIT', `Admin added ${formatINR(amount)} balance: ${reason}`, targetUser, amount, prevBal, newBal);
     addNotification(resolvedId, 'Wallet Balance Credited', `Admin credited ${formatINR(amount)} to your wallet. Reason: ${reason}`, 'SUCCESS');
+
+    // 2. Call backend adjust-balance API directly
+    try {
+      const res = await fetch('/api/v1/admin/user/adjust-balance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: resolvedId,
+          amount,
+          type: 'CREDIT',
+          reason: reason || 'Manual Admin Top-up',
+          admin_id: currentUser.id || 'admin-001',
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.wallet) {
+          setWallets((prev) => {
+            const next = {
+              ...prev,
+              [resolvedId]: data.wallet,
+              [resolvedCustomId]: data.wallet,
+            };
+            if (targetUser.mobile) next[targetUser.mobile] = data.wallet;
+            if (cleanMobile) next[cleanMobile] = data.wallet;
+            safeLocalStorageSet(`${LOCAL_STORAGE_KEY}_WALLETS`, JSON.stringify(next));
+            return next;
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Backend adjust-balance call failed:', err);
+    }
+
+    setTimeout(() => { refreshFromBackend(); }, 200);
 
     return { success: true, message: `Successfully credited ${formatINR(amount)} to ${targetUser.full_name}.` };
   };
 
   // Admin Manual Cut Balance
-  const cutBalanceByAdmin = (targetUserId: string, amount: number, reason: string) => {
+  const cutBalanceByAdmin = async (targetUserId: string, amount: number, reason: string): Promise<{ success: boolean; message: string }> => {
     if (amount <= 0) return { success: false, message: 'Please enter a valid positive amount.' };
-    const targetUser = profiles.find((p) => p.id === targetUserId || p.user_custom_id === targetUserId);
+    const targetUser = profiles.find((p) => p.id === targetUserId || p.user_custom_id === targetUserId || p.mobile === targetUserId);
     if (!targetUser) return { success: false, message: 'Target user not found.' };
     if (isDemoAccount(targetUser)) {
       return { success: false, message: '⚠️ Demo Account Restriction: Balance adjustments are disabled on demo accounts.' };
@@ -1661,33 +1877,42 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const resolvedId = targetUser.id;
     const resolvedCustomId = targetUser.user_custom_id;
-    const userWallet = wallets[resolvedId] || wallets[resolvedCustomId] || { available_balance: 0, locked_balance: 0 };
-    if (userWallet.available_balance < amount) {
-      return { success: false, message: `Cannot cut balance. User only has ${formatINR(userWallet.available_balance)} available.` };
+    const cleanMobile = targetUser.mobile ? targetUser.mobile.replace(/[^0-9]/g, '') : '';
+    const userWallet =
+      wallets[resolvedId] ||
+      wallets[resolvedCustomId] ||
+      (targetUser.mobile && wallets[targetUser.mobile]) ||
+      (cleanMobile && wallets[cleanMobile]) ||
+      { available_balance: 0, locked_balance: 0 };
+
+    const prevBal = Number(userWallet.available_balance) || 0;
+    if (prevBal < amount) {
+      return { success: false, message: `Cannot cut balance. User only has ${formatINR(prevBal)} available.` };
     }
 
-    const prevBal = userWallet.available_balance;
-    const newBal = prevBal - amount;
+    const newBal = Math.max(0, prevBal - amount);
 
-    setWallets((prev) => ({
-      ...prev,
-      [resolvedId]: {
-        ...(prev[resolvedId] || {}),
-        id: `w-${resolvedId}`,
-        user_id: resolvedId,
-        available_balance: newBal,
-        locked_balance: userWallet.locked_balance || 0,
-        updated_at: new Date().toISOString(),
-      },
-      [resolvedCustomId]: {
-        ...(prev[resolvedCustomId] || {}),
-        id: `w-${resolvedId}`,
-        user_id: resolvedId,
-        available_balance: newBal,
-        locked_balance: userWallet.locked_balance || 0,
-        updated_at: new Date().toISOString(),
-      },
-    }));
+    const updatedWallet = {
+      ...(userWallet || {}),
+      id: `w-${resolvedId}`,
+      user_id: resolvedId,
+      available_balance: newBal,
+      locked_balance: userWallet.locked_balance || 0,
+      updated_at: new Date().toISOString(),
+    };
+
+    // 1. Instant local state & localStorage update for all user lookup keys
+    setWallets((prev) => {
+      const next = {
+        ...prev,
+        [resolvedId]: updatedWallet,
+        [resolvedCustomId]: updatedWallet,
+      };
+      if (targetUser.mobile) next[targetUser.mobile] = updatedWallet;
+      if (cleanMobile) next[cleanMobile] = updatedWallet;
+      safeLocalStorageSet(`${LOCAL_STORAGE_KEY}_WALLETS`, JSON.stringify(next));
+      return next;
+    });
 
     const newTx: Transaction = {
       id: `TXN-ADM-${Date.now()}`,
@@ -1704,10 +1929,49 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       balance_after: newBal,
       created_at: new Date().toISOString(),
     };
-    setTransactions((prev) => [newTx, ...prev]);
+    setTransactions((prev) => {
+      const next = [newTx, ...prev];
+      safeLocalStorageSet(`${LOCAL_STORAGE_KEY}_TRANSACTIONS`, JSON.stringify(next));
+      return next;
+    });
 
     addAuditLog('ADMIN_DEBIT', `Admin deducted ${formatINR(amount)} balance: ${reason}`, targetUser, amount, prevBal, newBal);
     addNotification(resolvedId, 'Wallet Balance Adjusted', `Admin deducted ${formatINR(amount)} from your wallet. Reason: ${reason}`, 'WARNING');
+
+    // 2. Call backend adjust-balance API directly
+    try {
+      const res = await fetch('/api/v1/admin/user/adjust-balance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: resolvedId,
+          amount,
+          type: 'DEBIT',
+          reason: reason || 'Manual Admin Deduction',
+          admin_id: currentUser.id || 'admin-001',
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.wallet) {
+          setWallets((prev) => {
+            const next = {
+              ...prev,
+              [resolvedId]: data.wallet,
+              [resolvedCustomId]: data.wallet,
+            };
+            if (targetUser.mobile) next[targetUser.mobile] = data.wallet;
+            if (cleanMobile) next[cleanMobile] = data.wallet;
+            safeLocalStorageSet(`${LOCAL_STORAGE_KEY}_WALLETS`, JSON.stringify(next));
+            return next;
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Backend adjust-balance call failed:', err);
+    }
+
+    setTimeout(() => { refreshFromBackend(); }, 200);
 
     return { success: true, message: `Successfully deducted ${formatINR(amount)} from ${targetUser.full_name}.` };
   };
@@ -2498,6 +2762,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Lock the app so user enters RPIN to open wallet securely
     sessionStorage.removeItem('sr_app_unlocked');
     addNotification(user.id, 'Logged In Successfully 🔐', `Welcome back, ${user.full_name}!`, 'INFO');
+
+    // Immediately fetch freshest server state and wallet balance
+    refreshFromBackend();
 
     // Notify backend about login to trigger Telegram/Email alerts & sync server
     fetch('/api/v1/auth/login', {

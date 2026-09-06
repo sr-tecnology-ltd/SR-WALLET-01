@@ -45,7 +45,7 @@ export const INITIAL_SETTINGS: AppSettings = {
   "support_telegram_username": "@SRGatewaySupportBot",
   "whatsapp_support_number": "+91 7477661867",
   "whatsapp_support_url": "https://wa.me/917477661867",
-  "app_url": "https://srgateway-5jj4.onrender.com",
+  "app_url": "https://sr-gateway-in.up.railway.app",
   "otp_telegram_bot_username": "@SRGatewayBot",
   "otp_telegram_bot_token": "",
   "admin_upi_id": "sk190rihan@mvhdfc",

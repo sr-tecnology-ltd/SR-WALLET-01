@@ -24,6 +24,7 @@ import {
   Gift,
   Timer,
   AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 
 export const UserDashboard: React.FC<{
@@ -56,7 +57,15 @@ export const UserDashboard: React.FC<{
     settings,
     formatINR,
     toggleRoleMode,
+    refreshFromBackend,
   } = useWallet();
+
+  const [isRefreshingBalance, setIsRefreshingBalance] = useState(false);
+
+  // Sync latest wallet data when user views dashboard
+  useEffect(() => {
+    refreshFromBackend();
+  }, [refreshFromBackend]);
 
   // User-specific metrics (Memoized)
   const myDeposits = useMemo(
@@ -320,8 +329,24 @@ export const UserDashboard: React.FC<{
 
             {/* Net Vault Balance Box */}
             <div className="space-y-1">
-              <div className="text-[11px] font-mono tracking-widest text-emerald-300 font-extrabold uppercase">
-                NET VAULT BALANCE
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] font-mono tracking-widest text-emerald-300 font-extrabold uppercase">
+                  NET VAULT BALANCE
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsRefreshingBalance(true);
+                    await refreshFromBackend();
+                    setTimeout(() => setIsRefreshingBalance(false), 500);
+                  }}
+                  disabled={isRefreshingBalance}
+                  className="flex items-center gap-1.5 text-[11px] font-mono font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-950/70 hover:bg-emerald-900/80 border border-emerald-500/30 px-2.5 py-1 rounded-lg transition active:scale-95 cursor-pointer shadow-sm"
+                  title="Click to sync latest balance from server"
+                >
+                  <RefreshCw className={`h-3 w-3 ${isRefreshingBalance ? 'animate-spin text-emerald-300' : ''}`} />
+                  <span>{isRefreshingBalance ? 'Syncing...' : 'Sync Balance'}</span>
+                </button>
               </div>
               <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-white font-mono">
                 {formatINR(currentWallet.available_balance)}

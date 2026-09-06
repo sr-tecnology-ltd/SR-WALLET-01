@@ -77,7 +77,10 @@ export const AdminPortal: React.FC = () => {
     updateSettings,
     auditLogs,
     formatINR,
+    refreshFromBackend,
   } = useWallet();
+
+  const [isAdjustingBalance, setIsAdjustingBalance] = useState(false);
 
   // Add New User Modal State
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
@@ -600,27 +603,39 @@ export const AdminPortal: React.FC = () => {
       });
   }, [allProfiles, userSearch]);
 
-  const handleAdminAddBalance = () => {
-    if (!selectedUserForModal) return;
-    const res = addBalanceByAdmin(selectedUserForModal.id, modalAmount, modalReason || 'Manual Admin Top-up');
-    if (res.success) {
-      showAlert(res.message);
-      setAdminActionModal(null);
-      setModalReason('');
-    } else {
-      showAlert(res.message);
+  const handleAdminAddBalance = async () => {
+    if (!selectedUserForModal || isAdjustingBalance) return;
+    setIsAdjustingBalance(true);
+    try {
+      const res = await addBalanceByAdmin(selectedUserForModal.id, modalAmount, modalReason || 'Manual Admin Top-up');
+      if (res.success) {
+        showAlert(res.message);
+        setAdminActionModal(null);
+        setModalReason('');
+        await refreshFromBackend();
+      } else {
+        showAlert(res.message);
+      }
+    } finally {
+      setIsAdjustingBalance(false);
     }
   };
 
-  const handleAdminCutBalance = () => {
-    if (!selectedUserForModal) return;
-    const res = cutBalanceByAdmin(selectedUserForModal.id, modalAmount, modalReason || 'Manual Admin Adjustment');
-    if (res.success) {
-      showAlert(res.message);
-      setAdminActionModal(null);
-      setModalReason('');
-    } else {
-      showAlert(res.message);
+  const handleAdminCutBalance = async () => {
+    if (!selectedUserForModal || isAdjustingBalance) return;
+    setIsAdjustingBalance(true);
+    try {
+      const res = await cutBalanceByAdmin(selectedUserForModal.id, modalAmount, modalReason || 'Manual Admin Adjustment');
+      if (res.success) {
+        showAlert(res.message);
+        setAdminActionModal(null);
+        setModalReason('');
+        await refreshFromBackend();
+      } else {
+        showAlert(res.message);
+      }
+    } finally {
+      setIsAdjustingBalance(false);
     }
   };
 
@@ -647,37 +662,42 @@ export const AdminPortal: React.FC = () => {
     }
   };
 
-  const handleDepositApprove = (id: string) => {
-    const res = approveDeposit(id);
+  const handleDepositApprove = async (id: string) => {
+    const res = await approveDeposit(id);
     showAlert(res.message);
+    await refreshFromBackend();
   };
 
-  const handleDepositReject = () => {
+  const handleDepositReject = async () => {
     if (!rejectDepositId) return;
-    const res = rejectDeposit(rejectDepositId, depositRejectReason);
+    const res = await rejectDeposit(rejectDepositId, depositRejectReason);
     showAlert(res.message);
     setRejectDepositId(null);
+    await refreshFromBackend();
   };
 
-  const handleWithdrawalApprove = (id: string) => {
-    const res = approveWithdrawal(id);
+  const handleWithdrawalApprove = async (id: string) => {
+    const res = await approveWithdrawal(id);
     showAlert(res.message);
+    await refreshFromBackend();
   };
 
-  const handleWithdrawalMarkPaid = () => {
+  const handleWithdrawalMarkPaid = async () => {
     if (!markPaidWithdrawalId) return;
     const utr = markPaidUtr.trim() || `BANK-UTR-${Date.now().toString().slice(-8)}`;
-    const res = markWithdrawalPaid(markPaidWithdrawalId, utr);
+    const res = await markWithdrawalPaid(markPaidWithdrawalId, utr);
     showAlert(res.message);
     setMarkPaidWithdrawalId(null);
     setMarkPaidUtr('');
+    await refreshFromBackend();
   };
 
-  const handleWithdrawalReject = () => {
+  const handleWithdrawalReject = async () => {
     if (!rejectWithdrawalId) return;
-    const res = rejectWithdrawal(rejectWithdrawalId, withdrawalRejectReason);
+    const res = await rejectWithdrawal(rejectWithdrawalId, withdrawalRejectReason);
     showAlert(res.message);
     setRejectWithdrawalId(null);
+    await refreshFromBackend();
   };
 
   const saveSystemSettings = async (e: React.FormEvent) => {
@@ -1212,7 +1232,13 @@ export const AdminPortal: React.FC = () => {
               <p className="text-center text-slate-500 py-8">No matching user accounts found.</p>
             ) : (
               filteredUsers.map((user) => {
-                const wallet = allWallets[user.id] || { available_balance: 0, locked_balance: 0 };
+                const cleanMobile = user.mobile ? user.mobile.replace(/[^0-9]/g, '') : '';
+                const wallet =
+                  allWallets[user.id] ||
+                  allWallets[user.user_custom_id] ||
+                  (user.mobile && allWallets[user.mobile]) ||
+                  (cleanMobile && allWallets[cleanMobile]) ||
+                  { available_balance: 0, locked_balance: 0 };
                 return (
                   <div key={user.id} className="py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="space-y-1">
@@ -3522,7 +3548,12 @@ export const AdminPortal: React.FC = () => {
               <div className="font-bold text-white font-sans">{selectedUserForModal.full_name}</div>
               <div className="text-[10px] text-slate-400">ID: {selectedUserForModal.user_custom_id}</div>
               <div className="text-[11px] text-emerald-400 mt-1 font-bold">
-                Current Balance: {formatINR(allWallets[selectedUserForModal.id]?.available_balance || 0)}
+                Current Balance: {formatINR(
+                  allWallets[selectedUserForModal.id]?.available_balance ??
+                  allWallets[selectedUserForModal.user_custom_id]?.available_balance ??
+                  (selectedUserForModal.mobile && allWallets[selectedUserForModal.mobile]?.available_balance) ??
+                  0
+                )}
               </div>
             </div>
 
@@ -3550,18 +3581,27 @@ export const AdminPortal: React.FC = () => {
 
             <div className="flex justify-end gap-2 pt-2">
               <button
+                disabled={isAdjustingBalance}
                 onClick={() => setAdminActionModal(null)}
                 className="px-4 py-2 text-xs font-semibold bg-slate-800 text-slate-300 rounded-xl"
               >
                 Cancel
               </button>
               <button
+                disabled={isAdjustingBalance}
                 onClick={adminActionModal === 'ADD_BAL' ? handleAdminAddBalance : handleAdminCutBalance}
-                className={`px-5 py-2 text-xs font-black rounded-xl text-slate-950 ${
+                className={`px-5 py-2 text-xs font-black rounded-xl text-slate-950 flex items-center gap-1.5 ${
                   adminActionModal === 'ADD_BAL' ? 'bg-emerald-500 hover:bg-emerald-400' : 'bg-amber-500 hover:bg-amber-400'
-                }`}
+                } ${isAdjustingBalance ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                Confirm {adminActionModal === 'ADD_BAL' ? 'Credit' : 'Deduction'}
+                {isAdjustingBalance ? (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <span>Confirm {adminActionModal === 'ADD_BAL' ? 'Credit' : 'Deduction'}</span>
+                )}
               </button>
             </div>
           </div>

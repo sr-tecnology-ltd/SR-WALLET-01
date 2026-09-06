@@ -18,8 +18,8 @@ process.on('unhandledRejection', (reason) => {
   console.error('[CRITICAL UNHANDLED REJECTION]', reason);
 });
 
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // --- ENTERPRISE SECURITY & ANTI-HACK PROTECTION LAYERS ---
 
@@ -44,10 +44,24 @@ const ddosStats = {
   shield_status: 'ACTIVE_SHIELD_V3',
 };
 
-const rateLimiter = (defaultMax = 120, windowMs = 60000) => {
+const rateLimiter = (defaultMax = 300, windowMs = 60000) => {
   return (req: Request, res: Response, next: any) => {
     // Skip static assets
     if (!req.path.startsWith('/api/')) return next();
+
+    // Whitelist internal polling, real-time sync, health checks, and alerts to avoid false-positive throttling
+    const isInternalSync =
+      req.path === '/api/v1/sync-state' ||
+      req.path === '/api/v1/health' ||
+      req.path === '/api/v1/admin/bot-health' ||
+      req.path === '/api/v1/user/quota' ||
+      req.path === '/api/v1/admin/sync-users' ||
+      req.path.startsWith('/api/v1/alerts/') ||
+      req.path.startsWith('/api/v1/audit-logs');
+
+    if (isInternalSync) {
+      return next();
+    }
 
     const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
     const userAgent = (req.headers['user-agent'] || '').toLowerCase();
@@ -77,20 +91,20 @@ const rateLimiter = (defaultMax = 120, windowMs = 60000) => {
       return next();
     }
 
-    // Dynamic thresholds based on mode (Default: 20 req/min)
-    let maxRequests = appSettings.ddos_rate_limit_per_minute || defaultMax || 20;
-    let banDurationMs = 15 * 60 * 1000; // 15 minutes auto IP ban on 3 violations
+    // Dynamic thresholds based on mode (Default: 300 req/min for smooth dual admin & client usage)
+    let maxRequests = appSettings.ddos_rate_limit_per_minute || defaultMax || 300;
+    let banDurationMs = 15 * 60 * 1000; // 15 minutes auto IP ban on 5 violations
 
     if (appSettings.ddos_shield_mode === 'HIGH_SECURITY') {
-      maxRequests = 15;
+      maxRequests = 100;
       banDurationMs = 30 * 60 * 1000;
     } else if (appSettings.ddos_shield_mode === 'UNDER_ATTACK') {
-      maxRequests = 10;
+      maxRequests = 60;
       banDurationMs = 60 * 60 * 1000;
     }
 
     if (req.path.includes('/auth/') || req.path.includes('/otp/')) {
-      maxRequests = Math.min(maxRequests, 10);
+      maxRequests = Math.min(maxRequests, 30);
     }
 
     const existing = ipRateLimits.get(clientIp);
@@ -104,7 +118,7 @@ const rateLimiter = (defaultMax = 120, windowMs = 60000) => {
         code: 429,
         shield: 'SR-GATEWAY-DDoS-SHIELD-V3',
         error_code: 'IP_AUTO_BANNED',
-        message: `⛔ IP Auto-Banned by DDoS Shield (3 violations exceeded). Ban expires in ${remainingSec}s.`,
+        message: `⛔ IP Auto-Banned by DDoS Shield (Repeated violations exceeded). Ban expires in ${remainingSec}s.`,
         retry_after_seconds: remainingSec,
         timestamp: new Date().toISOString(),
       });
@@ -120,23 +134,23 @@ const rateLimiter = (defaultMax = 120, windowMs = 60000) => {
       ddosStats.rate_limited_requests++;
       ddosStats.total_blocked_attacks++;
 
-      const isBanned = existing.violations >= 3 || existing.count >= (appSettings.ddos_auto_ban_threshold || 60);
+      const isBanned = existing.violations >= 5 || existing.count >= (appSettings.ddos_auto_ban_threshold || 600);
       if (isBanned) {
         existing.isBannedUntil = now + banDurationMs;
         ddosStats.active_banned_ips++;
-        console.warn(`🚨 [DDoS Shield] Auto-banned IP ${clientIp} for ${Math.round(banDurationMs / 60000)} minutes due to 3 rate limit violations.`);
+        console.warn(`🚨 [DDoS Shield] Auto-banned IP ${clientIp} for ${Math.round(banDurationMs / 60000)} minutes due to rate limit violations.`);
       }
 
       return res.status(429).json({
         status: 'error',
         code: 429,
         shield: 'SR-GATEWAY-DDoS-SHIELD-V3',
-        error_code: isBanned ? 'IP_AUTO_BANNED_3_VIOLATIONS' : 'RATE_LIMIT_EXCEEDED',
+        error_code: isBanned ? 'IP_AUTO_BANNED_5_VIOLATIONS' : 'RATE_LIMIT_EXCEEDED',
         message: isBanned
-          ? `⛔ IP Auto-Banned! 3 consecutive rate limit violations detected. Banned for ${Math.round(banDurationMs / 60000)} minutes.`
-          : `⚠️ Rate limit exceeded (Max 20 req/min). Violation ${existing.violations}/3 (3 violations will trigger an automatic IP ban).`,
+          ? `⛔ IP Auto-Banned! Consecutive rate limit violations detected. Banned for ${Math.round(banDurationMs / 60000)} minutes.`
+          : `⚠️ Rate limit exceeded (Max ${maxRequests} req/min). Violation ${existing.violations}/5.`,
         violations: existing.violations,
-        max_violations_allowed: 3,
+        max_violations_allowed: 5,
         rate_limit_per_minute: maxRequests,
         retry_after_seconds: Math.ceil((existing.resetTime - now) / 1000),
         timestamp: new Date().toISOString(),
@@ -148,7 +162,7 @@ const rateLimiter = (defaultMax = 120, windowMs = 60000) => {
   };
 };
 
-app.use(rateLimiter(20, 60000));
+app.use(rateLimiter(300, 60000));
 
 // 3. Security Sanitizer Helpers
 function sanitizeInput(str: any, maxLen = 200): string {
@@ -2572,6 +2586,94 @@ app.post('/api/v1/alerts/welcome-bonus-alert', async (req: Request, res: Respons
   res.json({ status: 'success', message: 'Welcome bonus alert dispatched' });
 });
 
+// Admin Balance Adjustment Alert Endpoint (Automated Telegram & Email for Credit/Debit)
+app.post('/api/v1/alerts/balance-adjust-alert', async (req: Request, res: Response) => {
+  const {
+    user_id,
+    user_name,
+    email,
+    chat_id,
+    telegram_id,
+    amount,
+    type,
+    reason,
+    previous_balance,
+    new_balance,
+  } = req.body;
+
+  const targetTg = chat_id || telegram_id;
+  const time = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+  const numAmt = Number(amount || 0);
+  const displayAmt = numAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  const displayPrev = Number(previous_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  const displayNew = Number(new_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  const displayName = user_name || 'Valued User';
+  const customId = user_id || 'SR-10029';
+  const isCredit = (type || 'CREDIT').toString().toUpperCase() === 'CREDIT';
+  const reasonText = reason || (isCredit ? 'Admin Balance Top-up' : 'Admin Balance Deduction');
+
+  // 1. Telegram Dispatch
+  if (targetTg) {
+    const tgMsg = isCredit
+      ? `🟢 <b>SR GATEWAY • WALLET BALANCE CREDITED</b>\n\n` +
+        `Administrator has credited funds to your wallet!\n\n` +
+        `💰 <b>Amount Credited:</b> +₹${displayAmt}\n` +
+        `👤 <b>Account:</b> ${displayName} (<code>${customId}</code>)\n` +
+        `📝 <b>Reason / Note:</b> ${reasonText}\n` +
+        `💵 <b>New Balance:</b> ₹${displayNew}\n` +
+        `⏰ <b>Time:</b> ${time} IST\n\n` +
+        `⚡ <i>Funds are instantly credited and available for use.</i>`
+      : `⚠️ <b>SR GATEWAY • WALLET BALANCE DEDUCTED</b>\n\n` +
+        `Administrator has adjusted/deducted funds from your wallet.\n\n` +
+        `🔻 <b>Amount Deducted:</b> -₹${displayAmt}\n` +
+        `👤 <b>Account:</b> ${displayName} (<code>${customId}</code>)\n` +
+        `📝 <b>Reason / Note:</b> ${reasonText}\n` +
+        `💵 <b>Remaining Balance:</b> ₹${displayNew}\n` +
+        `⏰ <b>Time:</b> ${time} IST\n\n` +
+        `💬 <i>If you have questions regarding this adjustment, please contact 24/7 Support.</i>`;
+    sendTelegramNotification(targetTg, tgMsg).catch((e) => console.error('Telegram balance-adjust-alert error:', e));
+  }
+
+  // 2. Email Dispatch
+  if (email && email.includes('@') && !email.includes('@srgateway.in')) {
+    const emailHtml = buildAlertEmailHtml({
+      title: isCredit ? '💰 Wallet Balance Credited' : '⚠️ Wallet Balance Adjusted',
+      badgeText: isCredit ? 'BALANCE CREDITED' : 'BALANCE DEDUCTED',
+      badgeBgColor: isCredit ? '#10b981' : '#ef4444',
+      recipientName: displayName,
+      recipientId: customId,
+      summaryText: isCredit
+        ? `Great news! Your SR GATEWAY wallet has been credited with <strong>₹${displayAmt}</strong> by administrator.`
+        : `A balance deduction of <strong>₹${displayAmt}</strong> was processed on your SR GATEWAY wallet by administrator.`,
+      details: [
+        { label: 'Adjustment Type', value: isCredit ? 'Admin Top-up (Credit)' : 'Admin Adjustment (Debit)', isBold: true },
+        { label: 'Amount', value: `${isCredit ? '+' : '-'}₹${displayAmt}`, isBold: true, isHighlight: true },
+        { label: 'Previous Balance', value: `₹${displayPrev}` },
+        { label: 'Updated Available Balance', value: `₹${displayNew}`, isBold: true, isHighlight: true },
+        { label: 'Reason / Remark', value: reasonText },
+        { label: 'Timestamp', value: `${time} IST` },
+      ],
+      instructions: isCredit
+        ? 'You can now use your updated balance for instant transfers, payouts, or API operations.'
+        : 'If you have questions about this adjustment, please contact support.',
+    });
+
+    sendEmailNotification({
+      to: email,
+      subject: isCredit
+        ? `🟢 Balance Credited: ₹${displayAmt} added by Admin to your SR GATEWAY Wallet (${customId})`
+        : `⚠️ Balance Deducted: ₹${displayAmt} adjusted by Admin (${customId})`,
+      html: emailHtml,
+      text: `Admin ${isCredit ? 'Credit' : 'Debit'}: ₹${displayAmt}. Previous: ₹${displayPrev}, New Balance: ₹${displayNew}. Reason: ${reasonText}`,
+      type: 'SYSTEM_ALERT',
+      user_id: customId,
+      user_name: displayName,
+    }).catch((e) => console.error('Email balance-adjust-alert error:', e));
+  }
+
+  res.json({ status: 'success', message: 'Balance adjustment alert dispatched' });
+});
+
 // Email OTP Verification Endpoints
 app.post('/api/v1/auth/email-otp/send', async (req: Request, res: Response) => {
   const { email, otp: clientOtp } = req.body;
@@ -3423,6 +3525,309 @@ app.get('/api/v1/withdraw/list', validateApiKey, (req: Request, res: Response) =
   });
 });
 
+// Dedicated Web User Deposit Submission Endpoint (Persists directly to server database)
+app.post('/api/v1/user/deposit', async (req: Request, res: Response) => {
+  try {
+    const {
+      user_id,
+      user_custom_id,
+      user_name,
+      amount,
+      fee: clientFee,
+      net_amount: clientNet,
+      utr,
+      payment_method = 'UPI',
+      screenshot_url,
+      note,
+    } = req.body || {};
+
+    const numAmt = parseFloat(amount);
+    if (isNaN(numAmt) || numAmt <= 0) {
+      return res.status(400).json({ status: 'error', code: 400, message: 'Please enter a valid deposit amount.' });
+    }
+
+    if (numAmt < (appSettings.minimum_deposit || 10)) {
+      return res.status(400).json({
+        status: 'error',
+        code: 400,
+        message: `Minimum deposit amount is ₹${appSettings.minimum_deposit || 10}`,
+      });
+    }
+
+    if (!utr || utr.toString().trim().length < 4) {
+      return res.status(400).json({
+        status: 'error',
+        code: 400,
+        message: 'Valid transaction UTR / Reference number is required.',
+      });
+    }
+
+    const cleanUtr = utr.toString().trim();
+
+    // Look up user
+    const lookup = resolveUserAndWallet(user_id || user_custom_id);
+    const resolvedUser = lookup.user || users[user_id] || users[user_custom_id] || {
+      id: user_id || `u-${Date.now()}`,
+      user_custom_id: user_custom_id || user_id || 'USER',
+      full_name: user_name || 'Valued User',
+      email: '',
+      mobile: '',
+    };
+
+    const fee = typeof clientFee === 'number' ? clientFee : (numAmt * (appSettings.deposit_charge_percent || 0)) / 100;
+    const netAmount = typeof clientNet === 'number' ? clientNet : numAmt - fee;
+
+    const depositId = `DEP-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
+
+    const newDep = {
+      id: depositId,
+      user_id: resolvedUser.id || user_id,
+      user_name: resolvedUser.full_name || user_name || 'User',
+      user_custom_id: resolvedUser.user_custom_id || user_custom_id || resolvedUser.id,
+      amount: numAmt,
+      fee,
+      net_amount: netAmount,
+      utr: cleanUtr,
+      payment_method: payment_method || 'UPI',
+      screenshot_url: screenshot_url || '',
+      note: note || '',
+      status: 'PENDING',
+      created_at: new Date().toISOString(),
+    };
+
+    depositRequests.unshift(newDep);
+    saveDatabase();
+
+    // Trigger Automated Alert
+    try {
+      const userEmail = resolvedUser.email;
+      if (appSettings.email_alerts_enabled && appSettings.email_deposit_alert_enabled && userEmail && userEmail.includes('@')) {
+        const depositEmailHtml = buildAlertEmailHtml({
+          title: '💰 Deposit Request Submitted',
+          badgeText: 'UNDER REVIEW',
+          badgeBgColor: '#f59e0b',
+          recipientName: resolvedUser.full_name,
+          recipientId: resolvedUser.user_custom_id,
+          summaryText: `Your deposit request for <strong>₹${numAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> has been received and added to the admin review queue.`,
+          details: [
+            { label: 'Deposit Ref ID', value: depositId, isBold: true },
+            { label: 'Transaction UTR', value: cleanUtr, isBold: true },
+            { label: 'Gross Deposit', value: `₹${numAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true, isHighlight: true },
+            { label: 'Net Creditable', value: `₹${netAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+            { label: 'Payment Method', value: payment_method },
+            { label: 'Status', value: 'PENDING VERIFICATION' },
+            { label: 'Submission Time', value: `${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST` },
+          ],
+          instructions: 'Our administration is verifying the UTR confirmation. Balance will be added to your wallet upon approval.',
+        });
+
+        sendEmailNotification({
+          to: userEmail,
+          subject: `💰 Deposit Received: ₹${numAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })} (UTR: ${cleanUtr})`,
+          html: depositEmailHtml,
+          text: `Your deposit of ₹${numAmt} (UTR: ${cleanUtr}) has been received for verification.`,
+          type: 'DEPOSIT_ALERT',
+          user_id: resolvedUser.user_custom_id,
+          user_name: resolvedUser.full_name,
+        }).catch(() => null);
+      }
+    } catch (e) {
+      console.warn('Deposit alert email error:', e);
+    }
+
+    return res.json({
+      status: 'success',
+      code: 200,
+      message: 'Deposit request submitted successfully! Awaiting admin verification.',
+      deposit: newDep,
+    });
+  } catch (err: any) {
+    console.error('Submit deposit error:', err);
+    return res.status(500).json({ status: 'error', code: 500, message: err?.message || 'Failed to submit deposit request' });
+  }
+});
+
+// Dedicated Web User Withdrawal Submission Endpoint (Persists directly to server database)
+app.post('/api/v1/user/withdraw', async (req: Request, res: Response) => {
+  try {
+    const {
+      user_id,
+      user_custom_id,
+      user_name,
+      amount,
+      fee: clientFee,
+      net_payout: clientNet,
+      payment_identifier,
+      note,
+    } = req.body || {};
+
+    const numAmt = parseFloat(amount);
+    if (isNaN(numAmt) || numAmt <= 0) {
+      return res.status(400).json({ status: 'error', code: 400, message: 'Please enter a valid withdrawal amount.' });
+    }
+
+    if (numAmt < (appSettings.minimum_withdraw || 20)) {
+      return res.status(400).json({
+        status: 'error',
+        code: 400,
+        message: `Minimum withdrawal amount is ₹${appSettings.minimum_withdraw || 20}`,
+      });
+    }
+
+    if (appSettings.maximum_withdraw > 0 && numAmt > appSettings.maximum_withdraw) {
+      return res.status(400).json({
+        status: 'error',
+        code: 400,
+        message: `Maximum withdrawal limit is ₹${appSettings.maximum_withdraw}`,
+      });
+    }
+
+    if (!payment_identifier || payment_identifier.toString().trim().length < 3) {
+      return res.status(400).json({
+        status: 'error',
+        code: 400,
+        message: 'Please enter a valid recipient UPI ID or Bank Account.',
+      });
+    }
+
+    const lookup = resolveUserAndWallet(user_id || user_custom_id);
+    const user = lookup.user || users[user_id] || users[user_custom_id];
+    if (!user) {
+      return res.status(404).json({ status: 'error', code: 404, message: 'User account not found' });
+    }
+
+    if (user.status === 'BANNED') {
+      return res.status(403).json({ status: 'error', code: 403, message: 'Your account is restricted from performing withdrawals.' });
+    }
+
+    let wallet = lookup.wallet || wallets[user.id] || wallets[user.user_custom_id];
+    if (!wallet) {
+      wallet = {
+        id: `w-${user.id}`,
+        user_id: user.id,
+        available_balance: 0,
+        locked_balance: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      wallets[user.id] = wallet;
+      if (user.user_custom_id) wallets[user.user_custom_id] = wallet;
+    }
+
+    const currentBal = Number(wallet.available_balance) || 0;
+    if (currentBal < numAmt) {
+      return res.status(400).json({
+        status: 'error',
+        code: 400,
+        message: `Insufficient wallet balance. Available: ₹${currentBal.toLocaleString('en-IN')}`,
+      });
+    }
+
+    const fee = typeof clientFee === 'number' ? clientFee : (numAmt * (appSettings.withdraw_charge_percent || 0)) / 100;
+    const netPayout = typeof clientNet === 'number' ? clientNet : Math.max(0, numAmt - fee);
+
+    // Atomic Balance Lock on Server
+    wallet.available_balance = Math.max(0, currentBal - numAmt);
+    wallet.locked_balance = (Number(wallet.locked_balance) || 0) + numAmt;
+    wallet.updated_at = new Date().toISOString();
+
+    // Mirror to all identifier keys in wallets
+    wallets[user.id] = wallet;
+    if (user.user_custom_id) wallets[user.user_custom_id] = wallet;
+    if (user.mobile) {
+      wallets[user.mobile] = wallet;
+      const cleanMob = normalizePhone(user.mobile);
+      if (cleanMob) wallets[cleanMob] = wallet;
+    }
+
+    const withdrawId = `WD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
+
+    const newWd = {
+      id: withdrawId,
+      user_id: user.id,
+      user_name: user.full_name,
+      user_custom_id: user.user_custom_id,
+      amount: numAmt,
+      fee,
+      net_payout: netPayout,
+      payment_identifier: payment_identifier.toString().trim(),
+      note: note || '',
+      status: 'PENDING',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    withdrawalRequests.unshift(newWd);
+
+    // Ledger record
+    transactions.unshift({
+      id: `TXN-WD-${Date.now()}`,
+      user_id: user.id,
+      user_name: user.full_name,
+      type: 'WITHDRAW',
+      amount: numAmt,
+      fee,
+      net_amount: netPayout,
+      status: 'PENDING',
+      reference_id: withdrawId,
+      description: `Withdrawal Request Placed: ${payment_identifier.toString().trim()}`,
+      balance_before: currentBal,
+      balance_after: wallet.available_balance,
+      created_at: new Date().toISOString(),
+    });
+
+    saveDatabase();
+
+    // Automated Email Notification
+    try {
+      const userEmail = user.email;
+      if (appSettings.email_alerts_enabled && appSettings.email_withdraw_alert_enabled && userEmail && userEmail.includes('@')) {
+        const withdrawEmailHtml = buildAlertEmailHtml({
+          title: '💸 Withdrawal Request Initiated',
+          badgeText: 'PENDING SETTLEMENT',
+          badgeBgColor: '#f59e0b',
+          recipientName: user.full_name,
+          recipientId: user.user_custom_id,
+          summaryText: `Your withdrawal request of <strong>₹${numAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> has been submitted. Funds have been locked until payout is dispatched.`,
+          details: [
+            { label: 'Withdrawal Ref ID', value: withdrawId, isBold: true },
+            { label: 'Requested Amount', value: `₹${numAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true },
+            { label: 'Fee Deducted', value: `₹${fee.toFixed(2)}` },
+            { label: 'Net Payout to Receive', value: `₹${netPayout.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true, isHighlight: true },
+            { label: 'Payout Destination', value: payment_identifier.toString().trim(), isBold: true },
+            { label: 'Remaining Available Balance', value: `₹${wallet.available_balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+            { label: 'Request Time', value: `${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST` },
+          ],
+          instructions: 'Our administration will settle this payout to your destination shortly.',
+        });
+
+        sendEmailNotification({
+          to: userEmail,
+          subject: `💸 Withdrawal Placed: ₹${numAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })} (${withdrawId})`,
+          html: withdrawEmailHtml,
+          text: `Your withdrawal request of ₹${numAmt} has been placed.`,
+          type: 'WITHDRAW_ALERT',
+          user_id: user.user_custom_id,
+          user_name: user.full_name,
+        }).catch(() => null);
+      }
+    } catch (e) {
+      console.warn('Withdrawal alert error:', e);
+    }
+
+    return res.json({
+      status: 'success',
+      code: 200,
+      message: 'Withdrawal request submitted successfully! Funds locked awaiting settlement.',
+      withdrawal: newWd,
+      wallet,
+    });
+  } catch (err: any) {
+    console.error('Submit withdrawal error:', err);
+    return res.status(500).json({ status: 'error', code: 500, message: err?.message || 'Failed to submit withdrawal request' });
+  }
+});
+
 // 8. Transactions API
 app.get('/api/v1/transactions', validateApiKey, (req: Request, res: Response) => {
   const customId = (req.query.user_id as string) || 'SR-10029';
@@ -3891,33 +4296,43 @@ app.post('/api/v1/sync-state', (req: Request, res: Response) => {
   }
 
   // WALLETS: Server memory/database is the financial source of truth.
-  // We ONLY seed wallets that do not exist yet on server, or allow explicit admin overrides.
+  // We seed wallets that do not exist yet on server, and allow admin overrides.
   if (incomingWallets && typeof incomingWallets === 'object') {
     for (const [uid, w] of Object.entries(incomingWallets)) {
       if (!wallets[uid]) {
         wallets[uid] = w;
-      } else if (isAdmin && req.body.forceAdminWalletSync) {
+      } else if (isAdmin || req.body.forceAdminWalletSync) {
         wallets[uid] = w;
       }
     }
   }
 
   if (Array.isArray(deposits)) {
-    const existingDepIds = new Set(depositRequests.map((d) => d.id));
+    const depMap = new Map<string, any>(depositRequests.map((d) => [d.id, d]));
     for (const d of deposits) {
-      if (d && d.id && !existingDepIds.has(d.id)) {
-        depositRequests.unshift(d);
-        existingDepIds.add(d.id);
+      if (d && d.id) {
+        if (!depMap.has(d.id)) {
+          depositRequests.unshift(d);
+          depMap.set(d.id, d);
+        } else if (isAdmin) {
+          const existing = depMap.get(d.id);
+          Object.assign(existing, d);
+        }
       }
     }
   }
 
   if (Array.isArray(withdrawals)) {
-    const existingWithIds = new Set(withdrawalRequests.map((w) => w.id));
+    const withMap = new Map<string, any>(withdrawalRequests.map((w) => [w.id, w]));
     for (const w of withdrawals) {
-      if (w && w.id && !existingWithIds.has(w.id)) {
-        withdrawalRequests.unshift(w);
-        existingWithIds.add(w.id);
+      if (w && w.id) {
+        if (!withMap.has(w.id)) {
+          withdrawalRequests.unshift(w);
+          withMap.set(w.id, w);
+        } else if (isAdmin) {
+          const existing = withMap.get(w.id);
+          Object.assign(existing, w);
+        }
       }
     }
   }
@@ -4269,6 +4684,103 @@ app.post('/api/v1/admin/user/toggle-status', (req: Request, res: Response) => {
       status: user.status,
       suspension_reason: user.suspension_reason,
     },
+  });
+});
+
+// Admin: Adjust User Wallet Balance (Atomic Credit or Debit with Multi-key Mirroring)
+app.post('/api/v1/admin/user/adjust-balance', (req: Request, res: Response) => {
+  const { user_id, amount, type, reason, admin_id } = req.body || {};
+  const targetId = (user_id || '').toString().trim();
+  const numAmount = parseFloat(amount);
+  const adjType = (type || 'CREDIT').toString().toUpperCase();
+
+  if (!targetId || isNaN(numAmount) || numAmount <= 0) {
+    return res.status(400).json({ status: 'error', code: 400, message: 'Valid user_id and positive amount are required.' });
+  }
+
+  if (!['CREDIT', 'DEBIT'].includes(adjType)) {
+    return res.status(400).json({ status: 'error', code: 400, message: 'type must be either CREDIT or DEBIT.' });
+  }
+
+  const resolved = resolveUserAndWallet(targetId);
+  if (!resolved.user) {
+    return res.status(404).json({ status: 'error', code: 404, message: `User '${targetId}' not found.` });
+  }
+
+  const user = resolved.user;
+  let wallet = resolved.wallet;
+  if (!wallet) {
+    wallet = {
+      id: `w-${user.user_custom_id || user.id}`,
+      user_id: user.user_custom_id || user.id,
+      available_balance: 0,
+      locked_balance: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  const prevBal = Number(wallet.available_balance) || 0;
+  if (adjType === 'DEBIT' && prevBal < numAmount) {
+    return res.status(400).json({
+      status: 'error',
+      code: 400,
+      message: `Cannot deduct ₹${numAmount}. User only has ₹${prevBal} available balance.`,
+    });
+  }
+
+  const newBal = adjType === 'CREDIT' ? prevBal + numAmount : Math.max(0, prevBal - numAmount);
+  wallet.available_balance = newBal;
+  wallet.updated_at = new Date().toISOString();
+
+  // Crucial: Mirror updated wallet across all user keys in server database
+  if (user.id) wallets[user.id] = wallet;
+  if (user.user_custom_id) wallets[user.user_custom_id] = wallet;
+  if (user.mobile) {
+    wallets[user.mobile] = wallet;
+    const cleanMobile = normalizePhone(user.mobile);
+    if (cleanMobile) wallets[cleanMobile] = wallet;
+    const digitsOnly = user.mobile.replace(/[^0-9]/g, '');
+    if (digitsOnly) wallets[digitsOnly] = wallet;
+  }
+
+  // Create Transaction Record
+  const newTx: any = {
+    id: `TXN-ADM-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+    user_id: user.id || user.user_custom_id,
+    user_name: user.full_name,
+    user_custom_id: user.user_custom_id,
+    type: adjType === 'CREDIT' ? 'ADMIN_CREDIT' : 'ADMIN_DEBIT',
+    amount: numAmount,
+    fee: 0,
+    net_amount: numAmount,
+    status: 'SUCCESS',
+    reference_id: `ADM-${adjType === 'CREDIT' ? 'CR' : 'DB'}-${Date.now()}`,
+    description: `Manual Admin Adjustment (${reason || (adjType === 'CREDIT' ? 'Admin Top-up' : 'Admin Deduction')})`,
+    balance_before: prevBal,
+    balance_after: newBal,
+    created_at: new Date().toISOString(),
+  };
+  transactions.unshift(newTx);
+
+  saveDatabase();
+
+  console.log(`[ADMIN BALANCE ADJUSTMENT] User: ${user.full_name} (${user.user_custom_id}), Type: ${adjType}, Amount: ₹${numAmount}, Before: ₹${prevBal}, After: ₹${newBal}`);
+
+  res.json({
+    status: 'success',
+    code: 200,
+    message: `Successfully ${adjType === 'CREDIT' ? 'credited' : 'deducted'} ₹${numAmount} for ${user.full_name}.`,
+    user: {
+      id: user.id,
+      user_custom_id: user.user_custom_id,
+      full_name: user.full_name,
+      mobile: user.mobile,
+    },
+    balance_before: prevBal,
+    balance_after: newBal,
+    wallet,
+    transaction: newTx,
   });
 });
 
@@ -5329,31 +5841,62 @@ app.post('/api/v1/admin/approve-deposit', async (req: Request, res: Response) =>
   dep.status = 'SUCCESS';
   dep.reviewed_at = new Date().toISOString();
 
-  // Credit user wallet
-  const wallet = wallets[dep.user_id] || wallets['SR-10029'];
-  const balBefore = wallet.available_balance;
-  wallet.available_balance += dep.amount;
-  const balAfter = wallet.available_balance;
+  // Accurately resolve target user and wallet
+  const lookup = resolveUserAndWallet(dep.user_id || dep.user_custom_id);
+  const targetUser = lookup.user || users[dep.user_id] || users[dep.user_custom_id] || {
+    id: dep.user_id,
+    user_custom_id: dep.user_custom_id || dep.user_id,
+    full_name: dep.user_name || 'Valued User',
+    email: '',
+    mobile: '',
+  };
 
-  const targetUser = users[dep.user_id] || users['SR-10029'];
+  let wallet = lookup.wallet || wallets[dep.user_id] || wallets[dep.user_custom_id] || wallets[targetUser.id];
+  if (!wallet) {
+    wallet = {
+      id: `w-${targetUser.id || dep.user_id}`,
+      user_id: targetUser.id || dep.user_id,
+      available_balance: 0,
+      locked_balance: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  const creditAmt = Number(dep.net_amount || dep.amount || 0);
+  const balBefore = Number(wallet.available_balance) || 0;
+  wallet.available_balance = balBefore + creditAmt;
+  wallet.updated_at = new Date().toISOString();
+
+  // Sync wallet across all user identifiers
+  if (targetUser.id) wallets[targetUser.id] = wallet;
+  if (targetUser.user_custom_id) wallets[targetUser.user_custom_id] = wallet;
+  if (dep.user_id) wallets[dep.user_id] = wallet;
+  if (dep.user_custom_id) wallets[dep.user_custom_id] = wallet;
+  if (targetUser.mobile) {
+    wallets[targetUser.mobile] = wallet;
+    const cleanMob = normalizePhone(targetUser.mobile);
+    if (cleanMob) wallets[cleanMob] = wallet;
+  }
 
   transactions.unshift({
     id: `TXN-DEP-${Date.now()}`,
-    user_id: dep.user_id,
+    user_id: targetUser.id || dep.user_id,
+    user_name: targetUser.full_name || dep.user_name,
     type: 'DEPOSIT',
     amount: dep.amount,
-    fee: 0,
-    net_amount: dep.amount,
+    fee: dep.fee || 0,
+    net_amount: creditAmt,
     status: 'SUCCESS',
     reference_id: dep.utr,
     description: `Manual UPI Deposit Approved (UTR: ${dep.utr})`,
     balance_before: balBefore,
-    balance_after: balAfter,
+    balance_after: wallet.available_balance,
     created_at: new Date().toISOString(),
   });
 
   // Dispatch Automated Deposit Confirmation Email to User's registered Gmail
-  const userEmail = targetUser.email || (targetUser.user_custom_id ? `${targetUser.user_custom_id.toLowerCase()}@srgateway.in` : 'user@srgateway.in');
+  const userEmail = targetUser.email || (targetUser.user_custom_id ? `${targetUser.user_custom_id.toLowerCase()}@srgateway.in` : '');
   if (appSettings.email_alerts_enabled && appSettings.email_deposit_alert_enabled && userEmail && userEmail.includes('@')) {
     const depositApprovedHtml = buildAlertEmailHtml({
       title: '💰 Deposit Approved & Balance Credited',
@@ -5365,9 +5908,9 @@ app.post('/api/v1/admin/approve-deposit', async (req: Request, res: Response) =>
       details: [
         { label: 'Deposit Ref ID', value: dep.id, isBold: true },
         { label: 'Verified UTR', value: dep.utr, isBold: true },
-        { label: 'Credited Amount', value: `+₹${dep.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true, isHighlight: true },
+        { label: 'Credited Amount', value: `+₹${creditAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true, isHighlight: true },
         { label: 'Previous Balance', value: `₹${balBefore.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
-        { label: 'New Available Balance', value: `₹${balAfter.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true, isHighlight: true },
+        { label: 'New Available Balance', value: `₹${wallet.available_balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true, isHighlight: true },
         { label: 'Approval Time', value: `${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST` },
       ],
       instructions: 'You can now instantly transfer funds, generate payment links, or utilize developer APIs.',
@@ -5377,17 +5920,17 @@ app.post('/api/v1/admin/approve-deposit', async (req: Request, res: Response) =>
       to: userEmail,
       subject: `✅ Deposit Success: ₹${dep.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })} Credited to Wallet (UTR: ${dep.utr})`,
       html: depositApprovedHtml,
-      text: `Your deposit of ₹${dep.amount} (UTR: ${dep.utr}) has been approved. New Balance: ₹${balAfter}`,
+      text: `Your deposit of ₹${dep.amount} (UTR: ${dep.utr}) has been approved. New Balance: ₹${wallet.available_balance}`,
       type: 'DEPOSIT_ALERT',
       user_id: targetUser.user_custom_id,
       user_name: targetUser.full_name,
-      metadata: { deposit_id: dep.id, utr: dep.utr, amount: dep.amount, balance_after: balAfter },
+      metadata: { deposit_id: dep.id, utr: dep.utr, amount: dep.amount, balance_after: wallet.available_balance },
     }).catch((e) => console.error('Deposit approved email alert error:', e));
   }
 
   saveDatabase();
 
-  res.json({ status: 'success', code: 200, message: 'Deposit approved & user balance updated', deposit: dep });
+  res.json({ status: 'success', code: 200, message: 'Deposit approved & user balance updated', deposit: dep, wallet });
 });
 
 app.post('/api/v1/admin/reject-deposit', async (req: Request, res: Response) => {
@@ -5418,16 +5961,37 @@ app.post('/api/v1/admin/approve-withdraw', async (req: Request, res: Response) =
   wd.status = 'SUCCESS';
   wd.updated_at = new Date().toISOString();
 
-  // Deduct from locked balance
-  const wallet = wallets[wd.user_id] || wallets['SR-10029'];
-  const totalDeduct = wd.amount;
-  wallet.locked_balance = Math.max(0, wallet.locked_balance - totalDeduct);
+  // Accurately resolve target user and wallet
+  const lookup = resolveUserAndWallet(wd.user_id || wd.user_custom_id);
+  const targetUser = lookup.user || users[wd.user_id] || users[wd.user_custom_id] || {
+    id: wd.user_id,
+    user_custom_id: wd.user_custom_id || wd.user_id,
+    full_name: wd.user_name || 'Valued User',
+    email: '',
+    mobile: '',
+  };
 
-  const targetUser = users[wd.user_id] || users['SR-10029'];
+  let wallet = lookup.wallet || wallets[wd.user_id] || wallets[wd.user_custom_id] || wallets[targetUser.id];
+  if (wallet) {
+    wallet.locked_balance = Math.max(0, (Number(wallet.locked_balance) || 0) - Number(wd.amount || 0));
+    wallet.updated_at = new Date().toISOString();
+
+    // Mirror to all identifier keys
+    if (targetUser.id) wallets[targetUser.id] = wallet;
+    if (targetUser.user_custom_id) wallets[targetUser.user_custom_id] = wallet;
+    if (wd.user_id) wallets[wd.user_id] = wallet;
+    if (wd.user_custom_id) wallets[wd.user_custom_id] = wallet;
+    if (targetUser.mobile) {
+      wallets[targetUser.mobile] = wallet;
+      const cleanMob = normalizePhone(targetUser.mobile);
+      if (cleanMob) wallets[cleanMob] = wallet;
+    }
+  }
 
   transactions.unshift({
     id: `TXN-WD-${Date.now()}`,
-    user_id: wd.user_id,
+    user_id: targetUser.id || wd.user_id,
+    user_name: targetUser.full_name || wd.user_name,
     type: 'WITHDRAW',
     amount: wd.amount,
     fee: wd.fee,
@@ -5435,13 +5999,13 @@ app.post('/api/v1/admin/approve-withdraw', async (req: Request, res: Response) =
     status: 'SUCCESS',
     reference_id: wd.id,
     description: `Payout Dispatched: ${wd.payment_identifier || 'Bank A/C'}`,
-    balance_before: wallet.available_balance + totalDeduct,
-    balance_after: wallet.available_balance,
+    balance_before: wallet ? wallet.available_balance + wd.amount : wd.amount,
+    balance_after: wallet ? wallet.available_balance : 0,
     created_at: new Date().toISOString(),
   });
 
   // Dispatch Automated Withdrawal Paid Confirmation Email to User's registered Gmail
-  const userEmail = targetUser.email || (targetUser.user_custom_id ? `${targetUser.user_custom_id.toLowerCase()}@srgateway.in` : 'user@srgateway.in');
+  const userEmail = targetUser.email || (targetUser.user_custom_id ? `${targetUser.user_custom_id.toLowerCase()}@srgateway.in` : '');
   if (appSettings.email_alerts_enabled && appSettings.email_withdraw_alert_enabled && userEmail && userEmail.includes('@')) {
     const withdrawApprovedHtml = buildAlertEmailHtml({
       title: '💸 Withdrawal Dispatched & Settled',
@@ -5475,7 +6039,7 @@ app.post('/api/v1/admin/approve-withdraw', async (req: Request, res: Response) =
 
   saveDatabase();
 
-  res.json({ status: 'success', code: 200, message: 'Withdrawal marked as paid & confirmed', withdrawal: wd });
+  res.json({ status: 'success', code: 200, message: 'Withdrawal marked as paid & confirmed', withdrawal: wd, wallet });
 });
 
 app.post('/api/v1/admin/reject-withdraw', async (req: Request, res: Response) => {
@@ -5490,30 +6054,86 @@ app.post('/api/v1/admin/reject-withdraw', async (req: Request, res: Response) =>
   wd.rejection_reason = reason;
   wd.updated_at = new Date().toISOString();
 
-  // Restore balance
-  const wallet = wallets[wd.user_id] || wallets['SR-10029'];
-  wallet.locked_balance = Math.max(0, wallet.locked_balance - wd.amount);
-  wallet.available_balance += wd.amount;
+  // Accurately resolve target user and wallet & restore locked balance to available balance
+  const lookup = resolveUserAndWallet(wd.user_id || wd.user_custom_id);
+  const targetUser = lookup.user || users[wd.user_id] || users[wd.user_custom_id] || {
+    id: wd.user_id,
+    user_custom_id: wd.user_custom_id || wd.user_id,
+    full_name: wd.user_name || 'Valued User',
+  };
+
+  let wallet = lookup.wallet || wallets[wd.user_id] || wallets[wd.user_custom_id] || wallets[targetUser.id];
+  if (wallet) {
+    wallet.locked_balance = Math.max(0, (Number(wallet.locked_balance) || 0) - Number(wd.amount || 0));
+    wallet.available_balance = (Number(wallet.available_balance) || 0) + Number(wd.amount || 0);
+    wallet.updated_at = new Date().toISOString();
+
+    // Mirror to all identifier keys
+    if (targetUser.id) wallets[targetUser.id] = wallet;
+    if (targetUser.user_custom_id) wallets[targetUser.user_custom_id] = wallet;
+    if (wd.user_id) wallets[wd.user_id] = wallet;
+    if (wd.user_custom_id) wallets[wd.user_custom_id] = wallet;
+    if (targetUser.mobile) {
+      wallets[targetUser.mobile] = wallet;
+      const cleanMob = normalizePhone(targetUser.mobile);
+      if (cleanMob) wallets[cleanMob] = wallet;
+    }
+  }
 
   saveDatabase();
 
-  res.json({ status: 'success', code: 200, message: 'Withdrawal request rejected and balance restored', withdrawal: wd });
+  res.json({ status: 'success', code: 200, message: 'Withdrawal request rejected and balance restored', withdrawal: wd, wallet });
 });
 
 app.post('/api/v1/admin/credit-debit', (req: Request, res: Response) => {
   const { target_user_id, amount, type, reason } = req.body;
   const numAmt = parseFloat(amount);
 
-  const wallet = wallets[target_user_id] || wallets['SR-10029'];
+  if (isNaN(numAmt) || numAmt <= 0) {
+    return res.status(400).json({ status: 'error', code: 400, message: 'Please provide a valid amount.' });
+  }
+
+  const lookup = resolveUserAndWallet(target_user_id);
+  const targetUser = lookup.user || users[target_user_id] || {
+    id: target_user_id,
+    user_custom_id: target_user_id,
+    full_name: 'User',
+  };
+
+  let wallet = lookup.wallet || wallets[target_user_id] || wallets[targetUser.id] || wallets[targetUser.user_custom_id];
+  if (!wallet) {
+    wallet = {
+      id: `w-${targetUser.id || target_user_id}`,
+      user_id: targetUser.id || target_user_id,
+      available_balance: 0,
+      locked_balance: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  const balBefore = Number(wallet.available_balance) || 0;
   if (type === 'CREDIT') {
-    wallet.available_balance += numAmt;
+    wallet.available_balance = balBefore + numAmt;
   } else {
-    wallet.available_balance = Math.max(0, wallet.available_balance - numAmt);
+    wallet.available_balance = Math.max(0, balBefore - numAmt);
+  }
+  wallet.updated_at = new Date().toISOString();
+
+  // Mirror across all keys
+  wallets[target_user_id] = wallet;
+  if (targetUser.id) wallets[targetUser.id] = wallet;
+  if (targetUser.user_custom_id) wallets[targetUser.user_custom_id] = wallet;
+  if (targetUser.mobile) {
+    wallets[targetUser.mobile] = wallet;
+    const cleanMob = normalizePhone(targetUser.mobile);
+    if (cleanMob) wallets[cleanMob] = wallet;
   }
 
   transactions.unshift({
     id: `TXN-ADM-${Date.now()}`,
-    user_id: target_user_id,
+    user_id: targetUser.id || target_user_id,
+    user_name: targetUser.full_name || 'User',
     type: type === 'CREDIT' ? 'ADMIN_CREDIT' : 'ADMIN_DEBIT',
     amount: numAmt,
     fee: 0,
@@ -5521,14 +6141,19 @@ app.post('/api/v1/admin/credit-debit', (req: Request, res: Response) => {
     status: 'SUCCESS',
     reference_id: `ADM-${Date.now()}`,
     description: `Admin ${type}: ${reason || 'Adjustment'}`,
-    balance_before: wallet.available_balance + (type === 'CREDIT' ? -numAmt : numAmt),
+    balance_before: balBefore,
     balance_after: wallet.available_balance,
     created_at: new Date().toISOString(),
   });
 
   saveDatabase();
 
-  res.json({ status: 'success', code: 200, message: `Wallet ${type} of ₹${numAmt} processed successfully` });
+  res.json({
+    status: 'success',
+    code: 200,
+    message: `Wallet ${type} of ₹${numAmt} processed successfully for ${targetUser.full_name || target_user_id}`,
+    wallet,
+  });
 });
 
 // Admin Action: Update User Daily HTTPS Request Limit

@@ -66,12 +66,12 @@ export const WithdrawSection: React.FC = () => {
         : 'Set a 4-digit Security RPIN before completing your withdrawal.',
       amount,
       recipientName: paymentIdentifier,
-      onSuccessCallback: () => {
-        const res = submitWithdrawalRequest(amount, paymentIdentifier, note);
+      onSuccessCallback: async () => {
+        const res = await submitWithdrawalRequest(amount, paymentIdentifier, note);
         if (res.success) {
           setStatusMsg({ type: 'success', text: res.message });
           setWithdrawalModalData({
-            id: `WTH-${Date.now().toString().slice(-6)}`,
+            id: res.withdrawal?.id || `WD-${Date.now().toString().slice(-6)}`,
             amount,
             fee: calculatedFee,
             netPayout: calculatedNetPayout,
