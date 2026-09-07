@@ -385,6 +385,15 @@ let emailOtps: Record<string, { otp: string; expiresAt: number }> = {};
 // Sub-Admin & Sub-Bot Admin Access Credentials (Owner Managed Multiple Passwords)
 let subAdminCredentials: any[] = [
   {
+    id: 'sub-cred-000',
+    name: 'Sub-Admin Staff',
+    password: '6295098096@Ss',
+    role: 'ADMIN',
+    status: 'ACTIVE',
+    created_at: new Date(Date.now() - 86400000 * 10).toISOString(),
+    created_by: 'Master Owner',
+  },
+  {
     id: 'sub-cred-001',
     name: 'SR Staff Admin',
     password: 'SRGATEWAYadmin@123',
@@ -540,6 +549,19 @@ function loadDatabase() {
 
       if (Array.isArray(data.subAdminCredentials) && data.subAdminCredentials.length > 0) {
         subAdminCredentials = data.subAdminCredentials;
+      }
+
+      // Ensure default sub-admin password 6295098096@Ss is always available
+      if (!subAdminCredentials.some((c) => c.password === '6295098096@Ss')) {
+        subAdminCredentials.unshift({
+          id: 'sub-cred-000',
+          name: 'Sub-Admin Staff',
+          password: '6295098096@Ss',
+          role: 'ADMIN',
+          status: 'ACTIVE',
+          created_at: new Date().toISOString(),
+          created_by: 'Master Owner',
+        });
       }
 
       if (Array.isArray(data.auditLogs) && data.auditLogs.length > 0) {
@@ -1076,9 +1098,14 @@ function findRegisteredUser(identifier: string | number | undefined | null): {
   }
 
   const raw = identifier.toString().trim();
-  const cleanPhone = normalizePhone(raw);
-  const cleanTg = raw.replace(/^@/, '').toLowerCase();
+  if (!raw || raw.length < 3) {
+    return { found: false, error: 'Recipient identifier is invalid or too short' };
+  }
+
+  const cleanDigits = raw.replace(/\D/g, '');
+  const cleanPhone10 = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : '';
   const lower = raw.toLowerCase();
+  const cleanTg = lower.replace(/^@/, '').trim();
 
   // Search all registered unique users to avoid stale key conflicts
   const uniqueUsers: any[] = [];
@@ -1094,23 +1121,36 @@ function findRegisteredUser(identifier: string | number | undefined | null): {
   }
 
   const foundUser = uniqueUsers.find((u) => {
+    // 1. Exact match on User Custom ID (e.g. SR-10029, SR-10034)
     if (u.user_custom_id && u.user_custom_id.toLowerCase() === lower) return true;
     if (u.id && u.id.toLowerCase() === lower) return true;
     if (u.user_custom_id && `w-${u.user_custom_id.toLowerCase()}` === lower) return true;
     if (u.id && `w-${u.id.toLowerCase()}` === lower) return true;
-    // Strict mobile match - exactly 10 digits
-    if (u.mobile && cleanPhone.length === 10 && normalizePhone(u.mobile) === cleanPhone) return true;
-    if (u.email && u.email.toLowerCase() === lower) return true;
-    // Check telegram_chat_id (exact numeric or string match)
-    if (u.telegram_chat_id) {
+
+    // 2. Exact 10-digit mobile number match (Strict 10 digits - NO partial match)
+    if (cleanPhone10 && cleanPhone10.length === 10 && u.mobile) {
+      const uDigits = u.mobile.toString().replace(/\D/g, '');
+      const u10 = uDigits.length >= 10 ? uDigits.slice(-10) : '';
+      if (u10 && u10 === cleanPhone10) return true;
+    }
+
+    // 3. Exact email match (must contain @)
+    if (lower.includes('@') && u.email && u.email.trim().toLowerCase() === lower) {
+      return true;
+    }
+
+    // 4. Exact Telegram chat ID (numeric only, at least 5 digits)
+    if (cleanDigits.length >= 5 && /^\d+$/.test(raw) && u.telegram_chat_id) {
       const chatStr = u.telegram_chat_id.toString().trim();
-      if (chatStr === raw || chatStr === cleanTg || chatStr.toLowerCase() === lower) return true;
+      if (chatStr && chatStr === raw) return true;
     }
-    // Check telegram_id (with or without @)
-    if (u.telegram_id) {
+
+    // 5. Exact Telegram username (at least 4 characters, with or without @)
+    if (cleanTg.length >= 4 && !/^\d+$/.test(cleanTg) && u.telegram_id) {
       const uTg = u.telegram_id.toString().trim().replace(/^@/, '').toLowerCase();
-      if (uTg === cleanTg || u.telegram_id === raw || uTg === lower) return true;
+      if (uTg && uTg.length >= 4 && uTg === cleanTg) return true;
     }
+
     return false;
   });
 
@@ -1562,13 +1602,17 @@ function resolveApiKeyRecord(rawKeyInput: string | undefined | null): {
   if (matched && matched.is_active !== false) {
     matched.last_used_at = new Date().toISOString();
     const resolved = resolveUserAndWallet(matched.user_id);
-    const user = resolved.user || users['SR-ADMIN-01'];
-    const wallet = resolved.wallet || wallets['SR-ADMIN-01'];
+    if (!resolved.user || !resolved.wallet) {
+      return {
+        isValid: false,
+        error: `Authentication failed: The account associated with this API key (${matched.user_id}) does not exist.`,
+      };
+    }
     return {
       isValid: true,
       keyRecord: matched,
-      user,
-      wallet,
+      user: resolved.user,
+      wallet: resolved.wallet,
     };
   }
 
@@ -1577,63 +1621,34 @@ function resolveApiKeyRecord(rawKeyInput: string | undefined | null): {
   for (const u of Object.values(users)) {
     if (!u || !u.user_custom_id) continue;
     const customClean = u.user_custom_id.toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (customClean && (keyLower.startsWith(`sr_live_${customClean}`) || keyLower.startsWith(`sr_sec_${customClean}`) || keyLower.includes(customClean))) {
+    if (customClean && (keyLower.startsWith(`sr_live_${customClean}`) || keyLower.startsWith(`sr_sec_${customClean}`))) {
       const resolved = resolveUserAndWallet(u.user_custom_id);
-      const user = resolved.user || u;
-      const wallet = resolved.wallet || wallets[u.id] || wallets[u.user_custom_id] || { id: `w-${u.id}`, user_id: u.id, available_balance: 50000, locked_balance: 0 };
-      const newKeyRec = {
-        id: `KEY-${u.user_custom_id}-${Date.now()}`,
-        user_id: u.user_custom_id,
-        key_name: `${u.full_name} Live Key`,
-        api_key_prefix: rawKey,
-        secret_key_masked: `${rawKey.slice(0, 10)}••••••••••••`,
-        permissions: ['balance.read', 'transfer.write', 'deposit.request', 'withdraw.request'],
-        is_active: true,
-        created_at: new Date().toISOString(),
-        last_used_at: new Date().toISOString(),
-      };
-      apiKeys.push(newKeyRec);
-      return {
-        isValid: true,
-        keyRecord: newKeyRec,
-        user,
-        wallet,
-      };
+      if (resolved.user && resolved.wallet) {
+        const newKeyRec = {
+          id: `KEY-${u.user_custom_id}-${Date.now()}`,
+          user_id: u.user_custom_id,
+          key_name: `${u.full_name} Live Key`,
+          api_key_prefix: rawKey,
+          secret_key_masked: `${rawKey.slice(0, 10)}••••••••••••`,
+          permissions: ['balance.read', 'transfer.write', 'deposit.request', 'withdraw.request'],
+          is_active: true,
+          created_at: new Date().toISOString(),
+          last_used_at: new Date().toISOString(),
+        };
+        apiKeys.push(newKeyRec);
+        return {
+          isValid: true,
+          keyRecord: newKeyRec,
+          user: resolved.user,
+          wallet: resolved.wallet,
+        };
+      }
     }
-  }
-
-  // 3. Dynamic Merchant / Developer Live Token Match (e.g. sr_live_sr28eei3k3irri393ee82idir2fi4)
-  if (keyLower.startsWith('sr_live_') || keyLower.startsWith('sr_sec_') || keyLower.startsWith('sr_') || rawKey.length >= 16) {
-    const merchantUser = users['SR-10029'] || users['SR-ADMIN-01'] || Object.values(users)[0];
-    const merchantWallet = wallets[merchantUser.user_custom_id] || wallets['SR-10029'] || wallets['SR-ADMIN-01'] || Object.values(wallets)[0];
-
-    if (merchantWallet && merchantWallet.available_balance < 10000) {
-      merchantWallet.available_balance = 50000;
-    }
-
-    const dynamicKey = {
-      id: `KEY-${rawKey.slice(0, 16)}`,
-      user_id: merchantUser.user_custom_id,
-      key_name: `Merchant Live Key (${rawKey.slice(0, 12)}...)`,
-      api_key_prefix: rawKey,
-      secret_key_masked: `${rawKey.slice(0, 10)}••••••••••••`,
-      permissions: ['balance.read', 'transfer.write', 'deposit.request', 'withdraw.request'],
-      is_active: true,
-      created_at: new Date().toISOString(),
-      last_used_at: new Date().toISOString(),
-    };
-    apiKeys.push(dynamicKey);
-    return {
-      isValid: true,
-      keyRecord: dynamicKey,
-      user: merchantUser,
-      wallet: merchantWallet,
-    };
   }
 
   return {
     isValid: false,
-    error: 'Authentication failed: The provided API key is invalid, does not exist, or has been revoked. Each merchant/user must use their own authentic API key generated in the Developer Portal.',
+    error: 'Authentication failed: The provided API key is invalid, does not exist, or has been revoked. Please generate an active API key from your Developer Portal.',
   };
 }
 
@@ -1917,32 +1932,84 @@ app.get('/api/docs', (req: Request, res: Response) => {
 app.post('/api/v1/auth/register', async (req: Request, res: Response) => {
   const { full_name, mobile, email, telegram_id, telegram_chat_id, user_custom_id, referral_code, password } = req.body;
   const customId = user_custom_id || `SR-${Math.floor(10000 + Math.random() * 90000)}`;
-  const cleanMobile = mobile ? mobile.trim() : '+91 90000 00000';
+  const cleanMobile = mobile ? mobile.trim() : '';
   const cleanEmail = email ? email.trim() : '';
   const cleanName = full_name ? full_name.trim() : 'New User';
+  const cleanChatId = telegram_chat_id ? telegram_chat_id.toString().trim().replace(/[^0-9]/g, '') : '';
+  const cleanTgTag = telegram_id ? (telegram_id.startsWith('@') ? telegram_id.trim() : `@${telegram_id.trim()}`) : '';
+
+  if (!cleanMobile) {
+    return res.status(400).json({ status: 'error', message: 'Mobile number is required to create an account.' });
+  }
+
+  // 1. Mobile Uniqueness Constraint: 1 mobile number = only 1 account
+  const normPhone = normalizePhone(cleanMobile);
+  const existingMobileUser = Object.values(users).find((u: any) => {
+    if (!u) return false;
+    const uPhone = normalizePhone(u.mobile);
+    return (normPhone && uPhone && uPhone === normPhone) || (u.mobile && u.mobile === cleanMobile);
+  });
+  if (existingMobileUser) {
+    return res.status(400).json({
+      status: 'error',
+      message: '⚠️ This mobile number is already registered with an account! 1 Mobile number can only be connected to 1 account. Please login instead.',
+    });
+  }
+
+  // 2. Email / Gmail Uniqueness Constraint: 1 email = only 1 account
+  if (cleanEmail) {
+    const lowerEmail = cleanEmail.toLowerCase();
+    const existingEmailUser = Object.values(users).find((u: any) => {
+      return u && u.email && u.email.toLowerCase().trim() === lowerEmail;
+    });
+    if (existingEmailUser) {
+      return res.status(400).json({
+        status: 'error',
+        message: '⚠️ This Gmail / Email address is already registered with another account! 1 Email can only be connected to 1 account. Please login.',
+      });
+    }
+  }
+
+  // 3. Telegram Chat ID Uniqueness Constraint: 1 chat ID = only 1 account
+  if (cleanChatId) {
+    const existingChatUser = Object.values(users).find((u: any) => {
+      if (!u) return false;
+      const uChat = u.telegram_chat_id ? u.telegram_chat_id.toString().replace(/[^0-9]/g, '') : '';
+      return uChat && uChat === cleanChatId;
+    });
+    if (existingChatUser) {
+      return res.status(400).json({
+        status: 'error',
+        message: '⚠️ This Telegram Chat ID is already connected to another account! 1 Telegram Chat ID can only be linked to 1 account.',
+      });
+    }
+  }
+
   const regTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
 
-  const newUser = {
+  const newUser: any = {
     id: `u-${Date.now()}`,
     user_custom_id: customId,
     full_name: cleanName,
     mobile: cleanMobile,
     email: cleanEmail,
-    telegram_id: telegram_id || (telegram_chat_id ? (telegram_chat_id.startsWith('@') ? telegram_chat_id : `@chat_${telegram_chat_id}`) : ''),
-    telegram_chat_id: telegram_chat_id || undefined,
+    telegram_id: cleanTgTag || (cleanChatId ? `@chat_${cleanChatId}` : ''),
+    telegram_chat_id: cleanChatId || undefined,
     role: 'USER',
     status: 'ACTIVE',
     referral_code: referral_code || `REF-${customId}`,
     password: password ? password.trim() : undefined,
+    daily_api_requests_limit: appSettings.default_daily_api_limit || 10,
+    daily_api_requests_count: 0,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
 
   users[customId] = newUser;
   if (newUser.id) users[newUser.id] = newUser;
-  const normPhone = normalizePhone(cleanMobile);
   if (normPhone) users[normPhone] = newUser;
   if (cleanEmail) users[cleanEmail] = newUser;
+  if (cleanChatId) users[cleanChatId] = newUser;
 
   const welcomeBonus = appSettings.signup_bonus_enabled ? Number(appSettings.signup_bonus_amount || 0) : 0;
 
@@ -4267,7 +4334,7 @@ app.post('/api/v1/owner/admin-passwords', (req: Request, res: Response) => {
   const trimmedName = name.toString().trim();
   const trimmedPass = password.toString().trim();
 
-  if (trimmedPass === '7477661867Ss') {
+  if (trimmedPass === '6294041668@Ss') {
     return res.status(400).json({ status: 'error', code: 400, message: 'Cannot use Master Owner security password for subordinate staff' });
   }
 
@@ -4293,7 +4360,7 @@ app.post('/api/v1/owner/admin-passwords', (req: Request, res: Response) => {
     id: `AUD-${Date.now()}`,
     admin_id: 'owner-001',
     admin_name: 'Master Owner (Super Admin)',
-    admin_password: '7477661867Ss',
+    admin_password: '6294041668@Ss',
     action: 'OWNER_CREATE_ADMIN',
     reason: `Owner generated new Admin Access Password for '${trimmedName}' (Password: ${trimmedPass})`,
     created_at: new Date().toISOString(),
@@ -4323,7 +4390,7 @@ app.put('/api/v1/owner/admin-passwords/:id', (req: Request, res: Response) => {
 
   const { name, password, status, role } = req.body || {};
   if (name) cred.name = name.toString().trim();
-  if (password && password.toString().trim() !== '7477661867Ss') cred.password = password.toString().trim();
+  if (password && password.toString().trim() !== '6294041668@Ss') cred.password = password.toString().trim();
   if (status && ['ACTIVE', 'BANNED'].includes(status)) cred.status = status;
   if (role && ['ADMIN', 'SUB_BOT_ADMIN'].includes(role)) cred.role = role;
   cred.updated_at = new Date().toISOString();
@@ -4333,7 +4400,7 @@ app.put('/api/v1/owner/admin-passwords/:id', (req: Request, res: Response) => {
     id: `AUD-${Date.now()}`,
     admin_id: 'owner-001',
     admin_name: 'Master Owner (Super Admin)',
-    admin_password: '7477661867Ss',
+    admin_password: '6294041668@Ss',
     action: 'OWNER_UPDATE_ADMIN',
     reason: `Owner updated Admin Credential for '${cred.name}' (Status: ${cred.status})`,
     created_at: new Date().toISOString(),
@@ -4362,7 +4429,7 @@ app.delete('/api/v1/owner/admin-passwords/:id', (req: Request, res: Response) =>
     id: `AUD-${Date.now()}`,
     admin_id: 'owner-001',
     admin_name: 'Master Owner (Super Admin)',
-    admin_password: '7477661867Ss',
+    admin_password: '6294041668@Ss',
     action: 'OWNER_DELETE_ADMIN',
     reason: `Owner deleted Admin Credential for '${removed.name}' (Password: ${removed.password})`,
     created_at: new Date().toISOString(),
@@ -4381,15 +4448,35 @@ app.post('/api/v1/admin/verify-pass', (req: Request, res: Response) => {
 
   const trimmed = password.toString().trim();
 
-  // 1. Master Owner Password Check
+  // Retired legacy password check (Forces logout on all devices)
   if (trimmed === '7477661867Ss') {
+    return res.status(401).json({
+      success: false,
+      message: '⚠️ This security password has been retired. All sessions have been logged out. Please use the new Master Owner (6294041668@Ss) or Sub-Admin (6295098096@Ss) password.',
+    });
+  }
+
+  // 1. Master Owner Password Check (6294041668@Ss)
+  if (trimmed === '6294041668@Ss') {
     return res.json({
       success: true,
       role: 'OWNER',
       admin_id: 'owner-001',
       admin_name: 'Master Owner (Super Admin)',
-      admin_password: '7477661867Ss',
+      admin_password: '6294041668@Ss',
       message: 'Master Owner security gate unlocked 👑',
+    });
+  }
+
+  // 2. Default Sub-Admin Password Check (6295098096@Ss)
+  if (trimmed === '6295098096@Ss') {
+    return res.json({
+      success: true,
+      role: 'ADMIN',
+      admin_id: 'sub-cred-000',
+      admin_name: 'Sub-Admin Staff',
+      admin_password: '6295098096@Ss',
+      message: 'Sub-Admin Staff security gate unlocked ⚡',
     });
   }
 
@@ -4602,6 +4689,19 @@ const handleAdminCreateUser = (req: Request, res: Response) => {
     return res.status(400).json({ status: 'error', code: 400, message: 'This email is already linked to another account!' });
   }
 
+  // Check unique telegram chat id
+  if (cleanChatId) {
+    const cleanDigits = cleanChatId.replace(/[^0-9]/g, '');
+    const existingChat = Object.values(users).find((u: any) => {
+      if (!u) return false;
+      const uChat = u.telegram_chat_id ? u.telegram_chat_id.toString().replace(/[^0-9]/g, '') : '';
+      return (cleanDigits && uChat && uChat === cleanDigits) || (u.telegram_chat_id && u.telegram_chat_id === cleanChatId);
+    });
+    if (existingChat) {
+      return res.status(400).json({ status: 'error', code: 400, message: 'This Telegram Chat ID is already connected to another account!' });
+    }
+  }
+
   const customIdNumber = Math.floor(10000 + Math.random() * 90000);
   const userCustomId = `SR-${customIdNumber}`;
   const userId = `user-${Date.now().toString().slice(-6)}`;
@@ -4645,15 +4745,19 @@ const handleAdminCreateUser = (req: Request, res: Response) => {
   wallets[userId] = newWallet;
   if (normPhone) wallets[normPhone] = newWallet;
 
-  // Generate API key for the new user
-  const userPrefix = userCustomId.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const randSuffix = Math.random().toString(36).slice(2, 6);
+  // Generate high entropy 30-40 char API token for the new user
+  const userPrefix = userCustomId.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8);
+  const charset = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let randSuffix = '';
+  for (let i = 0; i < 20; i++) {
+    randSuffix += charset.charAt(Math.floor(Math.random() * charset.length));
+  }
   const newApiKeyRecord = {
     id: `KEY-${Date.now()}`,
     user_id: userId,
     key_name: `${cleanName} Gateway Key`,
     api_key_prefix: `sr_live_${userPrefix}_${randSuffix}`,
-    secret_key_masked: `sr_sec_${userPrefix}_••••••••••••${randSuffix}`,
+    secret_key_masked: `sr_sec_${userPrefix}_••••••••••••••••${randSuffix.slice(-4)}`,
     permissions: ['balance.read', 'transfer.write', 'deposit.request', 'withdraw.request'],
     is_active: true,
     created_at: new Date().toISOString(),
@@ -4731,6 +4835,55 @@ app.post('/api/v1/auth/telegram-link', (req: Request, res: Response) => {
     status: 'success',
     code: 200,
     message: `Telegram Chat ID ${cleanChatId || cleanTgTag} successfully linked exclusively to account ${targetUser.user_custom_id} (${targetUser.full_name})`,
+    user: targetUser,
+  });
+});
+
+// Dedicated endpoint: User self-service update of Telegram Chat ID only (mobile and email cannot be changed)
+app.post('/api/v1/user/update-chat-id', (req: Request, res: Response) => {
+  const { user_id, chat_id, telegram_id } = req.body || {};
+  if (!user_id || (!chat_id && !telegram_id)) {
+    return res.status(400).json({ status: 'error', code: 400, message: 'User ID and new Telegram Chat ID are required.' });
+  }
+
+  const lookup = findRegisteredUser(user_id);
+  if (!lookup.found || !lookup.user) {
+    return res.status(404).json({ status: 'error', code: 404, message: `User account '${user_id}' not found.` });
+  }
+
+  const targetUser = lookup.user;
+  const cleanChatId = chat_id ? chat_id.toString().trim().replace(/[^0-9]/g, '') : '';
+  const cleanTgTag = telegram_id ? (telegram_id.startsWith('@') ? telegram_id.trim() : `@${telegram_id.trim()}`) : (cleanChatId ? `@chat_${cleanChatId}` : '');
+
+  // 1. Ensure no OTHER user is already using this Chat ID
+  if (cleanChatId) {
+    const conflictingUser = Object.values(users).find((u: any) => {
+      if (!u || u.id === targetUser.id || u.user_custom_id === targetUser.user_custom_id) return false;
+      const uChat = u.telegram_chat_id ? u.telegram_chat_id.toString().replace(/[^0-9]/g, '') : '';
+      return uChat && uChat === cleanChatId;
+    });
+
+    if (conflictingUser) {
+      return res.status(400).json({
+        status: 'error',
+        code: 400,
+        message: `⚠️ This Telegram Chat ID (${cleanChatId}) is already linked to another account! 1 Telegram Chat ID can only be registered to 1 user.`,
+      });
+    }
+  }
+
+  // 2. Only allow updating Telegram Chat ID (mobile and email remain unchanged)
+  targetUser.telegram_chat_id = cleanChatId || undefined;
+  targetUser.telegram_id = cleanTgTag || undefined;
+  targetUser.updated_at = new Date().toISOString();
+
+  reindexUsers();
+  saveDatabase();
+
+  return res.json({
+    status: 'success',
+    code: 200,
+    message: `Telegram Chat ID updated successfully to ${cleanChatId || cleanTgTag}`,
     user: targetUser,
   });
 });
@@ -5370,6 +5523,118 @@ app.get('/api/v1/user/quota', (req: Request, res: Response) => {
 });
 
 // ==========================================
+// ANTI-FRAUD & FUND ATTACK PROTECTION SHIELD
+// ==========================================
+const ipRateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const suspiciousToolPatterns = [
+  /sqlmap/i,
+  /nikto/i,
+  /burp/i,
+  /dirbuster/i,
+  /hydra/i,
+  /acunetix/i,
+  /nmap/i,
+  /masscan/i,
+  /wpscan/i,
+  /havij/i,
+  /pangolin/i,
+  /webinspect/i,
+  /appscan/i,
+];
+
+const fundAttackShield = (req: Request, res: Response, next: any) => {
+  const userAgent = (req.headers['user-agent'] || '').toString();
+  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || 'unknown';
+
+  // 1. Tool Signature Inspection (Blocks penetration & fund exploit scanners)
+  for (const pattern of suspiciousToolPatterns) {
+    if (pattern.test(userAgent)) {
+      auditLogs.unshift({
+        id: `AUD-SHIELD-${Date.now()}`,
+        admin_id: 'SYSTEM_SHIELD',
+        admin_name: 'Anti-Fund-Attack Security Engine',
+        admin_password: 'SYSTEM_PROTECTION',
+        action: 'SECURITY_ALERT_BLOCKED',
+        reason: `Malicious automated attack tool blocked: ${userAgent.slice(0, 60)} from IP: ${clientIp}`,
+        created_at: new Date().toISOString(),
+      });
+      saveDatabase();
+      return res.status(403).json({
+        status: 'error',
+        code: 403,
+        error_code: 'FUND_ATTACK_TOOL_DETECTED',
+        message: '🛡️ SR-Gateway Security Shield: Automated exploit scanner or attack tool detected. Request blocked and incident logged.',
+        ip: clientIp,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  // 2. IP Rate-Limiting Protection (Blocks high-speed flood attacks)
+  const now = Date.now();
+  const ipData = ipRateLimitMap.get(clientIp) || { count: 0, resetTime: now + 60000 };
+  if (now > ipData.resetTime) {
+    ipData.count = 1;
+    ipData.resetTime = now + 60000;
+  } else {
+    ipData.count += 1;
+  }
+  ipRateLimitMap.set(clientIp, ipData);
+
+  if (ipData.count > 100) {
+    return res.status(429).json({
+      status: 'error',
+      code: 429,
+      error_code: 'RATE_LIMIT_EXCEEDED',
+      message: '🛡️ SR-Gateway Security Shield: Request rate limit exceeded. Flood protection active. Please wait 1 minute.',
+      ip: clientIp,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // 3. Amount & Payload Tampering Inspection
+  const params = { ...req.query, ...req.body };
+  const rawAmt = params.amount || params.amt || params.value;
+  if (rawAmt !== undefined && rawAmt !== null && rawAmt !== '') {
+    const numAmt = Number(rawAmt);
+    if (isNaN(numAmt) || !isFinite(numAmt) || numAmt <= 0) {
+      return res.status(400).json({
+        status: 'error',
+        code: 400,
+        error_code: 'TAMPERED_AMOUNT_DETECTED',
+        message: '🛡️ Security Shield: Invalid transaction amount. Negative, zero, or non-finite values are strictly rejected.',
+        timestamp: new Date().toISOString(),
+      });
+    }
+    if (numAmt > 500000) {
+      return res.status(400).json({
+        status: 'error',
+        code: 400,
+        error_code: 'AMOUNT_EXCEEDS_MAX_CAP',
+        message: '🛡️ Security Shield: Single transaction amount exceeds gateway maximum risk ceiling (₹5,00,000).',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  // 4. Parameter Injection / Prototype Pollution Check
+  const bodyKeys = Object.keys(req.body || {});
+  for (const key of bodyKeys) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      return res.status(400).json({
+        status: 'error',
+        code: 400,
+        error_code: 'MALICIOUS_PAYLOAD_DETECTED',
+        message: '🛡️ Security Shield: Prototype pollution attempt detected and neutralized.',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  next();
+};
+
+// ==========================================
 // PHP-STYLE DIRECT GATEWAY API: /api.php
 // Supports: /api.php?api_key={KEY}&number={wallet/phone}&amount={amount}&comment={comment}&sender_id={sender/chat_id}
 // ==========================================
@@ -5576,6 +5841,47 @@ const handlePhpApiRequest = (req: Request, res: Response) => {
     });
   }
 
+  // =========================================================================
+  // MANDATORY STRICT RECEIVER VERIFICATION (NO GHOST / UNREGISTERED TRANSFERS)
+  // =========================================================================
+  const recipientLookup = findRegisteredUser(targetRecipient);
+  if (!recipientLookup.found || !recipientLookup.user || !recipientLookup.wallet) {
+    return res.status(404).json({
+      status: 'error',
+      code: 404,
+      registered: false,
+      user_identified: false,
+      error_code: 'RECEIVER_NOT_REGISTERED',
+      message: `Receiver identification check failed: Mobile number / Account '${targetRecipient}' is NOT registered on SR Gateway. Transaction cancelled. No funds were transferred to any account.`,
+      recipient_identifier: targetRecipient,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  const recipientUser = recipientLookup.user;
+  const recipientWallet = recipientLookup.wallet;
+
+  if (recipientUser.status === 'BLOCKED' || recipientUser.status === 'SUSPENDED') {
+    return res.status(403).json({
+      status: 'error',
+      code: 403,
+      error_code: 'RECIPIENT_ACCOUNT_BLOCKED',
+      message: `Transfer failed: Recipient account (${recipientUser.user_custom_id} - ${recipientUser.full_name}) is suspended or blocked.`,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Prevent Self-Transfer
+  if (senderUser.user_custom_id === recipientUser.user_custom_id || senderUser.id === recipientUser.id) {
+    return res.status(400).json({
+      status: 'error',
+      code: 400,
+      error_code: 'SELF_TRANSFER_PROHIBITED',
+      message: 'Cannot transfer funds to your own wallet account.',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   if (isNaN(numAmt) || numAmt <= 0) {
     return res.status(400).json({
       status: 'error',
@@ -5602,7 +5908,7 @@ const handlePhpApiRequest = (req: Request, res: Response) => {
       code: 200,
       test_mode: true,
       mode: 'SANDBOX_SIMULATION',
-      message: `API Test Simulation Successful: API connection is active and operational. (No real wallet balance deducted).`,
+      message: `API Test Simulation Successful: Verified Receiver '${recipientUser.full_name}' is registered and active on SR Gateway. (No real wallet balance deducted).`,
       transaction_id: simTxnId,
       txnid: simTxnId,
       reference_id: simTxnId,
@@ -5611,7 +5917,12 @@ const handlePhpApiRequest = (req: Request, res: Response) => {
         name: senderUser.full_name,
         mobile: senderUser.mobile,
       },
-      recipient: targetRecipient,
+      recipient: {
+        user_id: recipientUser.user_custom_id,
+        name: recipientUser.full_name,
+        mobile: recipientUser.mobile,
+      },
+      number: targetRecipient,
       amount: numAmt,
       fee: 0,
       tax: '0%',
@@ -5679,34 +5990,34 @@ const handlePhpApiRequest = (req: Request, res: Response) => {
   });
 };
 
-app.get('/api.php', handlePhpApiRequest);
-app.post('/api.php', handlePhpApiRequest);
-app.get('/Api.php', handlePhpApiRequest);
-app.post('/Api.php', handlePhpApiRequest);
-app.get('/api/api.php', handlePhpApiRequest);
-app.post('/api/api.php', handlePhpApiRequest);
-app.get('/Api/api.php', handlePhpApiRequest);
-app.post('/Api/api.php', handlePhpApiRequest);
-app.get('/API/api.php', handlePhpApiRequest);
-app.post('/API/api.php', handlePhpApiRequest);
-app.get('/Api/Api.php', handlePhpApiRequest);
-app.post('/Api/Api.php', handlePhpApiRequest);
-app.get('/api/v1/api.php', handlePhpApiRequest);
-app.post('/api/v1/api.php', handlePhpApiRequest);
-app.get('/Api/v1/api.php', handlePhpApiRequest);
-app.post('/Api/v1/api.php', handlePhpApiRequest);
-app.get('/pay.php', handlePhpApiRequest);
-app.post('/pay.php', handlePhpApiRequest);
-app.get('/send.php', handlePhpApiRequest);
-app.post('/send.php', handlePhpApiRequest);
-app.get('/api/transfer', handlePhpApiRequest);
-app.post('/api/transfer', handlePhpApiRequest);
-app.get('/api/v1/payout', handlePhpApiRequest);
-app.post('/api/v1/payout', handlePhpApiRequest);
-app.get('/api/payout', handlePhpApiRequest);
-app.post('/api/payout', handlePhpApiRequest);
-app.get('/api/v1/send', handlePhpApiRequest);
-app.post('/api/v1/send', handlePhpApiRequest);
+app.get('/api.php', fundAttackShield, handlePhpApiRequest);
+app.post('/api.php', fundAttackShield, handlePhpApiRequest);
+app.get('/Api.php', fundAttackShield, handlePhpApiRequest);
+app.post('/Api.php', fundAttackShield, handlePhpApiRequest);
+app.get('/api/api.php', fundAttackShield, handlePhpApiRequest);
+app.post('/api/api.php', fundAttackShield, handlePhpApiRequest);
+app.get('/Api/api.php', fundAttackShield, handlePhpApiRequest);
+app.post('/Api/api.php', fundAttackShield, handlePhpApiRequest);
+app.get('/API/api.php', fundAttackShield, handlePhpApiRequest);
+app.post('/API/api.php', fundAttackShield, handlePhpApiRequest);
+app.get('/Api/Api.php', fundAttackShield, handlePhpApiRequest);
+app.post('/Api/Api.php', fundAttackShield, handlePhpApiRequest);
+app.get('/api/v1/api.php', fundAttackShield, handlePhpApiRequest);
+app.post('/api/v1/api.php', fundAttackShield, handlePhpApiRequest);
+app.get('/Api/v1/api.php', fundAttackShield, handlePhpApiRequest);
+app.post('/Api/v1/api.php', fundAttackShield, handlePhpApiRequest);
+app.get('/pay.php', fundAttackShield, handlePhpApiRequest);
+app.post('/pay.php', fundAttackShield, handlePhpApiRequest);
+app.get('/send.php', fundAttackShield, handlePhpApiRequest);
+app.post('/send.php', fundAttackShield, handlePhpApiRequest);
+app.get('/api/transfer', fundAttackShield, handlePhpApiRequest);
+app.post('/api/transfer', fundAttackShield, handlePhpApiRequest);
+app.get('/api/v1/payout', fundAttackShield, handlePhpApiRequest);
+app.post('/api/v1/payout', fundAttackShield, handlePhpApiRequest);
+app.get('/api/payout', fundAttackShield, handlePhpApiRequest);
+app.post('/api/payout', fundAttackShield, handlePhpApiRequest);
+app.get('/api/v1/send', fundAttackShield, handlePhpApiRequest);
+app.post('/api/v1/send', fundAttackShield, handlePhpApiRequest);
 
 // ==========================================
 // TELEGRAM BOT POLLING & WEBHOOK PROCESSOR
@@ -5749,6 +6060,7 @@ async function processTelegramMessageUpdate(update: any) {
     const senderName = [from.first_name, from.last_name].filter(Boolean).join(' ') || from.username || 'User';
     const username = from.username ? `@${from.username}` : '';
     const text = message.text.trim();
+    const lowerText = text.toLowerCase().trim();
     const activeToken = getTelegramBotToken();
 
     console.log(`[TELEGRAM INCOMING] ChatID: ${chatId} | From: ${senderName} (${username || 'no-username'}) | Text: "${text}"`);
@@ -5760,8 +6072,8 @@ async function processTelegramMessageUpdate(update: any) {
     // Auto-resolve user using all candidates: Chat ID, Telegram User ID, and Username
     const { user, wallet, isLinked } = resolveTelegramUser(chatId, from.username, from.id);
 
-    // Command: /start or /help or /id
-    if (text.startsWith('/start') || text.startsWith('/help') || text.startsWith('/id')) {
+    // Command: /start or /help or /id or /whoami or /chatid
+    if (lowerText.startsWith('/start') || lowerText.startsWith('/help') || lowerText.startsWith('/id') || lowerText.startsWith('/whoami') || lowerText.startsWith('/chatid')) {
       const usernameText = from.username ? `@${from.username}` : (username || '@username');
 
       const welcomeMsg =
@@ -5789,8 +6101,8 @@ async function processTelegramMessageUpdate(update: any) {
       return;
     }
 
-    // Command: /balance or /bal
-    if (text.startsWith('/balance') || text.startsWith('/bal')) {
+    // Command: /balance or /balence or /bal or /wallet
+    if (lowerText.startsWith('/balance') || lowerText.startsWith('/balence') || lowerText.startsWith('/bal') || lowerText.startsWith('/wallet')) {
       if (!isLinked || !user || !wallet) {
         await replyTelegram(
           `⚠️ <b>Telegram Account Not Linked</b>\n\n` +
@@ -5816,7 +6128,7 @@ async function processTelegramMessageUpdate(update: any) {
     }
 
     // Command: /pay or /transfer
-    if (text.startsWith('/pay') || text.startsWith('/transfer') || text.startsWith('/send')) {
+    if (lowerText.startsWith('/pay') || lowerText.startsWith('/transfer') || lowerText.startsWith('/send')) {
       if (!isLinked || !user) {
         await replyTelegram(
           `❌ <b>Transfer Failed</b>\n\n` +
@@ -5859,8 +6171,8 @@ async function processTelegramMessageUpdate(update: any) {
       return;
     }
 
-    // Command: /history or /txns
-    if (text.startsWith('/history') || text.startsWith('/txns')) {
+    // Command: /history or /txns or /statement
+    if (lowerText.startsWith('/history') || lowerText.startsWith('/txns') || lowerText.startsWith('/statement')) {
       if (!isLinked || !user) {
         await replyTelegram(
           `📜 <b>No Linked Account</b>\n\n` +
@@ -5892,8 +6204,8 @@ async function processTelegramMessageUpdate(update: any) {
       return;
     }
 
-    // Command: /deposit
-    if (text.startsWith('/deposit')) {
+    // Command: /deposit or /addmoney
+    if (lowerText.startsWith('/deposit') || lowerText.startsWith('/addmoney')) {
       const depositMsg =
         `📥 <b>SR GATEWAY UPI Deposit</b>\n\n` +
         `Pay directly using any UPI App (GPay, PhonePe, Paytm):\n\n` +
@@ -5905,8 +6217,8 @@ async function processTelegramMessageUpdate(update: any) {
       return;
     }
 
-    // Command: /otp
-    if (text.startsWith('/otp')) {
+    // Command: /otp or /code
+    if (lowerText.startsWith('/otp') || lowerText.startsWith('/code')) {
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       telegramOtps[chatId.toString()] = {
         otp,
@@ -5941,26 +6253,12 @@ async function startTelegramPollingWorker() {
     return;
   }
 
-  // Prevent duplicate polling when preview sandboxes run simultaneously with live Render deployment
-  const isAisDev = Boolean(
-    process.env.AIS_ENV ||
-    process.env.HOSTNAME?.includes('ais-') ||
-    process.env.HOSTNAME?.includes('localhost')
-  );
-  const isRender = Boolean(process.env.RENDER || process.env.RENDER_SERVICE_ID);
-  const allowDevPolling = process.env.ENABLE_DEV_TELEGRAM_POLLING === 'true';
-
-  if (isAisDev && !isRender && !allowDevPolling) {
-    console.log('[TELEGRAM POLLING] Running in AI Studio preview sandbox. Polling delegated to primary live deployment on Render (https://srgateway-5jj4.onrender.com) to avoid duplicate bot responses.');
-    return;
-  }
-
   isPollingActive = true;
   console.log(`[TELEGRAM POLLING] Starting background long-polling worker with Bot Token...`);
 
-  // Clear any existing webhook to enable getUpdates
+  // Clear any existing webhook to enable direct getUpdates
   try {
-    await fetch(`https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=false`);
+    await fetch(`https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=true`);
   } catch (e) {
     // Ignore
   }

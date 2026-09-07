@@ -25,7 +25,7 @@ export const MaintenanceScreen: React.FC = () => {
   const [adminPass, setAdminPass] = useState('');
   const [adminPassError, setAdminPassError] = useState<string | null>(null);
 
-  const MASTER_ADMIN_PASS = '7477661867Ss';
+  const MASTER_ADMIN_PASS = '6294041668@Ss';
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);

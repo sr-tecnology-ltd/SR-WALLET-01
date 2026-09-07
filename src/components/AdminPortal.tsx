@@ -348,10 +348,21 @@ export const AdminPortal: React.FC = () => {
     });
   };
 
-  // Fixed Master Admin Security Password Protection (7477661867Ss)
-  const MASTER_ADMIN_PASS = '7477661867Ss';
+  // Master Owner Security Password (6294041668@Ss) & Default Sub-Admin (6295098096@Ss)
+  const MASTER_ADMIN_PASS = '6294041668@Ss';
+  const DEFAULT_SUB_ADMIN_PASS = '6295098096@Ss';
   const [adminPassInput, setAdminPassInput] = useState('');
   const [isPassAuthed, setIsPassAuthed] = useState<boolean>(() => {
+    // Invalidate old expired passwords and force logout all previous sessions
+    const storedPass = sessionStorage.getItem('sr_admin_pass');
+    if (storedPass === '7477661867Ss' || !storedPass) {
+      sessionStorage.removeItem('sr_admin_authed');
+      sessionStorage.removeItem('sr_admin_role');
+      sessionStorage.removeItem('sr_admin_id');
+      sessionStorage.removeItem('sr_admin_name');
+      sessionStorage.removeItem('sr_admin_pass');
+      return false;
+    }
     return sessionStorage.getItem('sr_admin_authed') === 'true';
   });
   const [passError, setPassError] = useState<string | null>(null);
@@ -362,13 +373,29 @@ export const AdminPortal: React.FC = () => {
     const cleanPass = adminPassInput.trim();
     if (!cleanPass) return;
 
+    if (cleanPass === '7477661867Ss') {
+      setPassError('⚠️ This password has been retired. All prior sessions were logged out. Use new Master Owner (6294041668@Ss) or Sub-Admin (6295098096@Ss) password.');
+      return;
+    }
+
     if (cleanPass === MASTER_ADMIN_PASS) {
       setIsPassAuthed(true);
       sessionStorage.setItem('sr_admin_authed', 'true');
       sessionStorage.setItem('sr_admin_role', 'MASTER_OWNER');
-      sessionStorage.setItem('sr_admin_id', 'admin-001');
+      sessionStorage.setItem('sr_admin_id', 'owner-001');
       sessionStorage.setItem('sr_admin_name', 'Master Administrator');
       sessionStorage.setItem('sr_admin_pass', MASTER_ADMIN_PASS);
+      setPassError(null);
+      return;
+    }
+
+    if (cleanPass === DEFAULT_SUB_ADMIN_PASS) {
+      setIsPassAuthed(true);
+      sessionStorage.setItem('sr_admin_authed', 'true');
+      sessionStorage.setItem('sr_admin_role', 'ADMIN');
+      sessionStorage.setItem('sr_admin_id', 'sub-cred-000');
+      sessionStorage.setItem('sr_admin_name', 'Sub-Admin Staff');
+      sessionStorage.setItem('sr_admin_pass', DEFAULT_SUB_ADMIN_PASS);
       setPassError(null);
       return;
     }
@@ -1813,29 +1840,22 @@ export const AdminPortal: React.FC = () => {
                   </div>
 
                   {dep.status === 'PENDING' ? (
-                    isMasterOwner ? (
-                      <div className="flex gap-2 justify-end pt-2">
-                        <button
-                          onClick={() => {
-                            setRejectDepositId(dep.id);
-                          }}
-                          className="px-4 py-2 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 rounded-xl font-bold transition cursor-pointer"
-                        >
-                          Reject
-                        </button>
-                        <button
-                          onClick={() => handleDepositApprove(dep.id)}
-                          className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl transition shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer"
-                        >
-                          Approve & Credit Wallet ⚡
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 py-2 px-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-300 text-xs font-semibold justify-end mt-2">
-                        <Lock className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-                        <span>Master Owner Approval Only (Sub-Admin Read-Only Verification Mode)</span>
-                      </div>
-                    )
+                    <div className="flex gap-2 justify-end pt-2">
+                      <button
+                        onClick={() => {
+                          setRejectDepositId(dep.id);
+                        }}
+                        className="px-4 py-2 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 rounded-xl font-bold transition cursor-pointer"
+                      >
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => handleDepositApprove(dep.id)}
+                        className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl transition shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer"
+                      >
+                        Approve & Credit Wallet ⚡
+                      </button>
+                    </div>
                   ) : (
                     <div className="text-right text-[11px] font-bold">
                       Status:{' '}
@@ -1910,37 +1930,30 @@ export const AdminPortal: React.FC = () => {
                   </div>
 
                   {wd.status === 'PENDING' || wd.status === 'APPROVED' ? (
-                    isMasterOwner ? (
-                      <div className="flex flex-wrap gap-2 justify-end pt-2">
-                        <button
-                          onClick={() => setRejectWithdrawalId(wd.id)}
-                          className="px-3.5 py-2 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 rounded-xl font-bold transition cursor-pointer"
-                        >
-                          Reject
-                        </button>
+                    <div className="flex flex-wrap gap-2 justify-end pt-2">
+                      <button
+                        onClick={() => setRejectWithdrawalId(wd.id)}
+                        className="px-3.5 py-2 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 rounded-xl font-bold transition cursor-pointer"
+                      >
+                        Reject
+                      </button>
 
-                        {wd.status === 'PENDING' && (
-                          <button
-                            onClick={() => handleWithdrawalApprove(wd.id)}
-                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-xl transition shadow-md cursor-pointer"
-                          >
-                            Authorize Payout
-                          </button>
-                        )}
-
+                      {wd.status === 'PENDING' && (
                         <button
-                          onClick={() => setMarkPaidWithdrawalId(wd.id)}
-                          className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl transition shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer"
+                          onClick={() => handleWithdrawalApprove(wd.id)}
+                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold rounded-xl transition shadow-md cursor-pointer"
                         >
-                          Mark Paid (Enter UTR) 💸
+                          Authorize Payout
                         </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 py-2 px-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-300 text-xs font-semibold justify-end mt-2">
-                        <Lock className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-                        <span>Master Owner Payout Authorization Required (Sub-Admin Read-Only Mode)</span>
-                      </div>
-                    )
+                      )}
+
+                      <button
+                        onClick={() => setMarkPaidWithdrawalId(wd.id)}
+                        className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl transition shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer"
+                      >
+                        Mark Paid (Enter UTR) 💸
+                      </button>
+                    </div>
                   ) : (
                     <div className="text-right text-[11px] font-bold">
                       Status:{' '}

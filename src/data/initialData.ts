@@ -75,6 +75,40 @@ export const INITIAL_SETTINGS: AppSettings = {
 
 export const INITIAL_PROFILES: UserProfile[] = [
   {
+    "id": "owner-001",
+    "user_custom_id": "SR-OWNER-01",
+    "full_name": "SR Gateway Master Owner",
+    "mobile": "7477661867",
+    "email": "sk190rihan@gmail.com",
+    "telegram_id": "6561010416",
+    "telegram_chat_id": "6561010416",
+    "role": "OWNER",
+    "status": "ACTIVE",
+    "referral_code": "OWNER001",
+    "created_at": "2026-07-01T00:00:00.000Z",
+    "updated_at": "2026-08-22T00:00:00.000Z",
+    "rpin": "7477",
+    "daily_api_requests_limit": 100000,
+    "daily_api_requests_count": 0
+  },
+  {
+    "id": "admin-001",
+    "user_custom_id": "SR-ADMIN-01",
+    "full_name": "SR Gateway Staff Sub-Admin",
+    "mobile": "+91 90000 00000",
+    "email": "staff@srgateway.in",
+    "telegram_id": "",
+    "telegram_chat_id": "",
+    "role": "ADMIN",
+    "status": "ACTIVE",
+    "referral_code": "ADMIN001",
+    "created_at": "2026-07-01T00:00:00.000Z",
+    "updated_at": "2026-08-22T00:00:00.000Z",
+    "rpin": "1234",
+    "daily_api_requests_limit": 50000,
+    "daily_api_requests_count": 0
+  },
+  {
     "id": "user-001",
     "user_custom_id": "SR-10029",
     "full_name": "Rahul Sharma",
@@ -86,7 +120,9 @@ export const INITIAL_PROFILES: UserProfile[] = [
     "referral_code": "RAHUL10029",
     "created_at": "2026-08-01T10:00:00Z",
     "updated_at": "2026-08-14T01:02:58.637Z",
-    "rpin": "7477"
+    "rpin": "7477",
+    "daily_api_requests_limit": 100,
+    "daily_api_requests_count": 2
   },
   {
     "id": "user-002",
@@ -100,7 +136,10 @@ export const INITIAL_PROFILES: UserProfile[] = [
     "referral_code": "PRIYA10034",
     "referred_by": "RAHUL10029",
     "created_at": "2026-08-03T11:20:00Z",
-    "updated_at": "2026-08-12T10:00:00Z"
+    "updated_at": "2026-08-12T10:00:00Z",
+    "rpin": "1234",
+    "daily_api_requests_limit": 50,
+    "daily_api_requests_count": 0
   },
   {
     "id": "user-003",
@@ -114,226 +153,4940 @@ export const INITIAL_PROFILES: UserProfile[] = [
     "referral_code": "AMIT10088",
     "created_at": "2026-08-05T14:15:00Z",
     "updated_at": "2026-08-16T12:43:36.705Z",
-    "rpin": "2121"
+    "rpin": "2121",
+    "daily_api_requests_limit": 500,
+    "daily_api_requests_count": 12
   },
   {
-    "id": "owner-001",
-    "user_custom_id": "SR-OWNER-01",
-    "full_name": "SR Gateway Master Owner",
-    "mobile": "7477661867",
-    "email": "sk190rihan@gmail.com",
-    "telegram_id": "6561010416",
-    "telegram_chat_id": "6561010416",
-    "role": "OWNER",
-    "status": "ACTIVE",
-    "referral_code": "OWNER001",
-    "created_at": "2026-07-01T00:00:00.000Z",
-    "updated_at": "2026-08-22T00:00:00.000Z",
-    "rpin": "7477"
-  },
-  {
-    "id": "admin-001",
-    "user_custom_id": "SR-ADMIN-01",
-    "full_name": "SR Gateway Staff Sub-Admin",
-    "mobile": "+91 90000 00000",
-    "email": "staff@srgateway.in",
-    "telegram_id": "",
-    "role": "ADMIN",
-    "status": "ACTIVE",
-    "referral_code": "ADMIN001",
-    "created_at": "2026-07-01T00:00:00.000Z",
-    "updated_at": "2026-08-22T00:00:00.000Z",
-    "telegram_chat_id": "",
-    "rpin": "1234"
-  },
-  {
-    "id": "user-964253",
-    "user_custom_id": "SR-50963",
-    "full_name": "WonerXsrwallet",
-    "mobile": "7477661867",
-    "email": "sk190rihan@gmail.com",
-    "telegram_id": "6561010416",
-    "telegram_chat_id": "6561010416",
-    "role": "OWNER",
-    "status": "ACTIVE",
-    "referral_code": "SRREF50963",
-    "created_at": "2026-08-14T17:19:24.253Z",
-    "updated_at": "2026-08-24T05:42:02.849Z",
-    "rpin": "7477"
-  },
-  {
-    "id": "usr-1787297069443-381",
-    "user_custom_id": "SR-79811",
-    "full_name": "Paytm / Wallet User (9811122233)",
-    "mobile": "9811122233",
-    "email": "9811122233@srgateway.in",
+    "id": "user-006",
+    "user_custom_id": "SR-10006",
+    "full_name": "Vikram Malhotra",
+    "mobile": "+91 98200 0005",
+    "email": "vikram.malhotra5@srgateway.in",
     "role": "USER",
     "status": "ACTIVE",
-    "created_at": "2026-08-21T07:24:29.443Z",
-    "updated_at": "2026-08-21T07:24:29.443Z"
+    "referral_code": "VIKRAM10006",
+    "created_at": "2026-08-06T10:00:00Z",
+    "updated_at": "2026-08-06T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 500,
+    "daily_api_requests_count": 9
+  },
+  {
+    "id": "user-007",
+    "user_custom_id": "SR-10007",
+    "full_name": "Ananya Sen",
+    "mobile": "+91 98200 0006",
+    "email": "ananya.sen6@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "ANANYA10007",
+    "created_at": "2026-08-07T10:00:00Z",
+    "updated_at": "2026-08-07T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 1000,
+    "daily_api_requests_count": 4
+  },
+  {
+    "id": "user-008",
+    "user_custom_id": "SR-10008",
+    "full_name": "Rohan Joshi",
+    "mobile": "+91 98200 0007",
+    "email": "rohan.joshi7@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "ROHAN10008",
+    "created_at": "2026-08-08T10:00:00Z",
+    "updated_at": "2026-08-08T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 2500,
+    "daily_api_requests_count": 1
+  },
+  {
+    "id": "user-009",
+    "user_custom_id": "SR-10009",
+    "full_name": "Neha Gupta",
+    "mobile": "+91 98200 0008",
+    "email": "neha.gupta8@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "NEHA10009",
+    "created_at": "2026-08-09T10:00:00Z",
+    "updated_at": "2026-08-09T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 5000,
+    "daily_api_requests_count": 11
+  },
+  {
+    "id": "user-010",
+    "user_custom_id": "SR-10010",
+    "full_name": "Deepak Chauhan",
+    "mobile": "+91 98200 0009",
+    "email": "deepak.chauhan9@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "DEEPAK10010",
+    "created_at": "2026-08-10T10:00:00Z",
+    "updated_at": "2026-08-10T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 10,
+    "daily_api_requests_count": 3
+  },
+  {
+    "id": "user-011",
+    "user_custom_id": "SR-10011",
+    "full_name": "Sunil Yadav",
+    "mobile": "+91 98200 0010",
+    "email": "sunil.yadav10@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "SUNIL10011",
+    "created_at": "2026-08-11T10:00:00Z",
+    "updated_at": "2026-08-11T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 25,
+    "daily_api_requests_count": 9
+  },
+  {
+    "id": "user-012",
+    "user_custom_id": "SR-10012",
+    "full_name": "Pooja Singh",
+    "mobile": "+91 98200 0011",
+    "email": "pooja.singh11@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "POOJA10012",
+    "created_at": "2026-08-12T10:00:00Z",
+    "updated_at": "2026-08-12T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 50,
+    "daily_api_requests_count": 14
+  },
+  {
+    "id": "user-013",
+    "user_custom_id": "SR-10013",
+    "full_name": "Manoj Mishra",
+    "mobile": "+91 98200 0012",
+    "email": "manoj.mishra12@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "MANOJ10013",
+    "created_at": "2026-08-13T10:00:00Z",
+    "updated_at": "2026-08-13T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 100,
+    "daily_api_requests_count": 4
+  },
+  {
+    "id": "user-014",
+    "user_custom_id": "SR-10014",
+    "full_name": "Kavita Tiwari",
+    "mobile": "+91 98200 0013",
+    "email": "kavita.tiwari13@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "KAVITA10014",
+    "created_at": "2026-08-14T10:00:00Z",
+    "updated_at": "2026-08-14T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 250,
+    "daily_api_requests_count": 5
+  },
+  {
+    "id": "user-015",
+    "user_custom_id": "SR-10015",
+    "full_name": "Ravi Reddy",
+    "mobile": "+91 98200 0014",
+    "email": "ravi.reddy14@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "RAVI10015",
+    "created_at": "2026-08-15T10:00:00Z",
+    "updated_at": "2026-08-15T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 500,
+    "daily_api_requests_count": 5
+  },
+  {
+    "id": "user-016",
+    "user_custom_id": "SR-10016",
+    "full_name": "Sneha Nair",
+    "mobile": "+91 98200 0015",
+    "email": "sneha.nair15@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "SNEHA10016",
+    "created_at": "2026-08-16T10:00:00Z",
+    "updated_at": "2026-08-16T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 1000,
+    "daily_api_requests_count": 7
+  },
+  {
+    "id": "user-017",
+    "user_custom_id": "SR-10017",
+    "full_name": "Ajay Mehta",
+    "mobile": "+91 98200 0016",
+    "email": "ajay.mehta16@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "AJAY10017",
+    "created_at": "2026-08-17T10:00:00Z",
+    "updated_at": "2026-08-17T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 2500,
+    "daily_api_requests_count": 14
+  },
+  {
+    "id": "user-018",
+    "user_custom_id": "SR-10018",
+    "full_name": "Swati Shah",
+    "mobile": "+91 98200 0017",
+    "email": "swati.shah17@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "SWATI10018",
+    "created_at": "2026-08-18T10:00:00Z",
+    "updated_at": "2026-08-18T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 5000,
+    "daily_api_requests_count": 6
+  },
+  {
+    "id": "user-019",
+    "user_custom_id": "SR-10019",
+    "full_name": "Sanjay Agarwal",
+    "mobile": "+91 98200 0018",
+    "email": "sanjay.agarwal18@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "SANJAY10019",
+    "created_at": "2026-08-19T10:00:00Z",
+    "updated_at": "2026-08-19T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 10,
+    "daily_api_requests_count": 1
+  },
+  {
+    "id": "user-020",
+    "user_custom_id": "SR-10020",
+    "full_name": "Meera Bansal",
+    "mobile": "+91 98200 0019",
+    "email": "meera.bansal19@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "MEERA10020",
+    "created_at": "2026-08-20T10:00:00Z",
+    "updated_at": "2026-08-20T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 25,
+    "daily_api_requests_count": 1
+  },
+  {
+    "id": "user-021",
+    "user_custom_id": "SR-10021",
+    "full_name": "Alok Saxena",
+    "mobile": "+91 98200 0020",
+    "email": "alok.saxena20@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "ALOK10021",
+    "created_at": "2026-08-21T10:00:00Z",
+    "updated_at": "2026-08-21T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 50,
+    "daily_api_requests_count": 12
+  },
+  {
+    "id": "user-022",
+    "user_custom_id": "SR-10022",
+    "full_name": "Divya Bhatia",
+    "mobile": "+91 98200 0021",
+    "email": "divya.bhatia21@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "DIVYA10022",
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 100,
+    "daily_api_requests_count": 4
+  },
+  {
+    "id": "user-023",
+    "user_custom_id": "SR-10023",
+    "full_name": "Vikas Kapoor",
+    "mobile": "+91 98200 0022",
+    "email": "vikas.kapoor22@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "VIKAS10023",
+    "created_at": "2026-08-23T10:00:00Z",
+    "updated_at": "2026-08-23T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 250,
+    "daily_api_requests_count": 5
+  },
+  {
+    "id": "user-024",
+    "user_custom_id": "SR-10024",
+    "full_name": "Ritu Khanna",
+    "mobile": "+91 98200 0023",
+    "email": "ritu.khanna23@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "RITU10024",
+    "created_at": "2026-08-24T10:00:00Z",
+    "updated_at": "2026-08-24T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 500,
+    "daily_api_requests_count": 10
+  },
+  {
+    "id": "user-025",
+    "user_custom_id": "SR-10025",
+    "full_name": "Sachin Chopra",
+    "mobile": "+91 98200 0024",
+    "email": "sachin.chopra24@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "SACHIN10025",
+    "created_at": "2026-08-25T10:00:00Z",
+    "updated_at": "2026-08-25T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 1000,
+    "daily_api_requests_count": 10
+  },
+  {
+    "id": "user-026",
+    "user_custom_id": "SR-10026",
+    "full_name": "Preeti Deshmukh",
+    "mobile": "+91 98200 0025",
+    "email": "preeti.deshmukh25@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "PREETI10026",
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 2500,
+    "daily_api_requests_count": 8
+  },
+  {
+    "id": "user-027",
+    "user_custom_id": "SR-10027",
+    "full_name": "Kunal Patil",
+    "mobile": "+91 98200 0026",
+    "email": "kunal.patil26@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "KUNAL10027",
+    "created_at": "2026-08-02T10:00:00Z",
+    "updated_at": "2026-08-02T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 5000,
+    "daily_api_requests_count": 7
+  },
+  {
+    "id": "user-028",
+    "user_custom_id": "SR-10028",
+    "full_name": "Shweta Pawar",
+    "mobile": "+91 98200 0027",
+    "email": "shweta.pawar27@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "SHWETA10028",
+    "created_at": "2026-08-03T10:00:00Z",
+    "updated_at": "2026-08-03T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 10,
+    "daily_api_requests_count": 3
+  },
+  {
+    "id": "user-029",
+    "user_custom_id": "SR-10029",
+    "full_name": "Gaurav Shinde",
+    "mobile": "+91 98200 0028",
+    "email": "gaurav.shinde28@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "GAURAV10029",
+    "created_at": "2026-08-04T10:00:00Z",
+    "updated_at": "2026-08-04T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 25,
+    "daily_api_requests_count": 11
+  },
+  {
+    "id": "user-030",
+    "user_custom_id": "SR-10030",
+    "full_name": "Nisha Kadam",
+    "mobile": "+91 98200 0029",
+    "email": "nisha.kadam29@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "NISHA10030",
+    "created_at": "2026-08-05T10:00:00Z",
+    "updated_at": "2026-08-05T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 50,
+    "daily_api_requests_count": 5
+  },
+  {
+    "id": "user-031",
+    "user_custom_id": "SR-10031",
+    "full_name": "Manish More",
+    "mobile": "+91 98200 0030",
+    "email": "manish.more30@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "MANISH10031",
+    "created_at": "2026-08-06T10:00:00Z",
+    "updated_at": "2026-08-06T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 100,
+    "daily_api_requests_count": 3
+  },
+  {
+    "id": "user-032",
+    "user_custom_id": "SR-10032",
+    "full_name": "Aarti Sawant",
+    "mobile": "+91 98200 0031",
+    "email": "aarti.sawant31@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "AARTI10032",
+    "created_at": "2026-08-07T10:00:00Z",
+    "updated_at": "2026-08-07T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 250,
+    "daily_api_requests_count": 11
+  },
+  {
+    "id": "user-033",
+    "user_custom_id": "SR-10033",
+    "full_name": "Tarun Chavan",
+    "mobile": "+91 98200 0032",
+    "email": "tarun.chavan32@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "TARUN10033",
+    "created_at": "2026-08-08T10:00:00Z",
+    "updated_at": "2026-08-08T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 500,
+    "daily_api_requests_count": 1
+  },
+  {
+    "id": "user-034",
+    "user_custom_id": "SR-10034",
+    "full_name": "Komal Bhosale",
+    "mobile": "+91 98200 0033",
+    "email": "komal.bhosale33@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "KOMAL10034",
+    "created_at": "2026-08-09T10:00:00Z",
+    "updated_at": "2026-08-09T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 1000,
+    "daily_api_requests_count": 5
+  },
+  {
+    "id": "user-035",
+    "user_custom_id": "SR-10035",
+    "full_name": "Naveen Ghosh",
+    "mobile": "+91 98200 0034",
+    "email": "naveen.ghosh34@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "NAVEEN10035",
+    "created_at": "2026-08-10T10:00:00Z",
+    "updated_at": "2026-08-10T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 2500,
+    "daily_api_requests_count": 6
+  },
+  {
+    "id": "user-036",
+    "user_custom_id": "SR-10036",
+    "full_name": "Jyoti Mukherjee",
+    "mobile": "+91 98200 0035",
+    "email": "jyoti.mukherjee35@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "JYOTI10036",
+    "created_at": "2026-08-11T10:00:00Z",
+    "updated_at": "2026-08-11T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 5000,
+    "daily_api_requests_count": 3
+  },
+  {
+    "id": "user-037",
+    "user_custom_id": "SR-10037",
+    "full_name": "Pradeep Banerjee",
+    "mobile": "+91 98200 0036",
+    "email": "pradeep.banerjee36@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "PRADEEP10037",
+    "created_at": "2026-08-12T10:00:00Z",
+    "updated_at": "2026-08-12T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 10,
+    "daily_api_requests_count": 2
+  },
+  {
+    "id": "user-038",
+    "user_custom_id": "SR-10038",
+    "full_name": "Payal Chatterjee",
+    "mobile": "+91 98200 0037",
+    "email": "payal.chatterjee37@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "PAYAL10038",
+    "created_at": "2026-08-13T10:00:00Z",
+    "updated_at": "2026-08-13T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 25,
+    "daily_api_requests_count": 13
+  },
+  {
+    "id": "user-039",
+    "user_custom_id": "SR-10039",
+    "full_name": "Ashok Dutta",
+    "mobile": "+91 98200 0038",
+    "email": "ashok.dutta38@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "ASHOK10039",
+    "created_at": "2026-08-14T10:00:00Z",
+    "updated_at": "2026-08-14T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 50,
+    "daily_api_requests_count": 4
+  },
+  {
+    "id": "user-040",
+    "user_custom_id": "SR-10040",
+    "full_name": "Suman Das",
+    "mobile": "+91 98200 0039",
+    "email": "suman.das39@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "SUMAN10040",
+    "created_at": "2026-08-15T10:00:00Z",
+    "updated_at": "2026-08-15T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 100,
+    "daily_api_requests_count": 12
+  },
+  {
+    "id": "user-041",
+    "user_custom_id": "SR-10041",
+    "full_name": "Harish Roy",
+    "mobile": "+91 98200 0040",
+    "email": "harish.roy40@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "HARISH10041",
+    "created_at": "2026-08-16T10:00:00Z",
+    "updated_at": "2026-08-16T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 250,
+    "daily_api_requests_count": 3
+  },
+  {
+    "id": "user-042",
+    "user_custom_id": "SR-10042",
+    "full_name": "Monika Sengupta",
+    "mobile": "+91 98200 0041",
+    "email": "monika.sengupta41@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "MONIKA10042",
+    "created_at": "2026-08-17T10:00:00Z",
+    "updated_at": "2026-08-17T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 500,
+    "daily_api_requests_count": 9
+  },
+  {
+    "id": "user-043",
+    "user_custom_id": "SR-10043",
+    "full_name": "Dinesh Bose",
+    "mobile": "+91 98200 0042",
+    "email": "dinesh.bose42@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "DINESH10043",
+    "created_at": "2026-08-18T10:00:00Z",
+    "updated_at": "2026-08-18T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 1000,
+    "daily_api_requests_count": 4
+  },
+  {
+    "id": "user-044",
+    "user_custom_id": "SR-10044",
+    "full_name": "Pallavi Sarkar",
+    "mobile": "+91 98200 0043",
+    "email": "pallavi.sarkar43@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "PALLAVI10044",
+    "created_at": "2026-08-19T10:00:00Z",
+    "updated_at": "2026-08-19T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 2500,
+    "daily_api_requests_count": 0
+  },
+  {
+    "id": "user-045",
+    "user_custom_id": "SR-10045",
+    "full_name": "Mukesh Mitra",
+    "mobile": "+91 98200 0044",
+    "email": "mukesh.mitra44@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "MUKESH10045",
+    "created_at": "2026-08-20T10:00:00Z",
+    "updated_at": "2026-08-20T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 5000,
+    "daily_api_requests_count": 1
+  },
+  {
+    "id": "user-046",
+    "user_custom_id": "SR-10046",
+    "full_name": "Varsha Chakraborty",
+    "mobile": "+91 98200 0045",
+    "email": "varsha.chakraborty45@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "VARSHA10046",
+    "created_at": "2026-08-21T10:00:00Z",
+    "updated_at": "2026-08-21T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 10,
+    "daily_api_requests_count": 3
+  },
+  {
+    "id": "user-047",
+    "user_custom_id": "SR-10047",
+    "full_name": "Vinod Nath",
+    "mobile": "+91 98200 0046",
+    "email": "vinod.nath46@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "VINOD10047",
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 25,
+    "daily_api_requests_count": 1
+  },
+  {
+    "id": "user-048",
+    "user_custom_id": "SR-10048",
+    "full_name": "Kiran Barman",
+    "mobile": "+91 98200 0047",
+    "email": "kiran.barman47@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "KIRAN10048",
+    "created_at": "2026-08-23T10:00:00Z",
+    "updated_at": "2026-08-23T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 50,
+    "daily_api_requests_count": 10
+  },
+  {
+    "id": "user-049",
+    "user_custom_id": "SR-10049",
+    "full_name": "Satish Mandal",
+    "mobile": "+91 98200 0048",
+    "email": "satish.mandal48@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "SATISH10049",
+    "created_at": "2026-08-24T10:00:00Z",
+    "updated_at": "2026-08-24T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 100,
+    "daily_api_requests_count": 4
+  },
+  {
+    "id": "user-050",
+    "user_custom_id": "SR-10050",
+    "full_name": "Anjali Paul",
+    "mobile": "+91 98200 0049",
+    "email": "anjali.paul49@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "ANJALI10050",
+    "created_at": "2026-08-25T10:00:00Z",
+    "updated_at": "2026-08-25T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 250,
+    "daily_api_requests_count": 14
+  },
+  {
+    "id": "user-051",
+    "user_custom_id": "SR-10051",
+    "full_name": "Kamal Sharma",
+    "mobile": "+91 98200 0050",
+    "email": "kamal.sharma50@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "KAMAL10051",
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 500,
+    "daily_api_requests_count": 4
+  },
+  {
+    "id": "user-052",
+    "user_custom_id": "SR-10052",
+    "full_name": "Rachna Patel",
+    "mobile": "+91 98200 0051",
+    "email": "rachna.patel51@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "RACHNA10052",
+    "created_at": "2026-08-02T10:00:00Z",
+    "updated_at": "2026-08-02T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 1000,
+    "daily_api_requests_count": 3
+  },
+  {
+    "id": "user-053",
+    "user_custom_id": "SR-10053",
+    "full_name": "Naresh Kumar",
+    "mobile": "+91 98200 0052",
+    "email": "naresh.kumar52@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "NARESH10053",
+    "created_at": "2026-08-03T10:00:00Z",
+    "updated_at": "2026-08-03T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 2500,
+    "daily_api_requests_count": 4
+  },
+  {
+    "id": "user-054",
+    "user_custom_id": "SR-10054",
+    "full_name": "Bhavna Verma",
+    "mobile": "+91 98200 0053",
+    "email": "bhavna.verma53@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "BHAVNA10054",
+    "created_at": "2026-08-04T10:00:00Z",
+    "updated_at": "2026-08-04T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 5000,
+    "daily_api_requests_count": 0
+  },
+  {
+    "id": "user-055",
+    "user_custom_id": "SR-10055",
+    "full_name": "Ramesh Raina",
+    "mobile": "+91 98200 0054",
+    "email": "ramesh.raina54@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "RAMESH10055",
+    "created_at": "2026-08-05T10:00:00Z",
+    "updated_at": "2026-08-05T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 10,
+    "daily_api_requests_count": 6
+  },
+  {
+    "id": "user-056",
+    "user_custom_id": "SR-10056",
+    "full_name": "Simran Malhotra",
+    "mobile": "+91 98200 0055",
+    "email": "simran.malhotra55@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "SIMRAN10056",
+    "created_at": "2026-08-06T10:00:00Z",
+    "updated_at": "2026-08-06T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 25,
+    "daily_api_requests_count": 6
+  },
+  {
+    "id": "user-057",
+    "user_custom_id": "SR-10057",
+    "full_name": "Mahesh Sen",
+    "mobile": "+91 98200 0056",
+    "email": "mahesh.sen56@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "MAHESH10057",
+    "created_at": "2026-08-07T10:00:00Z",
+    "updated_at": "2026-08-07T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 50,
+    "daily_api_requests_count": 8
+  },
+  {
+    "id": "user-058",
+    "user_custom_id": "SR-10058",
+    "full_name": "Tanvi Joshi",
+    "mobile": "+91 98200 0057",
+    "email": "tanvi.joshi57@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "TANVI10058",
+    "created_at": "2026-08-08T10:00:00Z",
+    "updated_at": "2026-08-08T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 100,
+    "daily_api_requests_count": 8
+  },
+  {
+    "id": "user-059",
+    "user_custom_id": "SR-10059",
+    "full_name": "Lalit Gupta",
+    "mobile": "+91 98200 0058",
+    "email": "lalit.gupta58@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "LALIT10059",
+    "created_at": "2026-08-09T10:00:00Z",
+    "updated_at": "2026-08-09T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 250,
+    "daily_api_requests_count": 4
+  },
+  {
+    "id": "user-060",
+    "user_custom_id": "SR-10060",
+    "full_name": "Sapna Chauhan",
+    "mobile": "+91 98200 0059",
+    "email": "sapna.chauhan59@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "SAPNA10060",
+    "created_at": "2026-08-10T10:00:00Z",
+    "updated_at": "2026-08-10T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 500,
+    "daily_api_requests_count": 13
+  },
+  {
+    "id": "user-061",
+    "user_custom_id": "SR-10061",
+    "full_name": "Pawan Yadav",
+    "mobile": "+91 98200 0060",
+    "email": "pawan.yadav60@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "PAWAN10061",
+    "created_at": "2026-08-11T10:00:00Z",
+    "updated_at": "2026-08-11T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 1000,
+    "daily_api_requests_count": 12
+  },
+  {
+    "id": "user-062",
+    "user_custom_id": "SR-10062",
+    "full_name": "Rekha Singh",
+    "mobile": "+91 98200 0061",
+    "email": "rekha.singh61@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "REKHA10062",
+    "created_at": "2026-08-12T10:00:00Z",
+    "updated_at": "2026-08-12T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 2500,
+    "daily_api_requests_count": 14
+  },
+  {
+    "id": "user-063",
+    "user_custom_id": "SR-10063",
+    "full_name": "Santosh Mishra",
+    "mobile": "+91 98200 0062",
+    "email": "santosh.mishra62@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "SANTOSH10063",
+    "created_at": "2026-08-13T10:00:00Z",
+    "updated_at": "2026-08-13T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 5000,
+    "daily_api_requests_count": 6
+  },
+  {
+    "id": "user-064",
+    "user_custom_id": "SR-10064",
+    "full_name": "Sarita Tiwari",
+    "mobile": "+91 98200 0063",
+    "email": "sarita.tiwari63@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "SARITA10064",
+    "created_at": "2026-08-14T10:00:00Z",
+    "updated_at": "2026-08-14T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 10,
+    "daily_api_requests_count": 6
+  },
+  {
+    "id": "user-065",
+    "user_custom_id": "SR-10065",
+    "full_name": "Anil Reddy",
+    "mobile": "+91 98200 0064",
+    "email": "anil.reddy64@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "ANIL10065",
+    "created_at": "2026-08-15T10:00:00Z",
+    "updated_at": "2026-08-15T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 25,
+    "daily_api_requests_count": 2
+  },
+  {
+    "id": "user-066",
+    "user_custom_id": "SR-10066",
+    "full_name": "Seema Nair",
+    "mobile": "+91 98200 0065",
+    "email": "seema.nair65@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "SEEMA10066",
+    "created_at": "2026-08-16T10:00:00Z",
+    "updated_at": "2026-08-16T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 50,
+    "daily_api_requests_count": 3
+  },
+  {
+    "id": "user-067",
+    "user_custom_id": "SR-10067",
+    "full_name": "Hemant Mehta",
+    "mobile": "+91 98200 0066",
+    "email": "hemant.mehta66@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "HEMANT10067",
+    "created_at": "2026-08-17T10:00:00Z",
+    "updated_at": "2026-08-17T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 100,
+    "daily_api_requests_count": 4
+  },
+  {
+    "id": "user-068",
+    "user_custom_id": "SR-10068",
+    "full_name": "Rashmi Shah",
+    "mobile": "+91 98200 0067",
+    "email": "rashmi.shah67@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "RASHMI10068",
+    "created_at": "2026-08-18T10:00:00Z",
+    "updated_at": "2026-08-18T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 250,
+    "daily_api_requests_count": 11
+  },
+  {
+    "id": "user-069",
+    "user_custom_id": "SR-10069",
+    "full_name": "Chetan Agarwal",
+    "mobile": "+91 98200 0068",
+    "email": "chetan.agarwal68@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "CHETAN10069",
+    "created_at": "2026-08-19T10:00:00Z",
+    "updated_at": "2026-08-19T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 500,
+    "daily_api_requests_count": 5
+  },
+  {
+    "id": "user-070",
+    "user_custom_id": "SR-10070",
+    "full_name": "Sunita Bansal",
+    "mobile": "+91 98200 0069",
+    "email": "sunita.bansal69@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "SUNITA10070",
+    "created_at": "2026-08-20T10:00:00Z",
+    "updated_at": "2026-08-20T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 1000,
+    "daily_api_requests_count": 11
+  },
+  {
+    "id": "user-071",
+    "user_custom_id": "SR-10071",
+    "full_name": "Mohit Saxena",
+    "mobile": "+91 98200 0070",
+    "email": "mohit.saxena70@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "MOHIT10071",
+    "created_at": "2026-08-21T10:00:00Z",
+    "updated_at": "2026-08-21T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 2500,
+    "daily_api_requests_count": 11
+  },
+  {
+    "id": "user-072",
+    "user_custom_id": "SR-10072",
+    "full_name": "Geeta Bhatia",
+    "mobile": "+91 98200 0071",
+    "email": "geeta.bhatia71@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "GEETA10072",
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 5000,
+    "daily_api_requests_count": 14
+  },
+  {
+    "id": "user-073",
+    "user_custom_id": "SR-10073",
+    "full_name": "Rohit Kapoor",
+    "mobile": "+91 98200 0072",
+    "email": "rohit.kapoor72@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "ROHIT10073",
+    "created_at": "2026-08-23T10:00:00Z",
+    "updated_at": "2026-08-23T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 10,
+    "daily_api_requests_count": 1
+  },
+  {
+    "id": "user-074",
+    "user_custom_id": "SR-10074",
+    "full_name": "Usha Khanna",
+    "mobile": "+91 98200 0073",
+    "email": "usha.khanna73@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "USHA10074",
+    "created_at": "2026-08-24T10:00:00Z",
+    "updated_at": "2026-08-24T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 25,
+    "daily_api_requests_count": 1
+  },
+  {
+    "id": "user-075",
+    "user_custom_id": "SR-10075",
+    "full_name": "Mayank Chopra",
+    "mobile": "+91 98200 0074",
+    "email": "mayank.chopra74@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "MAYANK10075",
+    "created_at": "2026-08-25T10:00:00Z",
+    "updated_at": "2026-08-25T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 50,
+    "daily_api_requests_count": 1
+  },
+  {
+    "id": "user-076",
+    "user_custom_id": "SR-10076",
+    "full_name": "Madhu Deshmukh",
+    "mobile": "+91 98200 0075",
+    "email": "madhu.deshmukh75@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "MADHU10076",
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 100,
+    "daily_api_requests_count": 5
+  },
+  {
+    "id": "user-077",
+    "user_custom_id": "SR-10077",
+    "full_name": "Vivek Patil",
+    "mobile": "+91 98200 0076",
+    "email": "vivek.patil76@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "VIVEK10077",
+    "created_at": "2026-08-02T10:00:00Z",
+    "updated_at": "2026-08-02T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 250,
+    "daily_api_requests_count": 11
+  },
+  {
+    "id": "user-078",
+    "user_custom_id": "SR-10078",
+    "full_name": "Shilpa Pawar",
+    "mobile": "+91 98200 0077",
+    "email": "shilpa.pawar77@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "SHILPA10078",
+    "created_at": "2026-08-03T10:00:00Z",
+    "updated_at": "2026-08-03T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 500,
+    "daily_api_requests_count": 3
+  },
+  {
+    "id": "user-079",
+    "user_custom_id": "SR-10079",
+    "full_name": "Arun Shinde",
+    "mobile": "+91 98200 0078",
+    "email": "arun.shinde78@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "ARUN10079",
+    "created_at": "2026-08-04T10:00:00Z",
+    "updated_at": "2026-08-04T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 1000,
+    "daily_api_requests_count": 11
+  },
+  {
+    "id": "user-080",
+    "user_custom_id": "SR-10080",
+    "full_name": "Mamta Kadam",
+    "mobile": "+91 98200 0079",
+    "email": "mamta.kadam79@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "MAMTA10080",
+    "created_at": "2026-08-05T10:00:00Z",
+    "updated_at": "2026-08-05T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 2500,
+    "daily_api_requests_count": 8
+  },
+  {
+    "id": "user-081",
+    "user_custom_id": "SR-10081",
+    "full_name": "Jitendra More",
+    "mobile": "+91 98200 0080",
+    "email": "jitendra.more80@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "JITENDRA10081",
+    "created_at": "2026-08-06T10:00:00Z",
+    "updated_at": "2026-08-06T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 5000,
+    "daily_api_requests_count": 3
+  },
+  {
+    "id": "user-082",
+    "user_custom_id": "SR-10082",
+    "full_name": "Shalini Sawant",
+    "mobile": "+91 98200 0081",
+    "email": "shalini.sawant81@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "SHALINI10082",
+    "created_at": "2026-08-07T10:00:00Z",
+    "updated_at": "2026-08-07T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 10,
+    "daily_api_requests_count": 7
+  },
+  {
+    "id": "user-083",
+    "user_custom_id": "SR-10083",
+    "full_name": "Dharmendra Chavan",
+    "mobile": "+91 98200 0082",
+    "email": "dharmendra.chavan82@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "DHARMENDRA10083",
+    "created_at": "2026-08-08T10:00:00Z",
+    "updated_at": "2026-08-08T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 25,
+    "daily_api_requests_count": 5
+  },
+  {
+    "id": "user-084",
+    "user_custom_id": "SR-10084",
+    "full_name": "Vandana Bhosale",
+    "mobile": "+91 98200 0083",
+    "email": "vandana.bhosale83@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "VANDANA10084",
+    "created_at": "2026-08-09T10:00:00Z",
+    "updated_at": "2026-08-09T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 50,
+    "daily_api_requests_count": 13
+  },
+  {
+    "id": "user-085",
+    "user_custom_id": "SR-10085",
+    "full_name": "Yogesh Ghosh",
+    "mobile": "+91 98200 0084",
+    "email": "yogesh.ghosh84@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "YOGESH10085",
+    "created_at": "2026-08-10T10:00:00Z",
+    "updated_at": "2026-08-10T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 100,
+    "daily_api_requests_count": 2
+  },
+  {
+    "id": "user-086",
+    "user_custom_id": "SR-10086",
+    "full_name": "Archana Mukherjee",
+    "mobile": "+91 98200 0085",
+    "email": "archana.mukherjee85@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "ARCHANA10086",
+    "created_at": "2026-08-11T10:00:00Z",
+    "updated_at": "2026-08-11T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 250,
+    "daily_api_requests_count": 2
+  },
+  {
+    "id": "user-087",
+    "user_custom_id": "SR-10087",
+    "full_name": "Devendra Banerjee",
+    "mobile": "+91 98200 0086",
+    "email": "devendra.banerjee86@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "DEVENDRA10087",
+    "created_at": "2026-08-12T10:00:00Z",
+    "updated_at": "2026-08-12T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 500,
+    "daily_api_requests_count": 2
+  },
+  {
+    "id": "user-088",
+    "user_custom_id": "SR-10088",
+    "full_name": "Babita Chatterjee",
+    "mobile": "+91 98200 0087",
+    "email": "babita.chatterjee87@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "BABITA10088",
+    "created_at": "2026-08-13T10:00:00Z",
+    "updated_at": "2026-08-13T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 1000,
+    "daily_api_requests_count": 7
+  },
+  {
+    "id": "user-089",
+    "user_custom_id": "SR-10089",
+    "full_name": "Brijesh Dutta",
+    "mobile": "+91 98200 0088",
+    "email": "brijesh.dutta88@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "BRIJESH10089",
+    "created_at": "2026-08-14T10:00:00Z",
+    "updated_at": "2026-08-14T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 2500,
+    "daily_api_requests_count": 8
+  },
+  {
+    "id": "user-090",
+    "user_custom_id": "SR-10090",
+    "full_name": "Neelam Das",
+    "mobile": "+91 98200 0089",
+    "email": "neelam.das89@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "NEELAM10090",
+    "created_at": "2026-08-15T10:00:00Z",
+    "updated_at": "2026-08-15T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 5000,
+    "daily_api_requests_count": 7
+  },
+  {
+    "id": "user-091",
+    "user_custom_id": "SR-10091",
+    "full_name": "Akhilesh Roy",
+    "mobile": "+91 98200 0090",
+    "email": "akhilesh.roy90@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "AKHILESH10091",
+    "created_at": "2026-08-16T10:00:00Z",
+    "updated_at": "2026-08-16T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 10,
+    "daily_api_requests_count": 7
+  },
+  {
+    "id": "user-092",
+    "user_custom_id": "SR-10092",
+    "full_name": "Sonam Sengupta",
+    "mobile": "+91 98200 0091",
+    "email": "sonam.sengupta91@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "SONAM10092",
+    "created_at": "2026-08-17T10:00:00Z",
+    "updated_at": "2026-08-17T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 25,
+    "daily_api_requests_count": 13
+  },
+  {
+    "id": "user-093",
+    "user_custom_id": "SR-10093",
+    "full_name": "Umesh Bose",
+    "mobile": "+91 98200 0092",
+    "email": "umesh.bose92@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "UMESH10093",
+    "created_at": "2026-08-18T10:00:00Z",
+    "updated_at": "2026-08-18T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 50,
+    "daily_api_requests_count": 14
+  },
+  {
+    "id": "user-094",
+    "user_custom_id": "SR-10094",
+    "full_name": "Pinky Sarkar",
+    "mobile": "+91 98200 0093",
+    "email": "pinky.sarkar93@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "PINKY10094",
+    "created_at": "2026-08-19T10:00:00Z",
+    "updated_at": "2026-08-19T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 100,
+    "daily_api_requests_count": 2
+  },
+  {
+    "id": "user-095",
+    "user_custom_id": "SR-10095",
+    "full_name": "Bhupendra Mitra",
+    "mobile": "+91 98200 0094",
+    "email": "bhupendra.mitra94@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "BHUPENDRA10095",
+    "created_at": "2026-08-20T10:00:00Z",
+    "updated_at": "2026-08-20T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 250,
+    "daily_api_requests_count": 0
+  },
+  {
+    "id": "user-096",
+    "user_custom_id": "SR-10096",
+    "full_name": "Rani Chakraborty",
+    "mobile": "+91 98200 0095",
+    "email": "rani.chakraborty95@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "RANI10096",
+    "created_at": "2026-08-21T10:00:00Z",
+    "updated_at": "2026-08-21T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 500,
+    "daily_api_requests_count": 14
+  },
+  {
+    "id": "user-097",
+    "user_custom_id": "SR-10097",
+    "full_name": "Narendra Nath",
+    "mobile": "+91 98200 0096",
+    "email": "narendra.nath96@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "NARENDRA10097",
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 1000,
+    "daily_api_requests_count": 3
+  },
+  {
+    "id": "user-098",
+    "user_custom_id": "SR-10098",
+    "full_name": "Rupa Barman",
+    "mobile": "+91 98200 0097",
+    "email": "rupa.barman97@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "RUPA10098",
+    "created_at": "2026-08-23T10:00:00Z",
+    "updated_at": "2026-08-23T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 2500,
+    "daily_api_requests_count": 6
+  },
+  {
+    "id": "user-099",
+    "user_custom_id": "SR-10099",
+    "full_name": "Pramod Mandal",
+    "mobile": "+91 98200 0098",
+    "email": "pramod.mandal98@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "PRAMOD10099",
+    "created_at": "2026-08-24T10:00:00Z",
+    "updated_at": "2026-08-24T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 5000,
+    "daily_api_requests_count": 8
+  },
+  {
+    "id": "user-100",
+    "user_custom_id": "SR-10100",
+    "full_name": "Kusum Paul",
+    "mobile": "+91 98200 0099",
+    "email": "kusum.paul99@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "KUSUM10100",
+    "created_at": "2026-08-25T10:00:00Z",
+    "updated_at": "2026-08-25T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 10,
+    "daily_api_requests_count": 1
+  },
+  {
+    "id": "user-101",
+    "user_custom_id": "SR-10101",
+    "full_name": "Praveen Sharma",
+    "mobile": "+91 98200 0100",
+    "email": "praveen.sharma100@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "PRAVEEN10101",
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 25,
+    "daily_api_requests_count": 0
+  },
+  {
+    "id": "user-102",
+    "user_custom_id": "SR-10102",
+    "full_name": "Chanda Patel",
+    "mobile": "+91 98200 0101",
+    "email": "chanda.patel101@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "CHANDA10102",
+    "created_at": "2026-08-02T10:00:00Z",
+    "updated_at": "2026-08-02T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 50,
+    "daily_api_requests_count": 14
+  },
+  {
+    "id": "user-103",
+    "user_custom_id": "SR-10103",
+    "full_name": "Kuldeep Kumar",
+    "mobile": "+91 98200 0102",
+    "email": "kuldeep.kumar102@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "KULDEEP10103",
+    "created_at": "2026-08-03T10:00:00Z",
+    "updated_at": "2026-08-03T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 100,
+    "daily_api_requests_count": 11
+  },
+  {
+    "id": "user-104",
+    "user_custom_id": "SR-10104",
+    "full_name": "Aparna Verma",
+    "mobile": "+91 98200 0103",
+    "email": "aparna.verma103@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "APARNA10104",
+    "created_at": "2026-08-04T10:00:00Z",
+    "updated_at": "2026-08-04T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 250,
+    "daily_api_requests_count": 12
+  },
+  {
+    "id": "user-105",
+    "user_custom_id": "SR-10105",
+    "full_name": "Subhash Raina",
+    "mobile": "+91 98200 0104",
+    "email": "subhash.raina104@srgateway.in",
+    "role": "USER",
+    "status": "ACTIVE",
+    "referral_code": "SUBHASH10105",
+    "created_at": "2026-08-05T10:00:00Z",
+    "updated_at": "2026-08-05T12:00:00Z",
+    "rpin": "1234",
+    "password": "User@123",
+    "daily_api_requests_limit": 500,
+    "daily_api_requests_count": 10
   }
 ];
 
 export const INITIAL_WALLETS: Record<string, Wallet> = {
   "SR-OWNER-01": {
-    "id": "w-owner",
-    "user_id": "SR-OWNER-01",
-    "available_balance": 5000000,
+    "id": "w-owner-001",
+    "user_id": "owner-001",
+    "available_balance": 2500000,
     "locked_balance": 0,
-    "created_at": "2026-05-18T12:51:02.422Z",
-    "updated_at": "2026-08-16T12:51:02.422Z"
+    "created_at": "2026-07-01T00:00:00.000Z",
+    "updated_at": "2026-08-22T00:00:00.000Z"
   },
   "owner-001": {
-    "id": "w-owner",
+    "id": "w-owner-001",
     "user_id": "owner-001",
-    "available_balance": 5000000,
+    "available_balance": 2500000,
     "locked_balance": 0,
-    "created_at": "2026-05-18T12:51:02.422Z",
-    "updated_at": "2026-08-16T12:51:02.422Z"
+    "created_at": "2026-07-01T00:00:00.000Z",
+    "updated_at": "2026-08-22T00:00:00.000Z"
   },
   "SR-ADMIN-01": {
-    "id": "w-admin",
-    "user_id": "SR-ADMIN-01",
-    "available_balance": 2500000,
+    "id": "w-admin-001",
+    "user_id": "admin-001",
+    "available_balance": 500000,
     "locked_balance": 0,
-    "created_at": "2026-05-18T12:51:02.422Z",
-    "updated_at": "2026-08-16T12:51:02.422Z"
+    "created_at": "2026-07-01T00:00:00.000Z",
+    "updated_at": "2026-08-22T00:00:00.000Z"
   },
   "admin-001": {
-    "id": "w-admin",
+    "id": "w-admin-001",
     "user_id": "admin-001",
+    "available_balance": 500000,
+    "locked_balance": 0,
+    "created_at": "2026-07-01T00:00:00.000Z",
+    "updated_at": "2026-08-22T00:00:00.000Z"
+  },
+  "7477661867": {
+    "id": "w-owner-001",
+    "user_id": "owner-001",
     "available_balance": 2500000,
     "locked_balance": 0,
-    "created_at": "2026-07-01T00:00:00Z",
-    "updated_at": "2026-08-12T10:00:00Z"
+    "created_at": "2026-07-01T00:00:00.000Z",
+    "updated_at": "2026-08-22T00:00:00.000Z"
+  },
+  "919000000000": {
+    "id": "w-admin-001",
+    "user_id": "admin-001",
+    "available_balance": 500000,
+    "locked_balance": 0,
+    "created_at": "2026-07-01T00:00:00.000Z",
+    "updated_at": "2026-08-22T00:00:00.000Z"
+  },
+  "+91 90000 00000": {
+    "id": "w-admin-001",
+    "user_id": "admin-001",
+    "available_balance": 500000,
+    "locked_balance": 0,
+    "created_at": "2026-07-01T00:00:00.000Z",
+    "updated_at": "2026-08-22T00:00:00.000Z"
   },
   "user-001": {
     "id": "w-user-001",
     "user_id": "user-001",
-    "available_balance": 143850.5,
-    "locked_balance": 2500,
-    "created_at": "2026-07-18T10:48:00.541Z",
-    "updated_at": "2026-08-24T05:42:25.505Z"
-  },
-  "user-002": {
-    "id": "w-002",
-    "user_id": "user-002",
-    "available_balance": 85400,
-    "locked_balance": 5000,
-    "created_at": "2026-07-28T10:48:00.541Z",
-    "updated_at": "2026-08-18T16:26:38.652Z"
-  },
-  "user-003": {
-    "id": "w-003",
-    "user_id": "user-003",
-    "available_balance": 12450,
+    "available_balance": 11306.5,
     "locked_balance": 0,
-    "created_at": "2026-08-01T13:29:06.203Z",
-    "updated_at": "2026-08-16T13:29:06.203Z"
-  },
-  "user-964253": {
-    "id": "w-user-964253",
-    "user_id": "user-964253",
-    "available_balance": 230,
-    "locked_balance": 0,
-    "created_at": "2026-08-14T17:19:24.253Z",
-    "updated_at": "2026-08-24T05:42:25.505Z"
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-14T01:02:58.637Z"
   },
   "SR-10029": {
+    "id": "w-user-029",
+    "user_id": "user-029",
+    "available_balance": 11306.5,
+    "locked_balance": 0,
+    "created_at": "2026-08-04T10:00:00Z",
+    "updated_at": "2026-08-04T12:00:00Z"
+  },
+  "919876543210": {
     "id": "w-user-001",
-    "user_id": "SR-10029",
-    "available_balance": 143850.5,
-    "locked_balance": 2500,
-    "created_at": "2026-07-18T10:48:00.541Z",
-    "updated_at": "2026-08-24T05:42:25.505Z"
+    "user_id": "user-001",
+    "available_balance": 11306.5,
+    "locked_balance": 0,
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-14T01:02:58.637Z"
+  },
+  "+91 98765 43210": {
+    "id": "w-user-001",
+    "user_id": "user-001",
+    "available_balance": 11306.5,
+    "locked_balance": 0,
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-14T01:02:58.637Z"
+  },
+  "user-002": {
+    "id": "w-user-002",
+    "user_id": "user-002",
+    "available_balance": 4394.23,
+    "locked_balance": 0,
+    "created_at": "2026-08-03T11:20:00Z",
+    "updated_at": "2026-08-12T10:00:00Z"
   },
   "SR-10034": {
-    "id": "w-002",
-    "user_id": "SR-10034",
-    "available_balance": 85400,
-    "locked_balance": 5000,
-    "created_at": "2026-07-28T10:48:00.541Z",
-    "updated_at": "2026-08-18T16:26:38.652Z"
+    "id": "w-user-034",
+    "user_id": "user-034",
+    "available_balance": 4394.23,
+    "locked_balance": 0,
+    "created_at": "2026-08-09T10:00:00Z",
+    "updated_at": "2026-08-09T12:00:00Z"
+  },
+  "919812345678": {
+    "id": "w-user-002",
+    "user_id": "user-002",
+    "available_balance": 4394.23,
+    "locked_balance": 0,
+    "created_at": "2026-08-03T11:20:00Z",
+    "updated_at": "2026-08-12T10:00:00Z"
+  },
+  "+91 98123 45678": {
+    "id": "w-user-002",
+    "user_id": "user-002",
+    "available_balance": 4394.23,
+    "locked_balance": 0,
+    "created_at": "2026-08-03T11:20:00Z",
+    "updated_at": "2026-08-12T10:00:00Z"
+  },
+  "user-003": {
+    "id": "w-user-003",
+    "user_id": "user-003",
+    "available_balance": 23569.12,
+    "locked_balance": 0,
+    "created_at": "2026-08-05T14:15:00Z",
+    "updated_at": "2026-08-16T12:43:36.705Z"
   },
   "SR-10088": {
+    "id": "w-user-088",
+    "user_id": "user-088",
+    "available_balance": 23569.12,
+    "locked_balance": 0,
+    "created_at": "2026-08-13T10:00:00Z",
+    "updated_at": "2026-08-13T12:00:00Z"
+  },
+  "919988776655": {
     "id": "w-user-003",
-    "user_id": "SR-10088",
-    "available_balance": 12450,
+    "user_id": "user-003",
+    "available_balance": 23569.12,
     "locked_balance": 0,
-    "created_at": "2026-08-01T12:51:02.422Z",
-    "updated_at": "2026-08-16T12:51:02.422Z"
+    "created_at": "2026-08-05T14:15:00Z",
+    "updated_at": "2026-08-16T12:43:36.705Z"
   },
-  "SR-50963": {
-    "id": "w-user-964253",
-    "user_id": "SR-50963",
-    "available_balance": 230,
+  "+91 99887 76655": {
+    "id": "w-user-003",
+    "user_id": "user-003",
+    "available_balance": 23569.12,
     "locked_balance": 0,
-    "created_at": "2026-08-14T17:19:24.253Z",
-    "updated_at": "2026-08-24T05:42:25.505Z"
+    "created_at": "2026-08-05T14:15:00Z",
+    "updated_at": "2026-08-16T12:43:36.705Z"
   },
-  "9812345678": {
-    "id": "w-002",
-    "user_id": "SR-10034",
-    "available_balance": 85400,
-    "locked_balance": 5000,
-    "created_at": "2026-07-28T10:48:00.541Z",
-    "updated_at": "2026-08-18T16:26:38.652Z"
-  },
-  "9876543210": {
-    "id": "w-user-001",
-    "user_id": "SR-10029",
-    "available_balance": 143850.5,
-    "locked_balance": 2500,
-    "created_at": "2026-07-18T10:48:00.541Z",
-    "updated_at": "2026-08-24T05:42:25.505Z"
-  },
-  "SR-86752": {
-    "id": "w-SR-86752",
-    "user_id": "SR-86752",
-    "available_balance": 0,
+  "user-006": {
+    "id": "w-user-006",
+    "user_id": "user-006",
+    "available_balance": 30165.5,
     "locked_balance": 0,
-    "created_at": "2026-08-16T13:35:29.953Z",
-    "updated_at": "2026-08-16T13:35:29.953Z"
+    "created_at": "2026-08-06T10:00:00Z",
+    "updated_at": "2026-08-06T12:00:00Z"
   },
-  "@rahul_dev": {
-    "id": "w-SR-86752",
-    "user_id": "SR-86752",
-    "available_balance": 0,
+  "SR-10006": {
+    "id": "w-user-006",
+    "user_id": "user-006",
+    "available_balance": 30165.5,
     "locked_balance": 0,
-    "created_at": "2026-08-16T13:35:29.953Z",
-    "updated_at": "2026-08-16T13:35:29.953Z"
+    "created_at": "2026-08-06T10:00:00Z",
+    "updated_at": "2026-08-06T12:00:00Z"
   },
-  "7477661867": {
-    "id": "w-user-964253",
-    "user_id": "SR-50963",
-    "available_balance": 230,
+  "91982000005": {
+    "id": "w-user-006",
+    "user_id": "user-006",
+    "available_balance": 30165.5,
     "locked_balance": 0,
-    "created_at": "2026-08-14T17:19:24.253Z",
-    "updated_at": "2026-08-24T05:42:25.505Z"
+    "created_at": "2026-08-06T10:00:00Z",
+    "updated_at": "2026-08-06T12:00:00Z"
   },
-  "SR-79811": {
-    "id": "w-SR-79811",
-    "user_id": "SR-79811",
-    "available_balance": 50,
+  "+91 98200 0005": {
+    "id": "w-user-006",
+    "user_id": "user-006",
+    "available_balance": 30165.5,
     "locked_balance": 0,
-    "created_at": "2026-08-21T07:24:29.443Z",
-    "updated_at": "2026-08-21T07:24:29.443Z"
+    "created_at": "2026-08-06T10:00:00Z",
+    "updated_at": "2026-08-06T12:00:00Z"
   },
-  "usr-1787297069443-381": {
-    "id": "w-SR-79811",
-    "user_id": "usr-1787297069443-381",
-    "available_balance": 50,
+  "user-007": {
+    "id": "w-user-007",
+    "user_id": "user-007",
+    "available_balance": 11462.48,
     "locked_balance": 0,
-    "created_at": "2026-08-21T07:24:29.443Z",
-    "updated_at": "2026-08-21T07:24:29.443Z"
+    "created_at": "2026-08-07T10:00:00Z",
+    "updated_at": "2026-08-07T12:00:00Z"
   },
-  "9811122233": {
-    "id": "w-SR-79811",
-    "user_id": "SR-79811",
-    "available_balance": 50,
+  "SR-10007": {
+    "id": "w-user-007",
+    "user_id": "user-007",
+    "available_balance": 11462.48,
     "locked_balance": 0,
-    "created_at": "2026-08-21T07:24:29.443Z",
-    "updated_at": "2026-08-21T07:24:29.443Z"
+    "created_at": "2026-08-07T10:00:00Z",
+    "updated_at": "2026-08-07T12:00:00Z"
+  },
+  "91982000006": {
+    "id": "w-user-007",
+    "user_id": "user-007",
+    "available_balance": 11462.48,
+    "locked_balance": 0,
+    "created_at": "2026-08-07T10:00:00Z",
+    "updated_at": "2026-08-07T12:00:00Z"
+  },
+  "+91 98200 0006": {
+    "id": "w-user-007",
+    "user_id": "user-007",
+    "available_balance": 11462.48,
+    "locked_balance": 0,
+    "created_at": "2026-08-07T10:00:00Z",
+    "updated_at": "2026-08-07T12:00:00Z"
+  },
+  "user-008": {
+    "id": "w-user-008",
+    "user_id": "user-008",
+    "available_balance": 1889.91,
+    "locked_balance": 0,
+    "created_at": "2026-08-08T10:00:00Z",
+    "updated_at": "2026-08-08T12:00:00Z"
+  },
+  "SR-10008": {
+    "id": "w-user-008",
+    "user_id": "user-008",
+    "available_balance": 1889.91,
+    "locked_balance": 0,
+    "created_at": "2026-08-08T10:00:00Z",
+    "updated_at": "2026-08-08T12:00:00Z"
+  },
+  "91982000007": {
+    "id": "w-user-008",
+    "user_id": "user-008",
+    "available_balance": 1889.91,
+    "locked_balance": 0,
+    "created_at": "2026-08-08T10:00:00Z",
+    "updated_at": "2026-08-08T12:00:00Z"
+  },
+  "+91 98200 0007": {
+    "id": "w-user-008",
+    "user_id": "user-008",
+    "available_balance": 1889.91,
+    "locked_balance": 0,
+    "created_at": "2026-08-08T10:00:00Z",
+    "updated_at": "2026-08-08T12:00:00Z"
+  },
+  "user-009": {
+    "id": "w-user-009",
+    "user_id": "user-009",
+    "available_balance": 23892.08,
+    "locked_balance": 0,
+    "created_at": "2026-08-09T10:00:00Z",
+    "updated_at": "2026-08-09T12:00:00Z"
+  },
+  "SR-10009": {
+    "id": "w-user-009",
+    "user_id": "user-009",
+    "available_balance": 23892.08,
+    "locked_balance": 0,
+    "created_at": "2026-08-09T10:00:00Z",
+    "updated_at": "2026-08-09T12:00:00Z"
+  },
+  "91982000008": {
+    "id": "w-user-009",
+    "user_id": "user-009",
+    "available_balance": 23892.08,
+    "locked_balance": 0,
+    "created_at": "2026-08-09T10:00:00Z",
+    "updated_at": "2026-08-09T12:00:00Z"
+  },
+  "+91 98200 0008": {
+    "id": "w-user-009",
+    "user_id": "user-009",
+    "available_balance": 23892.08,
+    "locked_balance": 0,
+    "created_at": "2026-08-09T10:00:00Z",
+    "updated_at": "2026-08-09T12:00:00Z"
+  },
+  "user-010": {
+    "id": "w-user-010",
+    "user_id": "user-010",
+    "available_balance": 13528.98,
+    "locked_balance": 0,
+    "created_at": "2026-08-10T10:00:00Z",
+    "updated_at": "2026-08-10T12:00:00Z"
+  },
+  "SR-10010": {
+    "id": "w-user-010",
+    "user_id": "user-010",
+    "available_balance": 13528.98,
+    "locked_balance": 0,
+    "created_at": "2026-08-10T10:00:00Z",
+    "updated_at": "2026-08-10T12:00:00Z"
+  },
+  "91982000009": {
+    "id": "w-user-010",
+    "user_id": "user-010",
+    "available_balance": 13528.98,
+    "locked_balance": 0,
+    "created_at": "2026-08-10T10:00:00Z",
+    "updated_at": "2026-08-10T12:00:00Z"
+  },
+  "+91 98200 0009": {
+    "id": "w-user-010",
+    "user_id": "user-010",
+    "available_balance": 13528.98,
+    "locked_balance": 0,
+    "created_at": "2026-08-10T10:00:00Z",
+    "updated_at": "2026-08-10T12:00:00Z"
+  },
+  "user-011": {
+    "id": "w-user-011",
+    "user_id": "user-011",
+    "available_balance": 20460.54,
+    "locked_balance": 0,
+    "created_at": "2026-08-11T10:00:00Z",
+    "updated_at": "2026-08-11T12:00:00Z"
+  },
+  "SR-10011": {
+    "id": "w-user-011",
+    "user_id": "user-011",
+    "available_balance": 20460.54,
+    "locked_balance": 0,
+    "created_at": "2026-08-11T10:00:00Z",
+    "updated_at": "2026-08-11T12:00:00Z"
+  },
+  "91982000010": {
+    "id": "w-user-011",
+    "user_id": "user-011",
+    "available_balance": 20460.54,
+    "locked_balance": 0,
+    "created_at": "2026-08-11T10:00:00Z",
+    "updated_at": "2026-08-11T12:00:00Z"
+  },
+  "+91 98200 0010": {
+    "id": "w-user-011",
+    "user_id": "user-011",
+    "available_balance": 20460.54,
+    "locked_balance": 0,
+    "created_at": "2026-08-11T10:00:00Z",
+    "updated_at": "2026-08-11T12:00:00Z"
+  },
+  "user-012": {
+    "id": "w-user-012",
+    "user_id": "user-012",
+    "available_balance": 41822.64,
+    "locked_balance": 0,
+    "created_at": "2026-08-12T10:00:00Z",
+    "updated_at": "2026-08-12T12:00:00Z"
+  },
+  "SR-10012": {
+    "id": "w-user-012",
+    "user_id": "user-012",
+    "available_balance": 41822.64,
+    "locked_balance": 0,
+    "created_at": "2026-08-12T10:00:00Z",
+    "updated_at": "2026-08-12T12:00:00Z"
+  },
+  "91982000011": {
+    "id": "w-user-012",
+    "user_id": "user-012",
+    "available_balance": 41822.64,
+    "locked_balance": 0,
+    "created_at": "2026-08-12T10:00:00Z",
+    "updated_at": "2026-08-12T12:00:00Z"
+  },
+  "+91 98200 0011": {
+    "id": "w-user-012",
+    "user_id": "user-012",
+    "available_balance": 41822.64,
+    "locked_balance": 0,
+    "created_at": "2026-08-12T10:00:00Z",
+    "updated_at": "2026-08-12T12:00:00Z"
+  },
+  "user-013": {
+    "id": "w-user-013",
+    "user_id": "user-013",
+    "available_balance": 7927.98,
+    "locked_balance": 0,
+    "created_at": "2026-08-13T10:00:00Z",
+    "updated_at": "2026-08-13T12:00:00Z"
+  },
+  "SR-10013": {
+    "id": "w-user-013",
+    "user_id": "user-013",
+    "available_balance": 7927.98,
+    "locked_balance": 0,
+    "created_at": "2026-08-13T10:00:00Z",
+    "updated_at": "2026-08-13T12:00:00Z"
+  },
+  "91982000012": {
+    "id": "w-user-013",
+    "user_id": "user-013",
+    "available_balance": 7927.98,
+    "locked_balance": 0,
+    "created_at": "2026-08-13T10:00:00Z",
+    "updated_at": "2026-08-13T12:00:00Z"
+  },
+  "+91 98200 0012": {
+    "id": "w-user-013",
+    "user_id": "user-013",
+    "available_balance": 7927.98,
+    "locked_balance": 0,
+    "created_at": "2026-08-13T10:00:00Z",
+    "updated_at": "2026-08-13T12:00:00Z"
+  },
+  "user-014": {
+    "id": "w-user-014",
+    "user_id": "user-014",
+    "available_balance": 33985.63,
+    "locked_balance": 0,
+    "created_at": "2026-08-14T10:00:00Z",
+    "updated_at": "2026-08-14T12:00:00Z"
+  },
+  "SR-10014": {
+    "id": "w-user-014",
+    "user_id": "user-014",
+    "available_balance": 33985.63,
+    "locked_balance": 0,
+    "created_at": "2026-08-14T10:00:00Z",
+    "updated_at": "2026-08-14T12:00:00Z"
+  },
+  "91982000013": {
+    "id": "w-user-014",
+    "user_id": "user-014",
+    "available_balance": 33985.63,
+    "locked_balance": 0,
+    "created_at": "2026-08-14T10:00:00Z",
+    "updated_at": "2026-08-14T12:00:00Z"
+  },
+  "+91 98200 0013": {
+    "id": "w-user-014",
+    "user_id": "user-014",
+    "available_balance": 33985.63,
+    "locked_balance": 0,
+    "created_at": "2026-08-14T10:00:00Z",
+    "updated_at": "2026-08-14T12:00:00Z"
+  },
+  "user-015": {
+    "id": "w-user-015",
+    "user_id": "user-015",
+    "available_balance": 28121.06,
+    "locked_balance": 0,
+    "created_at": "2026-08-15T10:00:00Z",
+    "updated_at": "2026-08-15T12:00:00Z"
+  },
+  "SR-10015": {
+    "id": "w-user-015",
+    "user_id": "user-015",
+    "available_balance": 28121.06,
+    "locked_balance": 0,
+    "created_at": "2026-08-15T10:00:00Z",
+    "updated_at": "2026-08-15T12:00:00Z"
+  },
+  "91982000014": {
+    "id": "w-user-015",
+    "user_id": "user-015",
+    "available_balance": 28121.06,
+    "locked_balance": 0,
+    "created_at": "2026-08-15T10:00:00Z",
+    "updated_at": "2026-08-15T12:00:00Z"
+  },
+  "+91 98200 0014": {
+    "id": "w-user-015",
+    "user_id": "user-015",
+    "available_balance": 28121.06,
+    "locked_balance": 0,
+    "created_at": "2026-08-15T10:00:00Z",
+    "updated_at": "2026-08-15T12:00:00Z"
+  },
+  "user-016": {
+    "id": "w-user-016",
+    "user_id": "user-016",
+    "available_balance": 11576.3,
+    "locked_balance": 0,
+    "created_at": "2026-08-16T10:00:00Z",
+    "updated_at": "2026-08-16T12:00:00Z"
+  },
+  "SR-10016": {
+    "id": "w-user-016",
+    "user_id": "user-016",
+    "available_balance": 11576.3,
+    "locked_balance": 0,
+    "created_at": "2026-08-16T10:00:00Z",
+    "updated_at": "2026-08-16T12:00:00Z"
+  },
+  "91982000015": {
+    "id": "w-user-016",
+    "user_id": "user-016",
+    "available_balance": 11576.3,
+    "locked_balance": 0,
+    "created_at": "2026-08-16T10:00:00Z",
+    "updated_at": "2026-08-16T12:00:00Z"
+  },
+  "+91 98200 0015": {
+    "id": "w-user-016",
+    "user_id": "user-016",
+    "available_balance": 11576.3,
+    "locked_balance": 0,
+    "created_at": "2026-08-16T10:00:00Z",
+    "updated_at": "2026-08-16T12:00:00Z"
+  },
+  "user-017": {
+    "id": "w-user-017",
+    "user_id": "user-017",
+    "available_balance": 643.85,
+    "locked_balance": 0,
+    "created_at": "2026-08-17T10:00:00Z",
+    "updated_at": "2026-08-17T12:00:00Z"
+  },
+  "SR-10017": {
+    "id": "w-user-017",
+    "user_id": "user-017",
+    "available_balance": 643.85,
+    "locked_balance": 0,
+    "created_at": "2026-08-17T10:00:00Z",
+    "updated_at": "2026-08-17T12:00:00Z"
+  },
+  "91982000016": {
+    "id": "w-user-017",
+    "user_id": "user-017",
+    "available_balance": 643.85,
+    "locked_balance": 0,
+    "created_at": "2026-08-17T10:00:00Z",
+    "updated_at": "2026-08-17T12:00:00Z"
+  },
+  "+91 98200 0016": {
+    "id": "w-user-017",
+    "user_id": "user-017",
+    "available_balance": 643.85,
+    "locked_balance": 0,
+    "created_at": "2026-08-17T10:00:00Z",
+    "updated_at": "2026-08-17T12:00:00Z"
+  },
+  "user-018": {
+    "id": "w-user-018",
+    "user_id": "user-018",
+    "available_balance": 29420.73,
+    "locked_balance": 0,
+    "created_at": "2026-08-18T10:00:00Z",
+    "updated_at": "2026-08-18T12:00:00Z"
+  },
+  "SR-10018": {
+    "id": "w-user-018",
+    "user_id": "user-018",
+    "available_balance": 29420.73,
+    "locked_balance": 0,
+    "created_at": "2026-08-18T10:00:00Z",
+    "updated_at": "2026-08-18T12:00:00Z"
+  },
+  "91982000017": {
+    "id": "w-user-018",
+    "user_id": "user-018",
+    "available_balance": 29420.73,
+    "locked_balance": 0,
+    "created_at": "2026-08-18T10:00:00Z",
+    "updated_at": "2026-08-18T12:00:00Z"
+  },
+  "+91 98200 0017": {
+    "id": "w-user-018",
+    "user_id": "user-018",
+    "available_balance": 29420.73,
+    "locked_balance": 0,
+    "created_at": "2026-08-18T10:00:00Z",
+    "updated_at": "2026-08-18T12:00:00Z"
+  },
+  "user-019": {
+    "id": "w-user-019",
+    "user_id": "user-019",
+    "available_balance": 42304.47,
+    "locked_balance": 0,
+    "created_at": "2026-08-19T10:00:00Z",
+    "updated_at": "2026-08-19T12:00:00Z"
+  },
+  "SR-10019": {
+    "id": "w-user-019",
+    "user_id": "user-019",
+    "available_balance": 42304.47,
+    "locked_balance": 0,
+    "created_at": "2026-08-19T10:00:00Z",
+    "updated_at": "2026-08-19T12:00:00Z"
+  },
+  "91982000018": {
+    "id": "w-user-019",
+    "user_id": "user-019",
+    "available_balance": 42304.47,
+    "locked_balance": 0,
+    "created_at": "2026-08-19T10:00:00Z",
+    "updated_at": "2026-08-19T12:00:00Z"
+  },
+  "+91 98200 0018": {
+    "id": "w-user-019",
+    "user_id": "user-019",
+    "available_balance": 42304.47,
+    "locked_balance": 0,
+    "created_at": "2026-08-19T10:00:00Z",
+    "updated_at": "2026-08-19T12:00:00Z"
+  },
+  "user-020": {
+    "id": "w-user-020",
+    "user_id": "user-020",
+    "available_balance": 42062.69,
+    "locked_balance": 0,
+    "created_at": "2026-08-20T10:00:00Z",
+    "updated_at": "2026-08-20T12:00:00Z"
+  },
+  "SR-10020": {
+    "id": "w-user-020",
+    "user_id": "user-020",
+    "available_balance": 42062.69,
+    "locked_balance": 0,
+    "created_at": "2026-08-20T10:00:00Z",
+    "updated_at": "2026-08-20T12:00:00Z"
+  },
+  "91982000019": {
+    "id": "w-user-020",
+    "user_id": "user-020",
+    "available_balance": 42062.69,
+    "locked_balance": 0,
+    "created_at": "2026-08-20T10:00:00Z",
+    "updated_at": "2026-08-20T12:00:00Z"
+  },
+  "+91 98200 0019": {
+    "id": "w-user-020",
+    "user_id": "user-020",
+    "available_balance": 42062.69,
+    "locked_balance": 0,
+    "created_at": "2026-08-20T10:00:00Z",
+    "updated_at": "2026-08-20T12:00:00Z"
+  },
+  "user-021": {
+    "id": "w-user-021",
+    "user_id": "user-021",
+    "available_balance": 28910.59,
+    "locked_balance": 0,
+    "created_at": "2026-08-21T10:00:00Z",
+    "updated_at": "2026-08-21T12:00:00Z"
+  },
+  "SR-10021": {
+    "id": "w-user-021",
+    "user_id": "user-021",
+    "available_balance": 28910.59,
+    "locked_balance": 0,
+    "created_at": "2026-08-21T10:00:00Z",
+    "updated_at": "2026-08-21T12:00:00Z"
+  },
+  "91982000020": {
+    "id": "w-user-021",
+    "user_id": "user-021",
+    "available_balance": 28910.59,
+    "locked_balance": 0,
+    "created_at": "2026-08-21T10:00:00Z",
+    "updated_at": "2026-08-21T12:00:00Z"
+  },
+  "+91 98200 0020": {
+    "id": "w-user-021",
+    "user_id": "user-021",
+    "available_balance": 28910.59,
+    "locked_balance": 0,
+    "created_at": "2026-08-21T10:00:00Z",
+    "updated_at": "2026-08-21T12:00:00Z"
+  },
+  "user-022": {
+    "id": "w-user-022",
+    "user_id": "user-022",
+    "available_balance": 4707.26,
+    "locked_balance": 0,
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T12:00:00Z"
+  },
+  "SR-10022": {
+    "id": "w-user-022",
+    "user_id": "user-022",
+    "available_balance": 4707.26,
+    "locked_balance": 0,
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T12:00:00Z"
+  },
+  "91982000021": {
+    "id": "w-user-022",
+    "user_id": "user-022",
+    "available_balance": 4707.26,
+    "locked_balance": 0,
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T12:00:00Z"
+  },
+  "+91 98200 0021": {
+    "id": "w-user-022",
+    "user_id": "user-022",
+    "available_balance": 4707.26,
+    "locked_balance": 0,
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T12:00:00Z"
+  },
+  "user-023": {
+    "id": "w-user-023",
+    "user_id": "user-023",
+    "available_balance": 2187.75,
+    "locked_balance": 0,
+    "created_at": "2026-08-23T10:00:00Z",
+    "updated_at": "2026-08-23T12:00:00Z"
+  },
+  "SR-10023": {
+    "id": "w-user-023",
+    "user_id": "user-023",
+    "available_balance": 2187.75,
+    "locked_balance": 0,
+    "created_at": "2026-08-23T10:00:00Z",
+    "updated_at": "2026-08-23T12:00:00Z"
+  },
+  "91982000022": {
+    "id": "w-user-023",
+    "user_id": "user-023",
+    "available_balance": 2187.75,
+    "locked_balance": 0,
+    "created_at": "2026-08-23T10:00:00Z",
+    "updated_at": "2026-08-23T12:00:00Z"
+  },
+  "+91 98200 0022": {
+    "id": "w-user-023",
+    "user_id": "user-023",
+    "available_balance": 2187.75,
+    "locked_balance": 0,
+    "created_at": "2026-08-23T10:00:00Z",
+    "updated_at": "2026-08-23T12:00:00Z"
+  },
+  "user-024": {
+    "id": "w-user-024",
+    "user_id": "user-024",
+    "available_balance": 42687.36,
+    "locked_balance": 0,
+    "created_at": "2026-08-24T10:00:00Z",
+    "updated_at": "2026-08-24T12:00:00Z"
+  },
+  "SR-10024": {
+    "id": "w-user-024",
+    "user_id": "user-024",
+    "available_balance": 42687.36,
+    "locked_balance": 0,
+    "created_at": "2026-08-24T10:00:00Z",
+    "updated_at": "2026-08-24T12:00:00Z"
+  },
+  "91982000023": {
+    "id": "w-user-024",
+    "user_id": "user-024",
+    "available_balance": 42687.36,
+    "locked_balance": 0,
+    "created_at": "2026-08-24T10:00:00Z",
+    "updated_at": "2026-08-24T12:00:00Z"
+  },
+  "+91 98200 0023": {
+    "id": "w-user-024",
+    "user_id": "user-024",
+    "available_balance": 42687.36,
+    "locked_balance": 0,
+    "created_at": "2026-08-24T10:00:00Z",
+    "updated_at": "2026-08-24T12:00:00Z"
+  },
+  "user-025": {
+    "id": "w-user-025",
+    "user_id": "user-025",
+    "available_balance": 39726.95,
+    "locked_balance": 0,
+    "created_at": "2026-08-25T10:00:00Z",
+    "updated_at": "2026-08-25T12:00:00Z"
+  },
+  "SR-10025": {
+    "id": "w-user-025",
+    "user_id": "user-025",
+    "available_balance": 39726.95,
+    "locked_balance": 0,
+    "created_at": "2026-08-25T10:00:00Z",
+    "updated_at": "2026-08-25T12:00:00Z"
+  },
+  "91982000024": {
+    "id": "w-user-025",
+    "user_id": "user-025",
+    "available_balance": 39726.95,
+    "locked_balance": 0,
+    "created_at": "2026-08-25T10:00:00Z",
+    "updated_at": "2026-08-25T12:00:00Z"
+  },
+  "+91 98200 0024": {
+    "id": "w-user-025",
+    "user_id": "user-025",
+    "available_balance": 39726.95,
+    "locked_balance": 0,
+    "created_at": "2026-08-25T10:00:00Z",
+    "updated_at": "2026-08-25T12:00:00Z"
+  },
+  "user-026": {
+    "id": "w-user-026",
+    "user_id": "user-026",
+    "available_balance": 4154.83,
+    "locked_balance": 0,
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z"
+  },
+  "SR-10026": {
+    "id": "w-user-026",
+    "user_id": "user-026",
+    "available_balance": 4154.83,
+    "locked_balance": 0,
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z"
+  },
+  "91982000025": {
+    "id": "w-user-026",
+    "user_id": "user-026",
+    "available_balance": 4154.83,
+    "locked_balance": 0,
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z"
+  },
+  "+91 98200 0025": {
+    "id": "w-user-026",
+    "user_id": "user-026",
+    "available_balance": 4154.83,
+    "locked_balance": 0,
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z"
+  },
+  "user-027": {
+    "id": "w-user-027",
+    "user_id": "user-027",
+    "available_balance": 30687.1,
+    "locked_balance": 0,
+    "created_at": "2026-08-02T10:00:00Z",
+    "updated_at": "2026-08-02T12:00:00Z"
+  },
+  "SR-10027": {
+    "id": "w-user-027",
+    "user_id": "user-027",
+    "available_balance": 30687.1,
+    "locked_balance": 0,
+    "created_at": "2026-08-02T10:00:00Z",
+    "updated_at": "2026-08-02T12:00:00Z"
+  },
+  "91982000026": {
+    "id": "w-user-027",
+    "user_id": "user-027",
+    "available_balance": 30687.1,
+    "locked_balance": 0,
+    "created_at": "2026-08-02T10:00:00Z",
+    "updated_at": "2026-08-02T12:00:00Z"
+  },
+  "+91 98200 0026": {
+    "id": "w-user-027",
+    "user_id": "user-027",
+    "available_balance": 30687.1,
+    "locked_balance": 0,
+    "created_at": "2026-08-02T10:00:00Z",
+    "updated_at": "2026-08-02T12:00:00Z"
+  },
+  "user-028": {
+    "id": "w-user-028",
+    "user_id": "user-028",
+    "available_balance": 38271.41,
+    "locked_balance": 0,
+    "created_at": "2026-08-03T10:00:00Z",
+    "updated_at": "2026-08-03T12:00:00Z"
+  },
+  "SR-10028": {
+    "id": "w-user-028",
+    "user_id": "user-028",
+    "available_balance": 38271.41,
+    "locked_balance": 0,
+    "created_at": "2026-08-03T10:00:00Z",
+    "updated_at": "2026-08-03T12:00:00Z"
+  },
+  "91982000027": {
+    "id": "w-user-028",
+    "user_id": "user-028",
+    "available_balance": 38271.41,
+    "locked_balance": 0,
+    "created_at": "2026-08-03T10:00:00Z",
+    "updated_at": "2026-08-03T12:00:00Z"
+  },
+  "+91 98200 0027": {
+    "id": "w-user-028",
+    "user_id": "user-028",
+    "available_balance": 38271.41,
+    "locked_balance": 0,
+    "created_at": "2026-08-03T10:00:00Z",
+    "updated_at": "2026-08-03T12:00:00Z"
+  },
+  "user-029": {
+    "id": "w-user-029",
+    "user_id": "user-029",
+    "available_balance": 11306.5,
+    "locked_balance": 0,
+    "created_at": "2026-08-04T10:00:00Z",
+    "updated_at": "2026-08-04T12:00:00Z"
+  },
+  "91982000028": {
+    "id": "w-user-029",
+    "user_id": "user-029",
+    "available_balance": 11306.5,
+    "locked_balance": 0,
+    "created_at": "2026-08-04T10:00:00Z",
+    "updated_at": "2026-08-04T12:00:00Z"
+  },
+  "+91 98200 0028": {
+    "id": "w-user-029",
+    "user_id": "user-029",
+    "available_balance": 11306.5,
+    "locked_balance": 0,
+    "created_at": "2026-08-04T10:00:00Z",
+    "updated_at": "2026-08-04T12:00:00Z"
+  },
+  "user-030": {
+    "id": "w-user-030",
+    "user_id": "user-030",
+    "available_balance": 32785.86,
+    "locked_balance": 0,
+    "created_at": "2026-08-05T10:00:00Z",
+    "updated_at": "2026-08-05T12:00:00Z"
+  },
+  "SR-10030": {
+    "id": "w-user-030",
+    "user_id": "user-030",
+    "available_balance": 32785.86,
+    "locked_balance": 0,
+    "created_at": "2026-08-05T10:00:00Z",
+    "updated_at": "2026-08-05T12:00:00Z"
+  },
+  "91982000029": {
+    "id": "w-user-030",
+    "user_id": "user-030",
+    "available_balance": 32785.86,
+    "locked_balance": 0,
+    "created_at": "2026-08-05T10:00:00Z",
+    "updated_at": "2026-08-05T12:00:00Z"
+  },
+  "+91 98200 0029": {
+    "id": "w-user-030",
+    "user_id": "user-030",
+    "available_balance": 32785.86,
+    "locked_balance": 0,
+    "created_at": "2026-08-05T10:00:00Z",
+    "updated_at": "2026-08-05T12:00:00Z"
+  },
+  "user-031": {
+    "id": "w-user-031",
+    "user_id": "user-031",
+    "available_balance": 27388.95,
+    "locked_balance": 0,
+    "created_at": "2026-08-06T10:00:00Z",
+    "updated_at": "2026-08-06T12:00:00Z"
+  },
+  "SR-10031": {
+    "id": "w-user-031",
+    "user_id": "user-031",
+    "available_balance": 27388.95,
+    "locked_balance": 0,
+    "created_at": "2026-08-06T10:00:00Z",
+    "updated_at": "2026-08-06T12:00:00Z"
+  },
+  "91982000030": {
+    "id": "w-user-031",
+    "user_id": "user-031",
+    "available_balance": 27388.95,
+    "locked_balance": 0,
+    "created_at": "2026-08-06T10:00:00Z",
+    "updated_at": "2026-08-06T12:00:00Z"
+  },
+  "+91 98200 0030": {
+    "id": "w-user-031",
+    "user_id": "user-031",
+    "available_balance": 27388.95,
+    "locked_balance": 0,
+    "created_at": "2026-08-06T10:00:00Z",
+    "updated_at": "2026-08-06T12:00:00Z"
+  },
+  "user-032": {
+    "id": "w-user-032",
+    "user_id": "user-032",
+    "available_balance": 8085.51,
+    "locked_balance": 0,
+    "created_at": "2026-08-07T10:00:00Z",
+    "updated_at": "2026-08-07T12:00:00Z"
+  },
+  "SR-10032": {
+    "id": "w-user-032",
+    "user_id": "user-032",
+    "available_balance": 8085.51,
+    "locked_balance": 0,
+    "created_at": "2026-08-07T10:00:00Z",
+    "updated_at": "2026-08-07T12:00:00Z"
+  },
+  "91982000031": {
+    "id": "w-user-032",
+    "user_id": "user-032",
+    "available_balance": 8085.51,
+    "locked_balance": 0,
+    "created_at": "2026-08-07T10:00:00Z",
+    "updated_at": "2026-08-07T12:00:00Z"
+  },
+  "+91 98200 0031": {
+    "id": "w-user-032",
+    "user_id": "user-032",
+    "available_balance": 8085.51,
+    "locked_balance": 0,
+    "created_at": "2026-08-07T10:00:00Z",
+    "updated_at": "2026-08-07T12:00:00Z"
+  },
+  "user-033": {
+    "id": "w-user-033",
+    "user_id": "user-033",
+    "available_balance": 37351.94,
+    "locked_balance": 0,
+    "created_at": "2026-08-08T10:00:00Z",
+    "updated_at": "2026-08-08T12:00:00Z"
+  },
+  "SR-10033": {
+    "id": "w-user-033",
+    "user_id": "user-033",
+    "available_balance": 37351.94,
+    "locked_balance": 0,
+    "created_at": "2026-08-08T10:00:00Z",
+    "updated_at": "2026-08-08T12:00:00Z"
+  },
+  "91982000032": {
+    "id": "w-user-033",
+    "user_id": "user-033",
+    "available_balance": 37351.94,
+    "locked_balance": 0,
+    "created_at": "2026-08-08T10:00:00Z",
+    "updated_at": "2026-08-08T12:00:00Z"
+  },
+  "+91 98200 0032": {
+    "id": "w-user-033",
+    "user_id": "user-033",
+    "available_balance": 37351.94,
+    "locked_balance": 0,
+    "created_at": "2026-08-08T10:00:00Z",
+    "updated_at": "2026-08-08T12:00:00Z"
+  },
+  "user-034": {
+    "id": "w-user-034",
+    "user_id": "user-034",
+    "available_balance": 4394.23,
+    "locked_balance": 0,
+    "created_at": "2026-08-09T10:00:00Z",
+    "updated_at": "2026-08-09T12:00:00Z"
+  },
+  "91982000033": {
+    "id": "w-user-034",
+    "user_id": "user-034",
+    "available_balance": 4394.23,
+    "locked_balance": 0,
+    "created_at": "2026-08-09T10:00:00Z",
+    "updated_at": "2026-08-09T12:00:00Z"
+  },
+  "+91 98200 0033": {
+    "id": "w-user-034",
+    "user_id": "user-034",
+    "available_balance": 4394.23,
+    "locked_balance": 0,
+    "created_at": "2026-08-09T10:00:00Z",
+    "updated_at": "2026-08-09T12:00:00Z"
+  },
+  "user-035": {
+    "id": "w-user-035",
+    "user_id": "user-035",
+    "available_balance": 9254.72,
+    "locked_balance": 0,
+    "created_at": "2026-08-10T10:00:00Z",
+    "updated_at": "2026-08-10T12:00:00Z"
+  },
+  "SR-10035": {
+    "id": "w-user-035",
+    "user_id": "user-035",
+    "available_balance": 9254.72,
+    "locked_balance": 0,
+    "created_at": "2026-08-10T10:00:00Z",
+    "updated_at": "2026-08-10T12:00:00Z"
+  },
+  "91982000034": {
+    "id": "w-user-035",
+    "user_id": "user-035",
+    "available_balance": 9254.72,
+    "locked_balance": 0,
+    "created_at": "2026-08-10T10:00:00Z",
+    "updated_at": "2026-08-10T12:00:00Z"
+  },
+  "+91 98200 0034": {
+    "id": "w-user-035",
+    "user_id": "user-035",
+    "available_balance": 9254.72,
+    "locked_balance": 0,
+    "created_at": "2026-08-10T10:00:00Z",
+    "updated_at": "2026-08-10T12:00:00Z"
+  },
+  "user-036": {
+    "id": "w-user-036",
+    "user_id": "user-036",
+    "available_balance": 37142.86,
+    "locked_balance": 0,
+    "created_at": "2026-08-11T10:00:00Z",
+    "updated_at": "2026-08-11T12:00:00Z"
+  },
+  "SR-10036": {
+    "id": "w-user-036",
+    "user_id": "user-036",
+    "available_balance": 37142.86,
+    "locked_balance": 0,
+    "created_at": "2026-08-11T10:00:00Z",
+    "updated_at": "2026-08-11T12:00:00Z"
+  },
+  "91982000035": {
+    "id": "w-user-036",
+    "user_id": "user-036",
+    "available_balance": 37142.86,
+    "locked_balance": 0,
+    "created_at": "2026-08-11T10:00:00Z",
+    "updated_at": "2026-08-11T12:00:00Z"
+  },
+  "+91 98200 0035": {
+    "id": "w-user-036",
+    "user_id": "user-036",
+    "available_balance": 37142.86,
+    "locked_balance": 0,
+    "created_at": "2026-08-11T10:00:00Z",
+    "updated_at": "2026-08-11T12:00:00Z"
+  },
+  "user-037": {
+    "id": "w-user-037",
+    "user_id": "user-037",
+    "available_balance": 5371.71,
+    "locked_balance": 0,
+    "created_at": "2026-08-12T10:00:00Z",
+    "updated_at": "2026-08-12T12:00:00Z"
+  },
+  "SR-10037": {
+    "id": "w-user-037",
+    "user_id": "user-037",
+    "available_balance": 5371.71,
+    "locked_balance": 0,
+    "created_at": "2026-08-12T10:00:00Z",
+    "updated_at": "2026-08-12T12:00:00Z"
+  },
+  "91982000036": {
+    "id": "w-user-037",
+    "user_id": "user-037",
+    "available_balance": 5371.71,
+    "locked_balance": 0,
+    "created_at": "2026-08-12T10:00:00Z",
+    "updated_at": "2026-08-12T12:00:00Z"
+  },
+  "+91 98200 0036": {
+    "id": "w-user-037",
+    "user_id": "user-037",
+    "available_balance": 5371.71,
+    "locked_balance": 0,
+    "created_at": "2026-08-12T10:00:00Z",
+    "updated_at": "2026-08-12T12:00:00Z"
+  },
+  "user-038": {
+    "id": "w-user-038",
+    "user_id": "user-038",
+    "available_balance": 5236.34,
+    "locked_balance": 0,
+    "created_at": "2026-08-13T10:00:00Z",
+    "updated_at": "2026-08-13T12:00:00Z"
+  },
+  "SR-10038": {
+    "id": "w-user-038",
+    "user_id": "user-038",
+    "available_balance": 5236.34,
+    "locked_balance": 0,
+    "created_at": "2026-08-13T10:00:00Z",
+    "updated_at": "2026-08-13T12:00:00Z"
+  },
+  "91982000037": {
+    "id": "w-user-038",
+    "user_id": "user-038",
+    "available_balance": 5236.34,
+    "locked_balance": 0,
+    "created_at": "2026-08-13T10:00:00Z",
+    "updated_at": "2026-08-13T12:00:00Z"
+  },
+  "+91 98200 0037": {
+    "id": "w-user-038",
+    "user_id": "user-038",
+    "available_balance": 5236.34,
+    "locked_balance": 0,
+    "created_at": "2026-08-13T10:00:00Z",
+    "updated_at": "2026-08-13T12:00:00Z"
+  },
+  "user-039": {
+    "id": "w-user-039",
+    "user_id": "user-039",
+    "available_balance": 40759.6,
+    "locked_balance": 0,
+    "created_at": "2026-08-14T10:00:00Z",
+    "updated_at": "2026-08-14T12:00:00Z"
+  },
+  "SR-10039": {
+    "id": "w-user-039",
+    "user_id": "user-039",
+    "available_balance": 40759.6,
+    "locked_balance": 0,
+    "created_at": "2026-08-14T10:00:00Z",
+    "updated_at": "2026-08-14T12:00:00Z"
+  },
+  "91982000038": {
+    "id": "w-user-039",
+    "user_id": "user-039",
+    "available_balance": 40759.6,
+    "locked_balance": 0,
+    "created_at": "2026-08-14T10:00:00Z",
+    "updated_at": "2026-08-14T12:00:00Z"
+  },
+  "+91 98200 0038": {
+    "id": "w-user-039",
+    "user_id": "user-039",
+    "available_balance": 40759.6,
+    "locked_balance": 0,
+    "created_at": "2026-08-14T10:00:00Z",
+    "updated_at": "2026-08-14T12:00:00Z"
+  },
+  "user-040": {
+    "id": "w-user-040",
+    "user_id": "user-040",
+    "available_balance": 41086.06,
+    "locked_balance": 0,
+    "created_at": "2026-08-15T10:00:00Z",
+    "updated_at": "2026-08-15T12:00:00Z"
+  },
+  "SR-10040": {
+    "id": "w-user-040",
+    "user_id": "user-040",
+    "available_balance": 41086.06,
+    "locked_balance": 0,
+    "created_at": "2026-08-15T10:00:00Z",
+    "updated_at": "2026-08-15T12:00:00Z"
+  },
+  "91982000039": {
+    "id": "w-user-040",
+    "user_id": "user-040",
+    "available_balance": 41086.06,
+    "locked_balance": 0,
+    "created_at": "2026-08-15T10:00:00Z",
+    "updated_at": "2026-08-15T12:00:00Z"
+  },
+  "+91 98200 0039": {
+    "id": "w-user-040",
+    "user_id": "user-040",
+    "available_balance": 41086.06,
+    "locked_balance": 0,
+    "created_at": "2026-08-15T10:00:00Z",
+    "updated_at": "2026-08-15T12:00:00Z"
+  },
+  "user-041": {
+    "id": "w-user-041",
+    "user_id": "user-041",
+    "available_balance": 8390.82,
+    "locked_balance": 0,
+    "created_at": "2026-08-16T10:00:00Z",
+    "updated_at": "2026-08-16T12:00:00Z"
+  },
+  "SR-10041": {
+    "id": "w-user-041",
+    "user_id": "user-041",
+    "available_balance": 8390.82,
+    "locked_balance": 0,
+    "created_at": "2026-08-16T10:00:00Z",
+    "updated_at": "2026-08-16T12:00:00Z"
+  },
+  "91982000040": {
+    "id": "w-user-041",
+    "user_id": "user-041",
+    "available_balance": 8390.82,
+    "locked_balance": 0,
+    "created_at": "2026-08-16T10:00:00Z",
+    "updated_at": "2026-08-16T12:00:00Z"
+  },
+  "+91 98200 0040": {
+    "id": "w-user-041",
+    "user_id": "user-041",
+    "available_balance": 8390.82,
+    "locked_balance": 0,
+    "created_at": "2026-08-16T10:00:00Z",
+    "updated_at": "2026-08-16T12:00:00Z"
+  },
+  "user-042": {
+    "id": "w-user-042",
+    "user_id": "user-042",
+    "available_balance": 26362.98,
+    "locked_balance": 0,
+    "created_at": "2026-08-17T10:00:00Z",
+    "updated_at": "2026-08-17T12:00:00Z"
+  },
+  "SR-10042": {
+    "id": "w-user-042",
+    "user_id": "user-042",
+    "available_balance": 26362.98,
+    "locked_balance": 0,
+    "created_at": "2026-08-17T10:00:00Z",
+    "updated_at": "2026-08-17T12:00:00Z"
+  },
+  "91982000041": {
+    "id": "w-user-042",
+    "user_id": "user-042",
+    "available_balance": 26362.98,
+    "locked_balance": 0,
+    "created_at": "2026-08-17T10:00:00Z",
+    "updated_at": "2026-08-17T12:00:00Z"
+  },
+  "+91 98200 0041": {
+    "id": "w-user-042",
+    "user_id": "user-042",
+    "available_balance": 26362.98,
+    "locked_balance": 0,
+    "created_at": "2026-08-17T10:00:00Z",
+    "updated_at": "2026-08-17T12:00:00Z"
+  },
+  "user-043": {
+    "id": "w-user-043",
+    "user_id": "user-043",
+    "available_balance": 30365.86,
+    "locked_balance": 0,
+    "created_at": "2026-08-18T10:00:00Z",
+    "updated_at": "2026-08-18T12:00:00Z"
+  },
+  "SR-10043": {
+    "id": "w-user-043",
+    "user_id": "user-043",
+    "available_balance": 30365.86,
+    "locked_balance": 0,
+    "created_at": "2026-08-18T10:00:00Z",
+    "updated_at": "2026-08-18T12:00:00Z"
+  },
+  "91982000042": {
+    "id": "w-user-043",
+    "user_id": "user-043",
+    "available_balance": 30365.86,
+    "locked_balance": 0,
+    "created_at": "2026-08-18T10:00:00Z",
+    "updated_at": "2026-08-18T12:00:00Z"
+  },
+  "+91 98200 0042": {
+    "id": "w-user-043",
+    "user_id": "user-043",
+    "available_balance": 30365.86,
+    "locked_balance": 0,
+    "created_at": "2026-08-18T10:00:00Z",
+    "updated_at": "2026-08-18T12:00:00Z"
+  },
+  "user-044": {
+    "id": "w-user-044",
+    "user_id": "user-044",
+    "available_balance": 32680.04,
+    "locked_balance": 0,
+    "created_at": "2026-08-19T10:00:00Z",
+    "updated_at": "2026-08-19T12:00:00Z"
+  },
+  "SR-10044": {
+    "id": "w-user-044",
+    "user_id": "user-044",
+    "available_balance": 32680.04,
+    "locked_balance": 0,
+    "created_at": "2026-08-19T10:00:00Z",
+    "updated_at": "2026-08-19T12:00:00Z"
+  },
+  "91982000043": {
+    "id": "w-user-044",
+    "user_id": "user-044",
+    "available_balance": 32680.04,
+    "locked_balance": 0,
+    "created_at": "2026-08-19T10:00:00Z",
+    "updated_at": "2026-08-19T12:00:00Z"
+  },
+  "+91 98200 0043": {
+    "id": "w-user-044",
+    "user_id": "user-044",
+    "available_balance": 32680.04,
+    "locked_balance": 0,
+    "created_at": "2026-08-19T10:00:00Z",
+    "updated_at": "2026-08-19T12:00:00Z"
+  },
+  "user-045": {
+    "id": "w-user-045",
+    "user_id": "user-045",
+    "available_balance": 39428.81,
+    "locked_balance": 0,
+    "created_at": "2026-08-20T10:00:00Z",
+    "updated_at": "2026-08-20T12:00:00Z"
+  },
+  "SR-10045": {
+    "id": "w-user-045",
+    "user_id": "user-045",
+    "available_balance": 39428.81,
+    "locked_balance": 0,
+    "created_at": "2026-08-20T10:00:00Z",
+    "updated_at": "2026-08-20T12:00:00Z"
+  },
+  "91982000044": {
+    "id": "w-user-045",
+    "user_id": "user-045",
+    "available_balance": 39428.81,
+    "locked_balance": 0,
+    "created_at": "2026-08-20T10:00:00Z",
+    "updated_at": "2026-08-20T12:00:00Z"
+  },
+  "+91 98200 0044": {
+    "id": "w-user-045",
+    "user_id": "user-045",
+    "available_balance": 39428.81,
+    "locked_balance": 0,
+    "created_at": "2026-08-20T10:00:00Z",
+    "updated_at": "2026-08-20T12:00:00Z"
+  },
+  "user-046": {
+    "id": "w-user-046",
+    "user_id": "user-046",
+    "available_balance": 9619.19,
+    "locked_balance": 0,
+    "created_at": "2026-08-21T10:00:00Z",
+    "updated_at": "2026-08-21T12:00:00Z"
+  },
+  "SR-10046": {
+    "id": "w-user-046",
+    "user_id": "user-046",
+    "available_balance": 9619.19,
+    "locked_balance": 0,
+    "created_at": "2026-08-21T10:00:00Z",
+    "updated_at": "2026-08-21T12:00:00Z"
+  },
+  "91982000045": {
+    "id": "w-user-046",
+    "user_id": "user-046",
+    "available_balance": 9619.19,
+    "locked_balance": 0,
+    "created_at": "2026-08-21T10:00:00Z",
+    "updated_at": "2026-08-21T12:00:00Z"
+  },
+  "+91 98200 0045": {
+    "id": "w-user-046",
+    "user_id": "user-046",
+    "available_balance": 9619.19,
+    "locked_balance": 0,
+    "created_at": "2026-08-21T10:00:00Z",
+    "updated_at": "2026-08-21T12:00:00Z"
+  },
+  "user-047": {
+    "id": "w-user-047",
+    "user_id": "user-047",
+    "available_balance": 36192.1,
+    "locked_balance": 0,
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T12:00:00Z"
+  },
+  "SR-10047": {
+    "id": "w-user-047",
+    "user_id": "user-047",
+    "available_balance": 36192.1,
+    "locked_balance": 0,
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T12:00:00Z"
+  },
+  "91982000046": {
+    "id": "w-user-047",
+    "user_id": "user-047",
+    "available_balance": 36192.1,
+    "locked_balance": 0,
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T12:00:00Z"
+  },
+  "+91 98200 0046": {
+    "id": "w-user-047",
+    "user_id": "user-047",
+    "available_balance": 36192.1,
+    "locked_balance": 0,
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T12:00:00Z"
+  },
+  "user-048": {
+    "id": "w-user-048",
+    "user_id": "user-048",
+    "available_balance": 35720.97,
+    "locked_balance": 0,
+    "created_at": "2026-08-23T10:00:00Z",
+    "updated_at": "2026-08-23T12:00:00Z"
+  },
+  "SR-10048": {
+    "id": "w-user-048",
+    "user_id": "user-048",
+    "available_balance": 35720.97,
+    "locked_balance": 0,
+    "created_at": "2026-08-23T10:00:00Z",
+    "updated_at": "2026-08-23T12:00:00Z"
+  },
+  "91982000047": {
+    "id": "w-user-048",
+    "user_id": "user-048",
+    "available_balance": 35720.97,
+    "locked_balance": 0,
+    "created_at": "2026-08-23T10:00:00Z",
+    "updated_at": "2026-08-23T12:00:00Z"
+  },
+  "+91 98200 0047": {
+    "id": "w-user-048",
+    "user_id": "user-048",
+    "available_balance": 35720.97,
+    "locked_balance": 0,
+    "created_at": "2026-08-23T10:00:00Z",
+    "updated_at": "2026-08-23T12:00:00Z"
+  },
+  "user-049": {
+    "id": "w-user-049",
+    "user_id": "user-049",
+    "available_balance": 12667.33,
+    "locked_balance": 0,
+    "created_at": "2026-08-24T10:00:00Z",
+    "updated_at": "2026-08-24T12:00:00Z"
+  },
+  "SR-10049": {
+    "id": "w-user-049",
+    "user_id": "user-049",
+    "available_balance": 12667.33,
+    "locked_balance": 0,
+    "created_at": "2026-08-24T10:00:00Z",
+    "updated_at": "2026-08-24T12:00:00Z"
+  },
+  "91982000048": {
+    "id": "w-user-049",
+    "user_id": "user-049",
+    "available_balance": 12667.33,
+    "locked_balance": 0,
+    "created_at": "2026-08-24T10:00:00Z",
+    "updated_at": "2026-08-24T12:00:00Z"
+  },
+  "+91 98200 0048": {
+    "id": "w-user-049",
+    "user_id": "user-049",
+    "available_balance": 12667.33,
+    "locked_balance": 0,
+    "created_at": "2026-08-24T10:00:00Z",
+    "updated_at": "2026-08-24T12:00:00Z"
+  },
+  "user-050": {
+    "id": "w-user-050",
+    "user_id": "user-050",
+    "available_balance": 19236.99,
+    "locked_balance": 0,
+    "created_at": "2026-08-25T10:00:00Z",
+    "updated_at": "2026-08-25T12:00:00Z"
+  },
+  "SR-10050": {
+    "id": "w-user-050",
+    "user_id": "user-050",
+    "available_balance": 19236.99,
+    "locked_balance": 0,
+    "created_at": "2026-08-25T10:00:00Z",
+    "updated_at": "2026-08-25T12:00:00Z"
+  },
+  "91982000049": {
+    "id": "w-user-050",
+    "user_id": "user-050",
+    "available_balance": 19236.99,
+    "locked_balance": 0,
+    "created_at": "2026-08-25T10:00:00Z",
+    "updated_at": "2026-08-25T12:00:00Z"
+  },
+  "+91 98200 0049": {
+    "id": "w-user-050",
+    "user_id": "user-050",
+    "available_balance": 19236.99,
+    "locked_balance": 0,
+    "created_at": "2026-08-25T10:00:00Z",
+    "updated_at": "2026-08-25T12:00:00Z"
+  },
+  "user-051": {
+    "id": "w-user-051",
+    "user_id": "user-051",
+    "available_balance": 19279.79,
+    "locked_balance": 0,
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z"
+  },
+  "SR-10051": {
+    "id": "w-user-051",
+    "user_id": "user-051",
+    "available_balance": 19279.79,
+    "locked_balance": 0,
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z"
+  },
+  "91982000050": {
+    "id": "w-user-051",
+    "user_id": "user-051",
+    "available_balance": 19279.79,
+    "locked_balance": 0,
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z"
+  },
+  "+91 98200 0050": {
+    "id": "w-user-051",
+    "user_id": "user-051",
+    "available_balance": 19279.79,
+    "locked_balance": 0,
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z"
+  },
+  "user-052": {
+    "id": "w-user-052",
+    "user_id": "user-052",
+    "available_balance": 30367.7,
+    "locked_balance": 0,
+    "created_at": "2026-08-02T10:00:00Z",
+    "updated_at": "2026-08-02T12:00:00Z"
+  },
+  "SR-10052": {
+    "id": "w-user-052",
+    "user_id": "user-052",
+    "available_balance": 30367.7,
+    "locked_balance": 0,
+    "created_at": "2026-08-02T10:00:00Z",
+    "updated_at": "2026-08-02T12:00:00Z"
+  },
+  "91982000051": {
+    "id": "w-user-052",
+    "user_id": "user-052",
+    "available_balance": 30367.7,
+    "locked_balance": 0,
+    "created_at": "2026-08-02T10:00:00Z",
+    "updated_at": "2026-08-02T12:00:00Z"
+  },
+  "+91 98200 0051": {
+    "id": "w-user-052",
+    "user_id": "user-052",
+    "available_balance": 30367.7,
+    "locked_balance": 0,
+    "created_at": "2026-08-02T10:00:00Z",
+    "updated_at": "2026-08-02T12:00:00Z"
+  },
+  "user-053": {
+    "id": "w-user-053",
+    "user_id": "user-053",
+    "available_balance": 39908.47,
+    "locked_balance": 0,
+    "created_at": "2026-08-03T10:00:00Z",
+    "updated_at": "2026-08-03T12:00:00Z"
+  },
+  "SR-10053": {
+    "id": "w-user-053",
+    "user_id": "user-053",
+    "available_balance": 39908.47,
+    "locked_balance": 0,
+    "created_at": "2026-08-03T10:00:00Z",
+    "updated_at": "2026-08-03T12:00:00Z"
+  },
+  "91982000052": {
+    "id": "w-user-053",
+    "user_id": "user-053",
+    "available_balance": 39908.47,
+    "locked_balance": 0,
+    "created_at": "2026-08-03T10:00:00Z",
+    "updated_at": "2026-08-03T12:00:00Z"
+  },
+  "+91 98200 0052": {
+    "id": "w-user-053",
+    "user_id": "user-053",
+    "available_balance": 39908.47,
+    "locked_balance": 0,
+    "created_at": "2026-08-03T10:00:00Z",
+    "updated_at": "2026-08-03T12:00:00Z"
+  },
+  "user-054": {
+    "id": "w-user-054",
+    "user_id": "user-054",
+    "available_balance": 19025.96,
+    "locked_balance": 0,
+    "created_at": "2026-08-04T10:00:00Z",
+    "updated_at": "2026-08-04T12:00:00Z"
+  },
+  "SR-10054": {
+    "id": "w-user-054",
+    "user_id": "user-054",
+    "available_balance": 19025.96,
+    "locked_balance": 0,
+    "created_at": "2026-08-04T10:00:00Z",
+    "updated_at": "2026-08-04T12:00:00Z"
+  },
+  "91982000053": {
+    "id": "w-user-054",
+    "user_id": "user-054",
+    "available_balance": 19025.96,
+    "locked_balance": 0,
+    "created_at": "2026-08-04T10:00:00Z",
+    "updated_at": "2026-08-04T12:00:00Z"
+  },
+  "+91 98200 0053": {
+    "id": "w-user-054",
+    "user_id": "user-054",
+    "available_balance": 19025.96,
+    "locked_balance": 0,
+    "created_at": "2026-08-04T10:00:00Z",
+    "updated_at": "2026-08-04T12:00:00Z"
+  },
+  "user-055": {
+    "id": "w-user-055",
+    "user_id": "user-055",
+    "available_balance": 23326.39,
+    "locked_balance": 0,
+    "created_at": "2026-08-05T10:00:00Z",
+    "updated_at": "2026-08-05T12:00:00Z"
+  },
+  "SR-10055": {
+    "id": "w-user-055",
+    "user_id": "user-055",
+    "available_balance": 23326.39,
+    "locked_balance": 0,
+    "created_at": "2026-08-05T10:00:00Z",
+    "updated_at": "2026-08-05T12:00:00Z"
+  },
+  "91982000054": {
+    "id": "w-user-055",
+    "user_id": "user-055",
+    "available_balance": 23326.39,
+    "locked_balance": 0,
+    "created_at": "2026-08-05T10:00:00Z",
+    "updated_at": "2026-08-05T12:00:00Z"
+  },
+  "+91 98200 0054": {
+    "id": "w-user-055",
+    "user_id": "user-055",
+    "available_balance": 23326.39,
+    "locked_balance": 0,
+    "created_at": "2026-08-05T10:00:00Z",
+    "updated_at": "2026-08-05T12:00:00Z"
+  },
+  "user-056": {
+    "id": "w-user-056",
+    "user_id": "user-056",
+    "available_balance": 44569.49,
+    "locked_balance": 0,
+    "created_at": "2026-08-06T10:00:00Z",
+    "updated_at": "2026-08-06T12:00:00Z"
+  },
+  "SR-10056": {
+    "id": "w-user-056",
+    "user_id": "user-056",
+    "available_balance": 44569.49,
+    "locked_balance": 0,
+    "created_at": "2026-08-06T10:00:00Z",
+    "updated_at": "2026-08-06T12:00:00Z"
+  },
+  "91982000055": {
+    "id": "w-user-056",
+    "user_id": "user-056",
+    "available_balance": 44569.49,
+    "locked_balance": 0,
+    "created_at": "2026-08-06T10:00:00Z",
+    "updated_at": "2026-08-06T12:00:00Z"
+  },
+  "+91 98200 0055": {
+    "id": "w-user-056",
+    "user_id": "user-056",
+    "available_balance": 44569.49,
+    "locked_balance": 0,
+    "created_at": "2026-08-06T10:00:00Z",
+    "updated_at": "2026-08-06T12:00:00Z"
+  },
+  "user-057": {
+    "id": "w-user-057",
+    "user_id": "user-057",
+    "available_balance": 1557.7,
+    "locked_balance": 0,
+    "created_at": "2026-08-07T10:00:00Z",
+    "updated_at": "2026-08-07T12:00:00Z"
+  },
+  "SR-10057": {
+    "id": "w-user-057",
+    "user_id": "user-057",
+    "available_balance": 1557.7,
+    "locked_balance": 0,
+    "created_at": "2026-08-07T10:00:00Z",
+    "updated_at": "2026-08-07T12:00:00Z"
+  },
+  "91982000056": {
+    "id": "w-user-057",
+    "user_id": "user-057",
+    "available_balance": 1557.7,
+    "locked_balance": 0,
+    "created_at": "2026-08-07T10:00:00Z",
+    "updated_at": "2026-08-07T12:00:00Z"
+  },
+  "+91 98200 0056": {
+    "id": "w-user-057",
+    "user_id": "user-057",
+    "available_balance": 1557.7,
+    "locked_balance": 0,
+    "created_at": "2026-08-07T10:00:00Z",
+    "updated_at": "2026-08-07T12:00:00Z"
+  },
+  "user-058": {
+    "id": "w-user-058",
+    "user_id": "user-058",
+    "available_balance": 16033.07,
+    "locked_balance": 0,
+    "created_at": "2026-08-08T10:00:00Z",
+    "updated_at": "2026-08-08T12:00:00Z"
+  },
+  "SR-10058": {
+    "id": "w-user-058",
+    "user_id": "user-058",
+    "available_balance": 16033.07,
+    "locked_balance": 0,
+    "created_at": "2026-08-08T10:00:00Z",
+    "updated_at": "2026-08-08T12:00:00Z"
+  },
+  "91982000057": {
+    "id": "w-user-058",
+    "user_id": "user-058",
+    "available_balance": 16033.07,
+    "locked_balance": 0,
+    "created_at": "2026-08-08T10:00:00Z",
+    "updated_at": "2026-08-08T12:00:00Z"
+  },
+  "+91 98200 0057": {
+    "id": "w-user-058",
+    "user_id": "user-058",
+    "available_balance": 16033.07,
+    "locked_balance": 0,
+    "created_at": "2026-08-08T10:00:00Z",
+    "updated_at": "2026-08-08T12:00:00Z"
+  },
+  "user-059": {
+    "id": "w-user-059",
+    "user_id": "user-059",
+    "available_balance": 16557.58,
+    "locked_balance": 0,
+    "created_at": "2026-08-09T10:00:00Z",
+    "updated_at": "2026-08-09T12:00:00Z"
+  },
+  "SR-10059": {
+    "id": "w-user-059",
+    "user_id": "user-059",
+    "available_balance": 16557.58,
+    "locked_balance": 0,
+    "created_at": "2026-08-09T10:00:00Z",
+    "updated_at": "2026-08-09T12:00:00Z"
+  },
+  "91982000058": {
+    "id": "w-user-059",
+    "user_id": "user-059",
+    "available_balance": 16557.58,
+    "locked_balance": 0,
+    "created_at": "2026-08-09T10:00:00Z",
+    "updated_at": "2026-08-09T12:00:00Z"
+  },
+  "+91 98200 0058": {
+    "id": "w-user-059",
+    "user_id": "user-059",
+    "available_balance": 16557.58,
+    "locked_balance": 0,
+    "created_at": "2026-08-09T10:00:00Z",
+    "updated_at": "2026-08-09T12:00:00Z"
+  },
+  "user-060": {
+    "id": "w-user-060",
+    "user_id": "user-060",
+    "available_balance": 41700.42,
+    "locked_balance": 0,
+    "created_at": "2026-08-10T10:00:00Z",
+    "updated_at": "2026-08-10T12:00:00Z"
+  },
+  "SR-10060": {
+    "id": "w-user-060",
+    "user_id": "user-060",
+    "available_balance": 41700.42,
+    "locked_balance": 0,
+    "created_at": "2026-08-10T10:00:00Z",
+    "updated_at": "2026-08-10T12:00:00Z"
+  },
+  "91982000059": {
+    "id": "w-user-060",
+    "user_id": "user-060",
+    "available_balance": 41700.42,
+    "locked_balance": 0,
+    "created_at": "2026-08-10T10:00:00Z",
+    "updated_at": "2026-08-10T12:00:00Z"
+  },
+  "+91 98200 0059": {
+    "id": "w-user-060",
+    "user_id": "user-060",
+    "available_balance": 41700.42,
+    "locked_balance": 0,
+    "created_at": "2026-08-10T10:00:00Z",
+    "updated_at": "2026-08-10T12:00:00Z"
+  },
+  "user-061": {
+    "id": "w-user-061",
+    "user_id": "user-061",
+    "available_balance": 7208,
+    "locked_balance": 0,
+    "created_at": "2026-08-11T10:00:00Z",
+    "updated_at": "2026-08-11T12:00:00Z"
+  },
+  "SR-10061": {
+    "id": "w-user-061",
+    "user_id": "user-061",
+    "available_balance": 7208,
+    "locked_balance": 0,
+    "created_at": "2026-08-11T10:00:00Z",
+    "updated_at": "2026-08-11T12:00:00Z"
+  },
+  "91982000060": {
+    "id": "w-user-061",
+    "user_id": "user-061",
+    "available_balance": 7208,
+    "locked_balance": 0,
+    "created_at": "2026-08-11T10:00:00Z",
+    "updated_at": "2026-08-11T12:00:00Z"
+  },
+  "+91 98200 0060": {
+    "id": "w-user-061",
+    "user_id": "user-061",
+    "available_balance": 7208,
+    "locked_balance": 0,
+    "created_at": "2026-08-11T10:00:00Z",
+    "updated_at": "2026-08-11T12:00:00Z"
+  },
+  "user-062": {
+    "id": "w-user-062",
+    "user_id": "user-062",
+    "available_balance": 30835.3,
+    "locked_balance": 0,
+    "created_at": "2026-08-12T10:00:00Z",
+    "updated_at": "2026-08-12T12:00:00Z"
+  },
+  "SR-10062": {
+    "id": "w-user-062",
+    "user_id": "user-062",
+    "available_balance": 30835.3,
+    "locked_balance": 0,
+    "created_at": "2026-08-12T10:00:00Z",
+    "updated_at": "2026-08-12T12:00:00Z"
+  },
+  "91982000061": {
+    "id": "w-user-062",
+    "user_id": "user-062",
+    "available_balance": 30835.3,
+    "locked_balance": 0,
+    "created_at": "2026-08-12T10:00:00Z",
+    "updated_at": "2026-08-12T12:00:00Z"
+  },
+  "+91 98200 0061": {
+    "id": "w-user-062",
+    "user_id": "user-062",
+    "available_balance": 30835.3,
+    "locked_balance": 0,
+    "created_at": "2026-08-12T10:00:00Z",
+    "updated_at": "2026-08-12T12:00:00Z"
+  },
+  "user-063": {
+    "id": "w-user-063",
+    "user_id": "user-063",
+    "available_balance": 10565.42,
+    "locked_balance": 0,
+    "created_at": "2026-08-13T10:00:00Z",
+    "updated_at": "2026-08-13T12:00:00Z"
+  },
+  "SR-10063": {
+    "id": "w-user-063",
+    "user_id": "user-063",
+    "available_balance": 10565.42,
+    "locked_balance": 0,
+    "created_at": "2026-08-13T10:00:00Z",
+    "updated_at": "2026-08-13T12:00:00Z"
+  },
+  "91982000062": {
+    "id": "w-user-063",
+    "user_id": "user-063",
+    "available_balance": 10565.42,
+    "locked_balance": 0,
+    "created_at": "2026-08-13T10:00:00Z",
+    "updated_at": "2026-08-13T12:00:00Z"
+  },
+  "+91 98200 0062": {
+    "id": "w-user-063",
+    "user_id": "user-063",
+    "available_balance": 10565.42,
+    "locked_balance": 0,
+    "created_at": "2026-08-13T10:00:00Z",
+    "updated_at": "2026-08-13T12:00:00Z"
+  },
+  "user-064": {
+    "id": "w-user-064",
+    "user_id": "user-064",
+    "available_balance": 31311.53,
+    "locked_balance": 0,
+    "created_at": "2026-08-14T10:00:00Z",
+    "updated_at": "2026-08-14T12:00:00Z"
+  },
+  "SR-10064": {
+    "id": "w-user-064",
+    "user_id": "user-064",
+    "available_balance": 31311.53,
+    "locked_balance": 0,
+    "created_at": "2026-08-14T10:00:00Z",
+    "updated_at": "2026-08-14T12:00:00Z"
+  },
+  "91982000063": {
+    "id": "w-user-064",
+    "user_id": "user-064",
+    "available_balance": 31311.53,
+    "locked_balance": 0,
+    "created_at": "2026-08-14T10:00:00Z",
+    "updated_at": "2026-08-14T12:00:00Z"
+  },
+  "+91 98200 0063": {
+    "id": "w-user-064",
+    "user_id": "user-064",
+    "available_balance": 31311.53,
+    "locked_balance": 0,
+    "created_at": "2026-08-14T10:00:00Z",
+    "updated_at": "2026-08-14T12:00:00Z"
+  },
+  "user-065": {
+    "id": "w-user-065",
+    "user_id": "user-065",
+    "available_balance": 19552.18,
+    "locked_balance": 0,
+    "created_at": "2026-08-15T10:00:00Z",
+    "updated_at": "2026-08-15T12:00:00Z"
+  },
+  "SR-10065": {
+    "id": "w-user-065",
+    "user_id": "user-065",
+    "available_balance": 19552.18,
+    "locked_balance": 0,
+    "created_at": "2026-08-15T10:00:00Z",
+    "updated_at": "2026-08-15T12:00:00Z"
+  },
+  "91982000064": {
+    "id": "w-user-065",
+    "user_id": "user-065",
+    "available_balance": 19552.18,
+    "locked_balance": 0,
+    "created_at": "2026-08-15T10:00:00Z",
+    "updated_at": "2026-08-15T12:00:00Z"
+  },
+  "+91 98200 0064": {
+    "id": "w-user-065",
+    "user_id": "user-065",
+    "available_balance": 19552.18,
+    "locked_balance": 0,
+    "created_at": "2026-08-15T10:00:00Z",
+    "updated_at": "2026-08-15T12:00:00Z"
+  },
+  "user-066": {
+    "id": "w-user-066",
+    "user_id": "user-066",
+    "available_balance": 32403.92,
+    "locked_balance": 0,
+    "created_at": "2026-08-16T10:00:00Z",
+    "updated_at": "2026-08-16T12:00:00Z"
+  },
+  "SR-10066": {
+    "id": "w-user-066",
+    "user_id": "user-066",
+    "available_balance": 32403.92,
+    "locked_balance": 0,
+    "created_at": "2026-08-16T10:00:00Z",
+    "updated_at": "2026-08-16T12:00:00Z"
+  },
+  "91982000065": {
+    "id": "w-user-066",
+    "user_id": "user-066",
+    "available_balance": 32403.92,
+    "locked_balance": 0,
+    "created_at": "2026-08-16T10:00:00Z",
+    "updated_at": "2026-08-16T12:00:00Z"
+  },
+  "+91 98200 0065": {
+    "id": "w-user-066",
+    "user_id": "user-066",
+    "available_balance": 32403.92,
+    "locked_balance": 0,
+    "created_at": "2026-08-16T10:00:00Z",
+    "updated_at": "2026-08-16T12:00:00Z"
+  },
+  "user-067": {
+    "id": "w-user-067",
+    "user_id": "user-067",
+    "available_balance": 35300.28,
+    "locked_balance": 0,
+    "created_at": "2026-08-17T10:00:00Z",
+    "updated_at": "2026-08-17T12:00:00Z"
+  },
+  "SR-10067": {
+    "id": "w-user-067",
+    "user_id": "user-067",
+    "available_balance": 35300.28,
+    "locked_balance": 0,
+    "created_at": "2026-08-17T10:00:00Z",
+    "updated_at": "2026-08-17T12:00:00Z"
+  },
+  "91982000066": {
+    "id": "w-user-067",
+    "user_id": "user-067",
+    "available_balance": 35300.28,
+    "locked_balance": 0,
+    "created_at": "2026-08-17T10:00:00Z",
+    "updated_at": "2026-08-17T12:00:00Z"
+  },
+  "+91 98200 0066": {
+    "id": "w-user-067",
+    "user_id": "user-067",
+    "available_balance": 35300.28,
+    "locked_balance": 0,
+    "created_at": "2026-08-17T10:00:00Z",
+    "updated_at": "2026-08-17T12:00:00Z"
+  },
+  "user-068": {
+    "id": "w-user-068",
+    "user_id": "user-068",
+    "available_balance": 44649.44,
+    "locked_balance": 0,
+    "created_at": "2026-08-18T10:00:00Z",
+    "updated_at": "2026-08-18T12:00:00Z"
+  },
+  "SR-10068": {
+    "id": "w-user-068",
+    "user_id": "user-068",
+    "available_balance": 44649.44,
+    "locked_balance": 0,
+    "created_at": "2026-08-18T10:00:00Z",
+    "updated_at": "2026-08-18T12:00:00Z"
+  },
+  "91982000067": {
+    "id": "w-user-068",
+    "user_id": "user-068",
+    "available_balance": 44649.44,
+    "locked_balance": 0,
+    "created_at": "2026-08-18T10:00:00Z",
+    "updated_at": "2026-08-18T12:00:00Z"
+  },
+  "+91 98200 0067": {
+    "id": "w-user-068",
+    "user_id": "user-068",
+    "available_balance": 44649.44,
+    "locked_balance": 0,
+    "created_at": "2026-08-18T10:00:00Z",
+    "updated_at": "2026-08-18T12:00:00Z"
+  },
+  "user-069": {
+    "id": "w-user-069",
+    "user_id": "user-069",
+    "available_balance": 22308.99,
+    "locked_balance": 0,
+    "created_at": "2026-08-19T10:00:00Z",
+    "updated_at": "2026-08-19T12:00:00Z"
+  },
+  "SR-10069": {
+    "id": "w-user-069",
+    "user_id": "user-069",
+    "available_balance": 22308.99,
+    "locked_balance": 0,
+    "created_at": "2026-08-19T10:00:00Z",
+    "updated_at": "2026-08-19T12:00:00Z"
+  },
+  "91982000068": {
+    "id": "w-user-069",
+    "user_id": "user-069",
+    "available_balance": 22308.99,
+    "locked_balance": 0,
+    "created_at": "2026-08-19T10:00:00Z",
+    "updated_at": "2026-08-19T12:00:00Z"
+  },
+  "+91 98200 0068": {
+    "id": "w-user-069",
+    "user_id": "user-069",
+    "available_balance": 22308.99,
+    "locked_balance": 0,
+    "created_at": "2026-08-19T10:00:00Z",
+    "updated_at": "2026-08-19T12:00:00Z"
+  },
+  "user-070": {
+    "id": "w-user-070",
+    "user_id": "user-070",
+    "available_balance": 11196.31,
+    "locked_balance": 0,
+    "created_at": "2026-08-20T10:00:00Z",
+    "updated_at": "2026-08-20T12:00:00Z"
+  },
+  "SR-10070": {
+    "id": "w-user-070",
+    "user_id": "user-070",
+    "available_balance": 11196.31,
+    "locked_balance": 0,
+    "created_at": "2026-08-20T10:00:00Z",
+    "updated_at": "2026-08-20T12:00:00Z"
+  },
+  "91982000069": {
+    "id": "w-user-070",
+    "user_id": "user-070",
+    "available_balance": 11196.31,
+    "locked_balance": 0,
+    "created_at": "2026-08-20T10:00:00Z",
+    "updated_at": "2026-08-20T12:00:00Z"
+  },
+  "+91 98200 0069": {
+    "id": "w-user-070",
+    "user_id": "user-070",
+    "available_balance": 11196.31,
+    "locked_balance": 0,
+    "created_at": "2026-08-20T10:00:00Z",
+    "updated_at": "2026-08-20T12:00:00Z"
+  },
+  "user-071": {
+    "id": "w-user-071",
+    "user_id": "user-071",
+    "available_balance": 37210.11,
+    "locked_balance": 0,
+    "created_at": "2026-08-21T10:00:00Z",
+    "updated_at": "2026-08-21T12:00:00Z"
+  },
+  "SR-10071": {
+    "id": "w-user-071",
+    "user_id": "user-071",
+    "available_balance": 37210.11,
+    "locked_balance": 0,
+    "created_at": "2026-08-21T10:00:00Z",
+    "updated_at": "2026-08-21T12:00:00Z"
+  },
+  "91982000070": {
+    "id": "w-user-071",
+    "user_id": "user-071",
+    "available_balance": 37210.11,
+    "locked_balance": 0,
+    "created_at": "2026-08-21T10:00:00Z",
+    "updated_at": "2026-08-21T12:00:00Z"
+  },
+  "+91 98200 0070": {
+    "id": "w-user-071",
+    "user_id": "user-071",
+    "available_balance": 37210.11,
+    "locked_balance": 0,
+    "created_at": "2026-08-21T10:00:00Z",
+    "updated_at": "2026-08-21T12:00:00Z"
+  },
+  "user-072": {
+    "id": "w-user-072",
+    "user_id": "user-072",
+    "available_balance": 11215.92,
+    "locked_balance": 0,
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T12:00:00Z"
+  },
+  "SR-10072": {
+    "id": "w-user-072",
+    "user_id": "user-072",
+    "available_balance": 11215.92,
+    "locked_balance": 0,
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T12:00:00Z"
+  },
+  "91982000071": {
+    "id": "w-user-072",
+    "user_id": "user-072",
+    "available_balance": 11215.92,
+    "locked_balance": 0,
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T12:00:00Z"
+  },
+  "+91 98200 0071": {
+    "id": "w-user-072",
+    "user_id": "user-072",
+    "available_balance": 11215.92,
+    "locked_balance": 0,
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T12:00:00Z"
+  },
+  "user-073": {
+    "id": "w-user-073",
+    "user_id": "user-073",
+    "available_balance": 31181.05,
+    "locked_balance": 0,
+    "created_at": "2026-08-23T10:00:00Z",
+    "updated_at": "2026-08-23T12:00:00Z"
+  },
+  "SR-10073": {
+    "id": "w-user-073",
+    "user_id": "user-073",
+    "available_balance": 31181.05,
+    "locked_balance": 0,
+    "created_at": "2026-08-23T10:00:00Z",
+    "updated_at": "2026-08-23T12:00:00Z"
+  },
+  "91982000072": {
+    "id": "w-user-073",
+    "user_id": "user-073",
+    "available_balance": 31181.05,
+    "locked_balance": 0,
+    "created_at": "2026-08-23T10:00:00Z",
+    "updated_at": "2026-08-23T12:00:00Z"
+  },
+  "+91 98200 0072": {
+    "id": "w-user-073",
+    "user_id": "user-073",
+    "available_balance": 31181.05,
+    "locked_balance": 0,
+    "created_at": "2026-08-23T10:00:00Z",
+    "updated_at": "2026-08-23T12:00:00Z"
+  },
+  "user-074": {
+    "id": "w-user-074",
+    "user_id": "user-074",
+    "available_balance": 2988.17,
+    "locked_balance": 0,
+    "created_at": "2026-08-24T10:00:00Z",
+    "updated_at": "2026-08-24T12:00:00Z"
+  },
+  "SR-10074": {
+    "id": "w-user-074",
+    "user_id": "user-074",
+    "available_balance": 2988.17,
+    "locked_balance": 0,
+    "created_at": "2026-08-24T10:00:00Z",
+    "updated_at": "2026-08-24T12:00:00Z"
+  },
+  "91982000073": {
+    "id": "w-user-074",
+    "user_id": "user-074",
+    "available_balance": 2988.17,
+    "locked_balance": 0,
+    "created_at": "2026-08-24T10:00:00Z",
+    "updated_at": "2026-08-24T12:00:00Z"
+  },
+  "+91 98200 0073": {
+    "id": "w-user-074",
+    "user_id": "user-074",
+    "available_balance": 2988.17,
+    "locked_balance": 0,
+    "created_at": "2026-08-24T10:00:00Z",
+    "updated_at": "2026-08-24T12:00:00Z"
+  },
+  "user-075": {
+    "id": "w-user-075",
+    "user_id": "user-075",
+    "available_balance": 7425.65,
+    "locked_balance": 0,
+    "created_at": "2026-08-25T10:00:00Z",
+    "updated_at": "2026-08-25T12:00:00Z"
+  },
+  "SR-10075": {
+    "id": "w-user-075",
+    "user_id": "user-075",
+    "available_balance": 7425.65,
+    "locked_balance": 0,
+    "created_at": "2026-08-25T10:00:00Z",
+    "updated_at": "2026-08-25T12:00:00Z"
+  },
+  "91982000074": {
+    "id": "w-user-075",
+    "user_id": "user-075",
+    "available_balance": 7425.65,
+    "locked_balance": 0,
+    "created_at": "2026-08-25T10:00:00Z",
+    "updated_at": "2026-08-25T12:00:00Z"
+  },
+  "+91 98200 0074": {
+    "id": "w-user-075",
+    "user_id": "user-075",
+    "available_balance": 7425.65,
+    "locked_balance": 0,
+    "created_at": "2026-08-25T10:00:00Z",
+    "updated_at": "2026-08-25T12:00:00Z"
+  },
+  "user-076": {
+    "id": "w-user-076",
+    "user_id": "user-076",
+    "available_balance": 34719.22,
+    "locked_balance": 0,
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z"
+  },
+  "SR-10076": {
+    "id": "w-user-076",
+    "user_id": "user-076",
+    "available_balance": 34719.22,
+    "locked_balance": 0,
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z"
+  },
+  "91982000075": {
+    "id": "w-user-076",
+    "user_id": "user-076",
+    "available_balance": 34719.22,
+    "locked_balance": 0,
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z"
+  },
+  "+91 98200 0075": {
+    "id": "w-user-076",
+    "user_id": "user-076",
+    "available_balance": 34719.22,
+    "locked_balance": 0,
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z"
+  },
+  "user-077": {
+    "id": "w-user-077",
+    "user_id": "user-077",
+    "available_balance": 9546.88,
+    "locked_balance": 0,
+    "created_at": "2026-08-02T10:00:00Z",
+    "updated_at": "2026-08-02T12:00:00Z"
+  },
+  "SR-10077": {
+    "id": "w-user-077",
+    "user_id": "user-077",
+    "available_balance": 9546.88,
+    "locked_balance": 0,
+    "created_at": "2026-08-02T10:00:00Z",
+    "updated_at": "2026-08-02T12:00:00Z"
+  },
+  "91982000076": {
+    "id": "w-user-077",
+    "user_id": "user-077",
+    "available_balance": 9546.88,
+    "locked_balance": 0,
+    "created_at": "2026-08-02T10:00:00Z",
+    "updated_at": "2026-08-02T12:00:00Z"
+  },
+  "+91 98200 0076": {
+    "id": "w-user-077",
+    "user_id": "user-077",
+    "available_balance": 9546.88,
+    "locked_balance": 0,
+    "created_at": "2026-08-02T10:00:00Z",
+    "updated_at": "2026-08-02T12:00:00Z"
+  },
+  "user-078": {
+    "id": "w-user-078",
+    "user_id": "user-078",
+    "available_balance": 12144.53,
+    "locked_balance": 0,
+    "created_at": "2026-08-03T10:00:00Z",
+    "updated_at": "2026-08-03T12:00:00Z"
+  },
+  "SR-10078": {
+    "id": "w-user-078",
+    "user_id": "user-078",
+    "available_balance": 12144.53,
+    "locked_balance": 0,
+    "created_at": "2026-08-03T10:00:00Z",
+    "updated_at": "2026-08-03T12:00:00Z"
+  },
+  "91982000077": {
+    "id": "w-user-078",
+    "user_id": "user-078",
+    "available_balance": 12144.53,
+    "locked_balance": 0,
+    "created_at": "2026-08-03T10:00:00Z",
+    "updated_at": "2026-08-03T12:00:00Z"
+  },
+  "+91 98200 0077": {
+    "id": "w-user-078",
+    "user_id": "user-078",
+    "available_balance": 12144.53,
+    "locked_balance": 0,
+    "created_at": "2026-08-03T10:00:00Z",
+    "updated_at": "2026-08-03T12:00:00Z"
+  },
+  "user-079": {
+    "id": "w-user-079",
+    "user_id": "user-079",
+    "available_balance": 15886.24,
+    "locked_balance": 0,
+    "created_at": "2026-08-04T10:00:00Z",
+    "updated_at": "2026-08-04T12:00:00Z"
+  },
+  "SR-10079": {
+    "id": "w-user-079",
+    "user_id": "user-079",
+    "available_balance": 15886.24,
+    "locked_balance": 0,
+    "created_at": "2026-08-04T10:00:00Z",
+    "updated_at": "2026-08-04T12:00:00Z"
+  },
+  "91982000078": {
+    "id": "w-user-079",
+    "user_id": "user-079",
+    "available_balance": 15886.24,
+    "locked_balance": 0,
+    "created_at": "2026-08-04T10:00:00Z",
+    "updated_at": "2026-08-04T12:00:00Z"
+  },
+  "+91 98200 0078": {
+    "id": "w-user-079",
+    "user_id": "user-079",
+    "available_balance": 15886.24,
+    "locked_balance": 0,
+    "created_at": "2026-08-04T10:00:00Z",
+    "updated_at": "2026-08-04T12:00:00Z"
+  },
+  "user-080": {
+    "id": "w-user-080",
+    "user_id": "user-080",
+    "available_balance": 8667.71,
+    "locked_balance": 0,
+    "created_at": "2026-08-05T10:00:00Z",
+    "updated_at": "2026-08-05T12:00:00Z"
+  },
+  "SR-10080": {
+    "id": "w-user-080",
+    "user_id": "user-080",
+    "available_balance": 8667.71,
+    "locked_balance": 0,
+    "created_at": "2026-08-05T10:00:00Z",
+    "updated_at": "2026-08-05T12:00:00Z"
+  },
+  "91982000079": {
+    "id": "w-user-080",
+    "user_id": "user-080",
+    "available_balance": 8667.71,
+    "locked_balance": 0,
+    "created_at": "2026-08-05T10:00:00Z",
+    "updated_at": "2026-08-05T12:00:00Z"
+  },
+  "+91 98200 0079": {
+    "id": "w-user-080",
+    "user_id": "user-080",
+    "available_balance": 8667.71,
+    "locked_balance": 0,
+    "created_at": "2026-08-05T10:00:00Z",
+    "updated_at": "2026-08-05T12:00:00Z"
+  },
+  "user-081": {
+    "id": "w-user-081",
+    "user_id": "user-081",
+    "available_balance": 1110.08,
+    "locked_balance": 0,
+    "created_at": "2026-08-06T10:00:00Z",
+    "updated_at": "2026-08-06T12:00:00Z"
+  },
+  "SR-10081": {
+    "id": "w-user-081",
+    "user_id": "user-081",
+    "available_balance": 1110.08,
+    "locked_balance": 0,
+    "created_at": "2026-08-06T10:00:00Z",
+    "updated_at": "2026-08-06T12:00:00Z"
+  },
+  "91982000080": {
+    "id": "w-user-081",
+    "user_id": "user-081",
+    "available_balance": 1110.08,
+    "locked_balance": 0,
+    "created_at": "2026-08-06T10:00:00Z",
+    "updated_at": "2026-08-06T12:00:00Z"
+  },
+  "+91 98200 0080": {
+    "id": "w-user-081",
+    "user_id": "user-081",
+    "available_balance": 1110.08,
+    "locked_balance": 0,
+    "created_at": "2026-08-06T10:00:00Z",
+    "updated_at": "2026-08-06T12:00:00Z"
+  },
+  "user-082": {
+    "id": "w-user-082",
+    "user_id": "user-082",
+    "available_balance": 17695.26,
+    "locked_balance": 0,
+    "created_at": "2026-08-07T10:00:00Z",
+    "updated_at": "2026-08-07T12:00:00Z"
+  },
+  "SR-10082": {
+    "id": "w-user-082",
+    "user_id": "user-082",
+    "available_balance": 17695.26,
+    "locked_balance": 0,
+    "created_at": "2026-08-07T10:00:00Z",
+    "updated_at": "2026-08-07T12:00:00Z"
+  },
+  "91982000081": {
+    "id": "w-user-082",
+    "user_id": "user-082",
+    "available_balance": 17695.26,
+    "locked_balance": 0,
+    "created_at": "2026-08-07T10:00:00Z",
+    "updated_at": "2026-08-07T12:00:00Z"
+  },
+  "+91 98200 0081": {
+    "id": "w-user-082",
+    "user_id": "user-082",
+    "available_balance": 17695.26,
+    "locked_balance": 0,
+    "created_at": "2026-08-07T10:00:00Z",
+    "updated_at": "2026-08-07T12:00:00Z"
+  },
+  "user-083": {
+    "id": "w-user-083",
+    "user_id": "user-083",
+    "available_balance": 9023.52,
+    "locked_balance": 0,
+    "created_at": "2026-08-08T10:00:00Z",
+    "updated_at": "2026-08-08T12:00:00Z"
+  },
+  "SR-10083": {
+    "id": "w-user-083",
+    "user_id": "user-083",
+    "available_balance": 9023.52,
+    "locked_balance": 0,
+    "created_at": "2026-08-08T10:00:00Z",
+    "updated_at": "2026-08-08T12:00:00Z"
+  },
+  "91982000082": {
+    "id": "w-user-083",
+    "user_id": "user-083",
+    "available_balance": 9023.52,
+    "locked_balance": 0,
+    "created_at": "2026-08-08T10:00:00Z",
+    "updated_at": "2026-08-08T12:00:00Z"
+  },
+  "+91 98200 0082": {
+    "id": "w-user-083",
+    "user_id": "user-083",
+    "available_balance": 9023.52,
+    "locked_balance": 0,
+    "created_at": "2026-08-08T10:00:00Z",
+    "updated_at": "2026-08-08T12:00:00Z"
+  },
+  "user-084": {
+    "id": "w-user-084",
+    "user_id": "user-084",
+    "available_balance": 26471.83,
+    "locked_balance": 0,
+    "created_at": "2026-08-09T10:00:00Z",
+    "updated_at": "2026-08-09T12:00:00Z"
+  },
+  "SR-10084": {
+    "id": "w-user-084",
+    "user_id": "user-084",
+    "available_balance": 26471.83,
+    "locked_balance": 0,
+    "created_at": "2026-08-09T10:00:00Z",
+    "updated_at": "2026-08-09T12:00:00Z"
+  },
+  "91982000083": {
+    "id": "w-user-084",
+    "user_id": "user-084",
+    "available_balance": 26471.83,
+    "locked_balance": 0,
+    "created_at": "2026-08-09T10:00:00Z",
+    "updated_at": "2026-08-09T12:00:00Z"
+  },
+  "+91 98200 0083": {
+    "id": "w-user-084",
+    "user_id": "user-084",
+    "available_balance": 26471.83,
+    "locked_balance": 0,
+    "created_at": "2026-08-09T10:00:00Z",
+    "updated_at": "2026-08-09T12:00:00Z"
+  },
+  "user-085": {
+    "id": "w-user-085",
+    "user_id": "user-085",
+    "available_balance": 44303.4,
+    "locked_balance": 0,
+    "created_at": "2026-08-10T10:00:00Z",
+    "updated_at": "2026-08-10T12:00:00Z"
+  },
+  "SR-10085": {
+    "id": "w-user-085",
+    "user_id": "user-085",
+    "available_balance": 44303.4,
+    "locked_balance": 0,
+    "created_at": "2026-08-10T10:00:00Z",
+    "updated_at": "2026-08-10T12:00:00Z"
+  },
+  "91982000084": {
+    "id": "w-user-085",
+    "user_id": "user-085",
+    "available_balance": 44303.4,
+    "locked_balance": 0,
+    "created_at": "2026-08-10T10:00:00Z",
+    "updated_at": "2026-08-10T12:00:00Z"
+  },
+  "+91 98200 0084": {
+    "id": "w-user-085",
+    "user_id": "user-085",
+    "available_balance": 44303.4,
+    "locked_balance": 0,
+    "created_at": "2026-08-10T10:00:00Z",
+    "updated_at": "2026-08-10T12:00:00Z"
+  },
+  "user-086": {
+    "id": "w-user-086",
+    "user_id": "user-086",
+    "available_balance": 17905.97,
+    "locked_balance": 0,
+    "created_at": "2026-08-11T10:00:00Z",
+    "updated_at": "2026-08-11T12:00:00Z"
+  },
+  "SR-10086": {
+    "id": "w-user-086",
+    "user_id": "user-086",
+    "available_balance": 17905.97,
+    "locked_balance": 0,
+    "created_at": "2026-08-11T10:00:00Z",
+    "updated_at": "2026-08-11T12:00:00Z"
+  },
+  "91982000085": {
+    "id": "w-user-086",
+    "user_id": "user-086",
+    "available_balance": 17905.97,
+    "locked_balance": 0,
+    "created_at": "2026-08-11T10:00:00Z",
+    "updated_at": "2026-08-11T12:00:00Z"
+  },
+  "+91 98200 0085": {
+    "id": "w-user-086",
+    "user_id": "user-086",
+    "available_balance": 17905.97,
+    "locked_balance": 0,
+    "created_at": "2026-08-11T10:00:00Z",
+    "updated_at": "2026-08-11T12:00:00Z"
+  },
+  "user-087": {
+    "id": "w-user-087",
+    "user_id": "user-087",
+    "available_balance": 35016.01,
+    "locked_balance": 0,
+    "created_at": "2026-08-12T10:00:00Z",
+    "updated_at": "2026-08-12T12:00:00Z"
+  },
+  "SR-10087": {
+    "id": "w-user-087",
+    "user_id": "user-087",
+    "available_balance": 35016.01,
+    "locked_balance": 0,
+    "created_at": "2026-08-12T10:00:00Z",
+    "updated_at": "2026-08-12T12:00:00Z"
+  },
+  "91982000086": {
+    "id": "w-user-087",
+    "user_id": "user-087",
+    "available_balance": 35016.01,
+    "locked_balance": 0,
+    "created_at": "2026-08-12T10:00:00Z",
+    "updated_at": "2026-08-12T12:00:00Z"
+  },
+  "+91 98200 0086": {
+    "id": "w-user-087",
+    "user_id": "user-087",
+    "available_balance": 35016.01,
+    "locked_balance": 0,
+    "created_at": "2026-08-12T10:00:00Z",
+    "updated_at": "2026-08-12T12:00:00Z"
+  },
+  "user-088": {
+    "id": "w-user-088",
+    "user_id": "user-088",
+    "available_balance": 23569.12,
+    "locked_balance": 0,
+    "created_at": "2026-08-13T10:00:00Z",
+    "updated_at": "2026-08-13T12:00:00Z"
+  },
+  "91982000087": {
+    "id": "w-user-088",
+    "user_id": "user-088",
+    "available_balance": 23569.12,
+    "locked_balance": 0,
+    "created_at": "2026-08-13T10:00:00Z",
+    "updated_at": "2026-08-13T12:00:00Z"
+  },
+  "+91 98200 0087": {
+    "id": "w-user-088",
+    "user_id": "user-088",
+    "available_balance": 23569.12,
+    "locked_balance": 0,
+    "created_at": "2026-08-13T10:00:00Z",
+    "updated_at": "2026-08-13T12:00:00Z"
+  },
+  "user-089": {
+    "id": "w-user-089",
+    "user_id": "user-089",
+    "available_balance": 2549.25,
+    "locked_balance": 0,
+    "created_at": "2026-08-14T10:00:00Z",
+    "updated_at": "2026-08-14T12:00:00Z"
+  },
+  "SR-10089": {
+    "id": "w-user-089",
+    "user_id": "user-089",
+    "available_balance": 2549.25,
+    "locked_balance": 0,
+    "created_at": "2026-08-14T10:00:00Z",
+    "updated_at": "2026-08-14T12:00:00Z"
+  },
+  "91982000088": {
+    "id": "w-user-089",
+    "user_id": "user-089",
+    "available_balance": 2549.25,
+    "locked_balance": 0,
+    "created_at": "2026-08-14T10:00:00Z",
+    "updated_at": "2026-08-14T12:00:00Z"
+  },
+  "+91 98200 0088": {
+    "id": "w-user-089",
+    "user_id": "user-089",
+    "available_balance": 2549.25,
+    "locked_balance": 0,
+    "created_at": "2026-08-14T10:00:00Z",
+    "updated_at": "2026-08-14T12:00:00Z"
+  },
+  "user-090": {
+    "id": "w-user-090",
+    "user_id": "user-090",
+    "available_balance": 30196.24,
+    "locked_balance": 0,
+    "created_at": "2026-08-15T10:00:00Z",
+    "updated_at": "2026-08-15T12:00:00Z"
+  },
+  "SR-10090": {
+    "id": "w-user-090",
+    "user_id": "user-090",
+    "available_balance": 30196.24,
+    "locked_balance": 0,
+    "created_at": "2026-08-15T10:00:00Z",
+    "updated_at": "2026-08-15T12:00:00Z"
+  },
+  "91982000089": {
+    "id": "w-user-090",
+    "user_id": "user-090",
+    "available_balance": 30196.24,
+    "locked_balance": 0,
+    "created_at": "2026-08-15T10:00:00Z",
+    "updated_at": "2026-08-15T12:00:00Z"
+  },
+  "+91 98200 0089": {
+    "id": "w-user-090",
+    "user_id": "user-090",
+    "available_balance": 30196.24,
+    "locked_balance": 0,
+    "created_at": "2026-08-15T10:00:00Z",
+    "updated_at": "2026-08-15T12:00:00Z"
+  },
+  "user-091": {
+    "id": "w-user-091",
+    "user_id": "user-091",
+    "available_balance": 3362.55,
+    "locked_balance": 0,
+    "created_at": "2026-08-16T10:00:00Z",
+    "updated_at": "2026-08-16T12:00:00Z"
+  },
+  "SR-10091": {
+    "id": "w-user-091",
+    "user_id": "user-091",
+    "available_balance": 3362.55,
+    "locked_balance": 0,
+    "created_at": "2026-08-16T10:00:00Z",
+    "updated_at": "2026-08-16T12:00:00Z"
+  },
+  "91982000090": {
+    "id": "w-user-091",
+    "user_id": "user-091",
+    "available_balance": 3362.55,
+    "locked_balance": 0,
+    "created_at": "2026-08-16T10:00:00Z",
+    "updated_at": "2026-08-16T12:00:00Z"
+  },
+  "+91 98200 0090": {
+    "id": "w-user-091",
+    "user_id": "user-091",
+    "available_balance": 3362.55,
+    "locked_balance": 0,
+    "created_at": "2026-08-16T10:00:00Z",
+    "updated_at": "2026-08-16T12:00:00Z"
+  },
+  "user-092": {
+    "id": "w-user-092",
+    "user_id": "user-092",
+    "available_balance": 7344.27,
+    "locked_balance": 0,
+    "created_at": "2026-08-17T10:00:00Z",
+    "updated_at": "2026-08-17T12:00:00Z"
+  },
+  "SR-10092": {
+    "id": "w-user-092",
+    "user_id": "user-092",
+    "available_balance": 7344.27,
+    "locked_balance": 0,
+    "created_at": "2026-08-17T10:00:00Z",
+    "updated_at": "2026-08-17T12:00:00Z"
+  },
+  "91982000091": {
+    "id": "w-user-092",
+    "user_id": "user-092",
+    "available_balance": 7344.27,
+    "locked_balance": 0,
+    "created_at": "2026-08-17T10:00:00Z",
+    "updated_at": "2026-08-17T12:00:00Z"
+  },
+  "+91 98200 0091": {
+    "id": "w-user-092",
+    "user_id": "user-092",
+    "available_balance": 7344.27,
+    "locked_balance": 0,
+    "created_at": "2026-08-17T10:00:00Z",
+    "updated_at": "2026-08-17T12:00:00Z"
+  },
+  "user-093": {
+    "id": "w-user-093",
+    "user_id": "user-093",
+    "available_balance": 10273.27,
+    "locked_balance": 0,
+    "created_at": "2026-08-18T10:00:00Z",
+    "updated_at": "2026-08-18T12:00:00Z"
+  },
+  "SR-10093": {
+    "id": "w-user-093",
+    "user_id": "user-093",
+    "available_balance": 10273.27,
+    "locked_balance": 0,
+    "created_at": "2026-08-18T10:00:00Z",
+    "updated_at": "2026-08-18T12:00:00Z"
+  },
+  "91982000092": {
+    "id": "w-user-093",
+    "user_id": "user-093",
+    "available_balance": 10273.27,
+    "locked_balance": 0,
+    "created_at": "2026-08-18T10:00:00Z",
+    "updated_at": "2026-08-18T12:00:00Z"
+  },
+  "+91 98200 0092": {
+    "id": "w-user-093",
+    "user_id": "user-093",
+    "available_balance": 10273.27,
+    "locked_balance": 0,
+    "created_at": "2026-08-18T10:00:00Z",
+    "updated_at": "2026-08-18T12:00:00Z"
+  },
+  "user-094": {
+    "id": "w-user-094",
+    "user_id": "user-094",
+    "available_balance": 11025.02,
+    "locked_balance": 0,
+    "created_at": "2026-08-19T10:00:00Z",
+    "updated_at": "2026-08-19T12:00:00Z"
+  },
+  "SR-10094": {
+    "id": "w-user-094",
+    "user_id": "user-094",
+    "available_balance": 11025.02,
+    "locked_balance": 0,
+    "created_at": "2026-08-19T10:00:00Z",
+    "updated_at": "2026-08-19T12:00:00Z"
+  },
+  "91982000093": {
+    "id": "w-user-094",
+    "user_id": "user-094",
+    "available_balance": 11025.02,
+    "locked_balance": 0,
+    "created_at": "2026-08-19T10:00:00Z",
+    "updated_at": "2026-08-19T12:00:00Z"
+  },
+  "+91 98200 0093": {
+    "id": "w-user-094",
+    "user_id": "user-094",
+    "available_balance": 11025.02,
+    "locked_balance": 0,
+    "created_at": "2026-08-19T10:00:00Z",
+    "updated_at": "2026-08-19T12:00:00Z"
+  },
+  "user-095": {
+    "id": "w-user-095",
+    "user_id": "user-095",
+    "available_balance": 39369.49,
+    "locked_balance": 0,
+    "created_at": "2026-08-20T10:00:00Z",
+    "updated_at": "2026-08-20T12:00:00Z"
+  },
+  "SR-10095": {
+    "id": "w-user-095",
+    "user_id": "user-095",
+    "available_balance": 39369.49,
+    "locked_balance": 0,
+    "created_at": "2026-08-20T10:00:00Z",
+    "updated_at": "2026-08-20T12:00:00Z"
+  },
+  "91982000094": {
+    "id": "w-user-095",
+    "user_id": "user-095",
+    "available_balance": 39369.49,
+    "locked_balance": 0,
+    "created_at": "2026-08-20T10:00:00Z",
+    "updated_at": "2026-08-20T12:00:00Z"
+  },
+  "+91 98200 0094": {
+    "id": "w-user-095",
+    "user_id": "user-095",
+    "available_balance": 39369.49,
+    "locked_balance": 0,
+    "created_at": "2026-08-20T10:00:00Z",
+    "updated_at": "2026-08-20T12:00:00Z"
+  },
+  "user-096": {
+    "id": "w-user-096",
+    "user_id": "user-096",
+    "available_balance": 13844.56,
+    "locked_balance": 0,
+    "created_at": "2026-08-21T10:00:00Z",
+    "updated_at": "2026-08-21T12:00:00Z"
+  },
+  "SR-10096": {
+    "id": "w-user-096",
+    "user_id": "user-096",
+    "available_balance": 13844.56,
+    "locked_balance": 0,
+    "created_at": "2026-08-21T10:00:00Z",
+    "updated_at": "2026-08-21T12:00:00Z"
+  },
+  "91982000095": {
+    "id": "w-user-096",
+    "user_id": "user-096",
+    "available_balance": 13844.56,
+    "locked_balance": 0,
+    "created_at": "2026-08-21T10:00:00Z",
+    "updated_at": "2026-08-21T12:00:00Z"
+  },
+  "+91 98200 0095": {
+    "id": "w-user-096",
+    "user_id": "user-096",
+    "available_balance": 13844.56,
+    "locked_balance": 0,
+    "created_at": "2026-08-21T10:00:00Z",
+    "updated_at": "2026-08-21T12:00:00Z"
+  },
+  "user-097": {
+    "id": "w-user-097",
+    "user_id": "user-097",
+    "available_balance": 22316.98,
+    "locked_balance": 0,
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T12:00:00Z"
+  },
+  "SR-10097": {
+    "id": "w-user-097",
+    "user_id": "user-097",
+    "available_balance": 22316.98,
+    "locked_balance": 0,
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T12:00:00Z"
+  },
+  "91982000096": {
+    "id": "w-user-097",
+    "user_id": "user-097",
+    "available_balance": 22316.98,
+    "locked_balance": 0,
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T12:00:00Z"
+  },
+  "+91 98200 0096": {
+    "id": "w-user-097",
+    "user_id": "user-097",
+    "available_balance": 22316.98,
+    "locked_balance": 0,
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T12:00:00Z"
+  },
+  "user-098": {
+    "id": "w-user-098",
+    "user_id": "user-098",
+    "available_balance": 18091.99,
+    "locked_balance": 0,
+    "created_at": "2026-08-23T10:00:00Z",
+    "updated_at": "2026-08-23T12:00:00Z"
+  },
+  "SR-10098": {
+    "id": "w-user-098",
+    "user_id": "user-098",
+    "available_balance": 18091.99,
+    "locked_balance": 0,
+    "created_at": "2026-08-23T10:00:00Z",
+    "updated_at": "2026-08-23T12:00:00Z"
+  },
+  "91982000097": {
+    "id": "w-user-098",
+    "user_id": "user-098",
+    "available_balance": 18091.99,
+    "locked_balance": 0,
+    "created_at": "2026-08-23T10:00:00Z",
+    "updated_at": "2026-08-23T12:00:00Z"
+  },
+  "+91 98200 0097": {
+    "id": "w-user-098",
+    "user_id": "user-098",
+    "available_balance": 18091.99,
+    "locked_balance": 0,
+    "created_at": "2026-08-23T10:00:00Z",
+    "updated_at": "2026-08-23T12:00:00Z"
+  },
+  "user-099": {
+    "id": "w-user-099",
+    "user_id": "user-099",
+    "available_balance": 9752.17,
+    "locked_balance": 0,
+    "created_at": "2026-08-24T10:00:00Z",
+    "updated_at": "2026-08-24T12:00:00Z"
+  },
+  "SR-10099": {
+    "id": "w-user-099",
+    "user_id": "user-099",
+    "available_balance": 9752.17,
+    "locked_balance": 0,
+    "created_at": "2026-08-24T10:00:00Z",
+    "updated_at": "2026-08-24T12:00:00Z"
+  },
+  "91982000098": {
+    "id": "w-user-099",
+    "user_id": "user-099",
+    "available_balance": 9752.17,
+    "locked_balance": 0,
+    "created_at": "2026-08-24T10:00:00Z",
+    "updated_at": "2026-08-24T12:00:00Z"
+  },
+  "+91 98200 0098": {
+    "id": "w-user-099",
+    "user_id": "user-099",
+    "available_balance": 9752.17,
+    "locked_balance": 0,
+    "created_at": "2026-08-24T10:00:00Z",
+    "updated_at": "2026-08-24T12:00:00Z"
+  },
+  "user-100": {
+    "id": "w-user-100",
+    "user_id": "user-100",
+    "available_balance": 30226.51,
+    "locked_balance": 0,
+    "created_at": "2026-08-25T10:00:00Z",
+    "updated_at": "2026-08-25T12:00:00Z"
+  },
+  "SR-10100": {
+    "id": "w-user-100",
+    "user_id": "user-100",
+    "available_balance": 30226.51,
+    "locked_balance": 0,
+    "created_at": "2026-08-25T10:00:00Z",
+    "updated_at": "2026-08-25T12:00:00Z"
+  },
+  "91982000099": {
+    "id": "w-user-100",
+    "user_id": "user-100",
+    "available_balance": 30226.51,
+    "locked_balance": 0,
+    "created_at": "2026-08-25T10:00:00Z",
+    "updated_at": "2026-08-25T12:00:00Z"
+  },
+  "+91 98200 0099": {
+    "id": "w-user-100",
+    "user_id": "user-100",
+    "available_balance": 30226.51,
+    "locked_balance": 0,
+    "created_at": "2026-08-25T10:00:00Z",
+    "updated_at": "2026-08-25T12:00:00Z"
+  },
+  "user-101": {
+    "id": "w-user-101",
+    "user_id": "user-101",
+    "available_balance": 1486.29,
+    "locked_balance": 0,
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z"
+  },
+  "SR-10101": {
+    "id": "w-user-101",
+    "user_id": "user-101",
+    "available_balance": 1486.29,
+    "locked_balance": 0,
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z"
+  },
+  "91982000100": {
+    "id": "w-user-101",
+    "user_id": "user-101",
+    "available_balance": 1486.29,
+    "locked_balance": 0,
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z"
+  },
+  "+91 98200 0100": {
+    "id": "w-user-101",
+    "user_id": "user-101",
+    "available_balance": 1486.29,
+    "locked_balance": 0,
+    "created_at": "2026-08-01T10:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z"
+  },
+  "user-102": {
+    "id": "w-user-102",
+    "user_id": "user-102",
+    "available_balance": 30167.99,
+    "locked_balance": 0,
+    "created_at": "2026-08-02T10:00:00Z",
+    "updated_at": "2026-08-02T12:00:00Z"
+  },
+  "SR-10102": {
+    "id": "w-user-102",
+    "user_id": "user-102",
+    "available_balance": 30167.99,
+    "locked_balance": 0,
+    "created_at": "2026-08-02T10:00:00Z",
+    "updated_at": "2026-08-02T12:00:00Z"
+  },
+  "91982000101": {
+    "id": "w-user-102",
+    "user_id": "user-102",
+    "available_balance": 30167.99,
+    "locked_balance": 0,
+    "created_at": "2026-08-02T10:00:00Z",
+    "updated_at": "2026-08-02T12:00:00Z"
+  },
+  "+91 98200 0101": {
+    "id": "w-user-102",
+    "user_id": "user-102",
+    "available_balance": 30167.99,
+    "locked_balance": 0,
+    "created_at": "2026-08-02T10:00:00Z",
+    "updated_at": "2026-08-02T12:00:00Z"
+  },
+  "user-103": {
+    "id": "w-user-103",
+    "user_id": "user-103",
+    "available_balance": 37182.56,
+    "locked_balance": 0,
+    "created_at": "2026-08-03T10:00:00Z",
+    "updated_at": "2026-08-03T12:00:00Z"
+  },
+  "SR-10103": {
+    "id": "w-user-103",
+    "user_id": "user-103",
+    "available_balance": 37182.56,
+    "locked_balance": 0,
+    "created_at": "2026-08-03T10:00:00Z",
+    "updated_at": "2026-08-03T12:00:00Z"
+  },
+  "91982000102": {
+    "id": "w-user-103",
+    "user_id": "user-103",
+    "available_balance": 37182.56,
+    "locked_balance": 0,
+    "created_at": "2026-08-03T10:00:00Z",
+    "updated_at": "2026-08-03T12:00:00Z"
+  },
+  "+91 98200 0102": {
+    "id": "w-user-103",
+    "user_id": "user-103",
+    "available_balance": 37182.56,
+    "locked_balance": 0,
+    "created_at": "2026-08-03T10:00:00Z",
+    "updated_at": "2026-08-03T12:00:00Z"
+  },
+  "user-104": {
+    "id": "w-user-104",
+    "user_id": "user-104",
+    "available_balance": 39090.2,
+    "locked_balance": 0,
+    "created_at": "2026-08-04T10:00:00Z",
+    "updated_at": "2026-08-04T12:00:00Z"
+  },
+  "SR-10104": {
+    "id": "w-user-104",
+    "user_id": "user-104",
+    "available_balance": 39090.2,
+    "locked_balance": 0,
+    "created_at": "2026-08-04T10:00:00Z",
+    "updated_at": "2026-08-04T12:00:00Z"
+  },
+  "91982000103": {
+    "id": "w-user-104",
+    "user_id": "user-104",
+    "available_balance": 39090.2,
+    "locked_balance": 0,
+    "created_at": "2026-08-04T10:00:00Z",
+    "updated_at": "2026-08-04T12:00:00Z"
+  },
+  "+91 98200 0103": {
+    "id": "w-user-104",
+    "user_id": "user-104",
+    "available_balance": 39090.2,
+    "locked_balance": 0,
+    "created_at": "2026-08-04T10:00:00Z",
+    "updated_at": "2026-08-04T12:00:00Z"
+  },
+  "user-105": {
+    "id": "w-user-105",
+    "user_id": "user-105",
+    "available_balance": 27680.77,
+    "locked_balance": 0,
+    "created_at": "2026-08-05T10:00:00Z",
+    "updated_at": "2026-08-05T12:00:00Z"
+  },
+  "SR-10105": {
+    "id": "w-user-105",
+    "user_id": "user-105",
+    "available_balance": 27680.77,
+    "locked_balance": 0,
+    "created_at": "2026-08-05T10:00:00Z",
+    "updated_at": "2026-08-05T12:00:00Z"
+  },
+  "91982000104": {
+    "id": "w-user-105",
+    "user_id": "user-105",
+    "available_balance": 27680.77,
+    "locked_balance": 0,
+    "created_at": "2026-08-05T10:00:00Z",
+    "updated_at": "2026-08-05T12:00:00Z"
+  },
+  "+91 98200 0104": {
+    "id": "w-user-105",
+    "user_id": "user-105",
+    "available_balance": 27680.77,
+    "locked_balance": 0,
+    "created_at": "2026-08-05T10:00:00Z",
+    "updated_at": "2026-08-05T12:00:00Z"
   }
 };
 
@@ -3624,7 +8377,7 @@ export const INITIAL_API_KEYS: ApiKeyRecord[] = [
     "id": "KEY-AUTO-admin-001-1786729067692",
     "user_id": "admin-001",
     "key_name": "SR Gateway System Admin Gateway Key",
-    "api_key_prefix": "sr_live_sradmin01_r4j4",
+    "api_key_prefix": "sr_live_sradmin01_r4j4x9d2k7m3v5b8w1q",
     "secret_key_masked": "sr_sec_sra••••••••••••••••ic3a",
     "permissions": [
       "balance.read",
@@ -3639,7 +8392,7 @@ export const INITIAL_API_KEYS: ApiKeyRecord[] = [
     "id": "KEY-AUTO-user-964253-1786728733333",
     "user_id": "user-964253",
     "key_name": "WonerXsrwallet Gateway Key",
-    "api_key_prefix": "sr_live_sr50963_42iw",
+    "api_key_prefix": "sr_live_sr50963_42iwde23rdg44t4y5gu5ygawhor629sr",
     "secret_key_masked": "sr_sec_sr5••••••••••••••••27bs",
     "permissions": [
       "balance.read",
@@ -3654,7 +8407,7 @@ export const INITIAL_API_KEYS: ApiKeyRecord[] = [
     "id": "KEY-1786631398738",
     "user_id": "user-001",
     "key_name": "Telegram Bot Gateway Key",
-    "api_key_prefix": "sr_live_cypk",
+    "api_key_prefix": "sr_live_sr10029_cypk9t2b7m4v8w1q5x",
     "secret_key_masked": "sr_sec_••••••••••••••••8tw5",
     "permissions": [
       "balance.read",

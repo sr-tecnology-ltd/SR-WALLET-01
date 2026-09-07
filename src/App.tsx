@@ -40,28 +40,42 @@ function WalletAppContent() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [activeTab]);
 
-  // Check for secret owner or admin portal access via URL query or hash
+  // Check for secret owner or sub-admin portal access via URL query or hidden hash
   useEffect(() => {
     const checkAdminQuery = () => {
-      const params = new URLSearchParams(window.location.search);
+      let rawHash = '';
+      try {
+        rawHash = decodeURIComponent(window.location.hash || '').trim().toLowerCase();
+      } catch {
+        rawHash = (window.location.hash || '').trim().toLowerCase();
+      }
+      const rawSearch = window.location.search || '';
+      const params = new URLSearchParams(rawSearch);
+      const pathname = window.location.pathname.toLowerCase();
+
+      // Secret Master Owner Portal: `#ownersahil hai.com`, `#ownersahilhai.com`, `#ownersahil-hai.com`
       const isSecretOwnerRoute =
-        params.get('owner') === 'portal' ||
-        params.get('owner') === 'true' ||
-        params.get('route') === 'owner' ||
-        window.location.hash === '#owner' ||
-        window.location.hash === '#owner-portal';
+        rawHash === '#ownersahil hai.com' ||
+        rawHash === '#ownersahilhai.com' ||
+        rawHash === '#ownersahil-hai.com' ||
+        rawHash === '#ownersahil%20hai.com' ||
+        pathname === '/ownersahilhai.com' ||
+        params.get('portal') === 'ownersahil';
 
+      // Secret Sub-Admin Portal: `#sradminxyzbcsqr`
       const isSecretAdminRoute =
-        params.get('admin') === 'portal' ||
-        params.get('admin') === 'true' ||
-        params.get('route') === 'admin' ||
-        window.location.hash === '#admin' ||
-        window.location.hash === '#admin-portal';
+        rawHash === '#sradminxyzbcsqr' ||
+        pathname === '/sradminxyzbcsqr' ||
+        params.get('portal') === 'sradminxyzbcsqr';
 
-      if (isSecretOwnerRoute && activeRole !== 'OWNER') {
-        switchUser('owner-001');
-      } else if (isSecretAdminRoute && activeRole !== 'ADMIN' && activeRole !== 'OWNER') {
-        switchUser('admin-001');
+      if (isSecretOwnerRoute) {
+        if (activeRole !== 'OWNER') {
+          switchUser('owner-001');
+        }
+      } else if (isSecretAdminRoute) {
+        if (activeRole !== 'ADMIN') {
+          switchUser('admin-001');
+        }
       }
     };
 

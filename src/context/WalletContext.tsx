@@ -1006,7 +1006,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Call server endpoint directly to ensure database persistence
     let serverWallet: Wallet | null = null;
-    const adminPass = sessionStorage.getItem('sr_admin_pass') || '7477661867Ss';
+    const adminPass = sessionStorage.getItem('sr_admin_pass') || '6294041668@Ss';
     const adminName = sessionStorage.getItem('sr_admin_name') || currentUser?.full_name || 'Administrator';
     const adminId = sessionStorage.getItem('sr_admin_id') || currentUser?.id || 'admin-001';
 
@@ -1122,7 +1122,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!deposit) return { success: false, message: 'Deposit request not found.' };
     if (deposit.status !== 'PENDING') return { success: false, message: 'This request has already been processed.' };
 
-    const adminPass = sessionStorage.getItem('sr_admin_pass') || '7477661867Ss';
+    const adminPass = sessionStorage.getItem('sr_admin_pass') || '6294041668@Ss';
     const adminName = sessionStorage.getItem('sr_admin_name') || currentUser?.full_name || 'Administrator';
     const adminId = sessionStorage.getItem('sr_admin_id') || currentUser?.id || 'admin-001';
 
@@ -1365,7 +1365,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const userWallet = wallets[resolvedId] || wallets[resolvedCustomId] || { available_balance: 0, locked_balance: 0 };
 
     let serverWallet: Wallet | null = null;
-    const adminPass = sessionStorage.getItem('sr_admin_pass') || '7477661867Ss';
+    const adminPass = sessionStorage.getItem('sr_admin_pass') || '6294041668@Ss';
     const adminName = sessionStorage.getItem('sr_admin_name') || currentUser?.full_name || 'Administrator';
     const adminId = sessionStorage.getItem('sr_admin_id') || currentUser?.id || 'admin-001';
 
@@ -1474,7 +1474,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const userWallet = wallets[resolvedId] || wallets[resolvedCustomId] || { available_balance: 0, locked_balance: 0 };
 
     let serverWallet: Wallet | null = null;
-    const adminPass = sessionStorage.getItem('sr_admin_pass') || '7477661867Ss';
+    const adminPass = sessionStorage.getItem('sr_admin_pass') || '6294041668@Ss';
     const adminName = sessionStorage.getItem('sr_admin_name') || currentUser?.full_name || 'Administrator';
     const adminId = sessionStorage.getItem('sr_admin_id') || currentUser?.id || 'admin-001';
 
@@ -1572,14 +1572,38 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     const queryClean = recipientQuery.trim().toLowerCase();
-    const recipient = profiles.find(
-      (p) =>
-        p.id !== currentUser.id &&
-        (p.user_custom_id.toLowerCase() === queryClean ||
-          p.mobile.toLowerCase().includes(queryClean) ||
-          p.email.toLowerCase() === queryClean ||
-          (p.telegram_id && p.telegram_id.toLowerCase() === queryClean))
-    );
+    const cleanDigits = queryClean.replace(/[^0-9]/g, '');
+    const clean10 = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : '';
+
+    const recipient = profiles.find((p) => {
+      // Prevent self-transfer
+      if (p.id === currentUser.id || (p.user_custom_id && p.user_custom_id.toLowerCase() === currentUser.user_custom_id.toLowerCase())) {
+        return false;
+      }
+      // Exact User Custom ID match (e.g. SR-10029)
+      if (p.user_custom_id && p.user_custom_id.toLowerCase() === queryClean) return true;
+      if (p.id && p.id.toLowerCase() === queryClean) return true;
+      if (p.user_custom_id && `w-${p.user_custom_id.toLowerCase()}` === queryClean) return true;
+      
+      // Strict 10-digit mobile number match (NEVER substring includes)
+      if (clean10 && clean10.length === 10 && p.mobile) {
+        const pDigits = p.mobile.replace(/[^0-9]/g, '');
+        const p10 = pDigits.length >= 10 ? pDigits.slice(-10) : '';
+        if (p10 && p10 === clean10) return true;
+      }
+
+      // Exact email match
+      if (p.email && p.email.toLowerCase() === queryClean) return true;
+
+      // Exact telegram username match
+      if (p.telegram_id) {
+        const cleanTg = p.telegram_id.replace(/^@/, '').toLowerCase();
+        const inputTg = queryClean.replace(/^@/, '').toLowerCase();
+        if (cleanTg && cleanTg === inputTg) return true;
+      }
+
+      return false;
+    });
 
     if (!recipient) {
       return { success: false, message: 'Recipient user not found. Search by Registered Mobile Number (Wallet A/C) or Email.' };
@@ -2254,9 +2278,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const userPrefix = (currentUser.user_custom_id || currentUser.full_name || 'usr')
       .toLowerCase()
       .replace(/[^a-z0-9]/g, '')
-      .slice(0, 10);
-    const randSuffix = Math.random().toString(36).slice(2, 6);
-    const prefix = `sr_live_${userPrefix}_${randSuffix}`;
+      .slice(0, 8);
+    // Generate high-entropy 20-character random token suffix (ensures total length is 35-37 chars: strictly 30 to 40 characters)
+    const charset = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let entropy = '';
+    for (let i = 0; i < 20; i++) {
+      entropy += charset.charAt(Math.floor(Math.random() * charset.length));
+    }
+    const prefix = `sr_live_${userPrefix}_${entropy}`;
     const secret = `sr_sec_${userPrefix}_${Math.random().toString(36).slice(2, 12)}${Math.random().toString(36).slice(2, 12)}`;
     const masked = `${secret.slice(0, 12)}••••••••••••••••${secret.slice(-4)}`;
 
@@ -2272,9 +2301,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     setApiKeys((prev) => [newKey, ...prev]);
-    addAuditLog('API_KEY_CREATED', `Created developer API Key: ${keyName} for ${currentUser.full_name} (${currentUser.user_custom_id})`);
+    addAuditLog('API_KEY_CREATED', `Created developer API Key (36 chars): ${keyName} for ${currentUser.full_name} (${currentUser.user_custom_id})`);
 
-    return { success: true, apiKey: prefix, secretKey: secret };
+    return { success: true, apiKey: newKey, secretKey: secret, token: prefix };
   };
 
   const revokeApiKey = (keyId: string) => {
@@ -2398,14 +2427,18 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       updated_at: new Date().toISOString(),
     };
 
-    const userPrefix = userCustomId.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const randSuffix = Math.random().toString(36).slice(2, 6);
+    const userPrefix = userCustomId.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8);
+    const charset = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let randSuffix = '';
+    for (let i = 0; i < 20; i++) {
+      randSuffix += charset.charAt(Math.floor(Math.random() * charset.length));
+    }
     const newApiKeyRecord: ApiKeyRecord = {
       id: `KEY-${Date.now()}`,
       user_id: newUserId,
       key_name: `${fullName.trim()} Bot & Merchant Key`,
       api_key_prefix: `sr_live_${userPrefix}_${randSuffix}`,
-      secret_key_masked: `sr_sec_${userPrefix}_••••••••••••${randSuffix}`,
+      secret_key_masked: `sr_sec_${userPrefix}_••••••••••••••••${randSuffix.slice(-4)}`,
       permissions: ['balance.read', 'transfer.write', 'deposit.request', 'withdraw.request'],
       is_active: true,
       created_at: new Date().toISOString(),
@@ -3063,6 +3096,18 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         wallets,
       }),
     }).catch(() => null);
+
+    if (cleanedChatId || cleanedTgId) {
+      fetch('/api/v1/user/update-chat-id', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: currentUser.user_custom_id || currentUser.id,
+          chat_id: cleanedChatId,
+          telegram_id: cleanedTgId,
+        }),
+      }).catch(() => null);
+    }
 
     return { success: true, message: 'Profile updated and saved successfully!' };
   };

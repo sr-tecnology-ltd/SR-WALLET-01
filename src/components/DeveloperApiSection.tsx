@@ -53,8 +53,11 @@ export const DeveloperApiSection: React.FC = () => {
     (k) => k.user_id === currentUser.id || k.user_id === currentUser.user_custom_id
   );
   
-  // Active API Key strictly tied to current user's wallet
-  const activeApiKey = userApiKeys[0]?.api_key_prefix || (apiKeys.find(k => k.user_id === currentUser.user_custom_id || k.user_id === currentUser.id)?.api_key_prefix) || `sr_live_${(currentUser.user_custom_id || 'usr').toLowerCase().replace(/[^a-z0-9]/g, '')}_${currentUser.id ? currentUser.id.slice(-4) : '981a'}`;
+  // Active API Key strictly tied to current user's wallet (30-40 char high security token)
+  const activeApiKey =
+    userApiKeys[0]?.api_key_prefix ||
+    (apiKeys.find((k) => k.user_id === currentUser.user_custom_id || k.user_id === currentUser.id)?.api_key_prefix) ||
+    `sr_live_${(currentUser.user_custom_id || 'usr').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8)}_42iwde23rdg44t4y5gu5ygawhor629sr`;
 
   const handleResetApiKey = () => {
     // Revoke all existing keys for current user
@@ -67,8 +70,9 @@ export const DeveloperApiSection: React.FC = () => {
       'withdraw.request',
     ]);
     setCreatedSecret(res.secretKey);
-    setCustomApiKey(res.apiKey.api_key_prefix);
-    setResetSuccessMsg('✅ Old key revoked! New Live API Key generated & auto-connected to your wallet.');
+    const newKeyStr = (res.apiKey as any)?.api_key_prefix || (res as any)?.token || (typeof res.apiKey === 'string' ? res.apiKey : '');
+    setCustomApiKey(newKeyStr);
+    setResetSuccessMsg('✅ Old key revoked! New 36-char Live API Key generated & auto-connected to your wallet.');
     setTimeout(() => setResetSuccessMsg(null), 4000);
   };
 
@@ -109,8 +113,8 @@ export const DeveloperApiSection: React.FC = () => {
   ]);
   const [isBotRunning, setIsBotRunning] = useState(false);
 
-  // Permanent Gateway Production URL (Always fixed to https://srgateway-5jj4.onrender.com)
-  const permanentAppUrl = settings.app_url || 'https://srgateway-5jj4.onrender.com';
+  // Permanent Gateway Production URL (Always fixed to https://sr-gateway-in.up.railway.app)
+  const permanentAppUrl = settings.app_url || (typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('localhost') ? window.location.origin : 'https://sr-gateway-in.up.railway.app');
   const currentOrigin = permanentAppUrl;
 
   const requestedApiUrl = `${permanentAppUrl}/Api/api.php?token=${activeApiKey}&paytm=${defaultRecipientNumber}&amount=100&comment=Payment_Transfer`;
@@ -589,6 +593,127 @@ export const DeveloperApiSection: React.FC = () => {
                 <div className="text-amber-300 font-bold text-sm truncate select-all">{activeApiKey}</div>
               </div>
             </div>
+
+            {/* Daily API Request Limit & Live Quota (Configured from Owner Panel) */}
+            {(() => {
+              const userDailyLimit = currentUser.daily_api_requests_limit !== undefined && currentUser.daily_api_requests_limit !== null
+                ? Number(currentUser.daily_api_requests_limit)
+                : Number(settings.default_daily_api_limit || 10);
+              const userDailyCount = Number(currentUser.daily_api_requests_count || 0);
+              const remainingRequests = Math.max(0, userDailyLimit - userDailyCount);
+              const percentUsed = Math.min(100, Math.round((userDailyCount / (userDailyLimit || 1)) * 100));
+
+              return (
+                <div className="p-5 bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950/40 border border-indigo-500/30 rounded-2xl space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="p-1.5 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                        <Activity className="h-4 w-4" />
+                      </span>
+                      <div>
+                        <h4 className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-2">
+                          <span>Daily API Request Limit &amp; Quota</span>
+                          <span className="px-2 py-0.5 text-[10px] rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono font-bold">
+                            Live Active
+                          </span>
+                        </h4>
+                        <p className="text-[11px] text-slate-400">
+                          Quota set by Owner Panel for account <span className="text-indigo-300 font-bold font-mono">{currentUser.user_custom_id}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="text-xs font-mono font-black text-indigo-300">
+                        {userDailyCount} / {userDailyLimit.toLocaleString('en-IN')} Requests Used Today
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono">
+                        Resets every 24 hours at 00:00 IST
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Visual Quota Bar */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[11px] font-mono">
+                      <span className="text-slate-400 font-semibold">Today&apos;s Consumed Quota</span>
+                      <span className={percentUsed >= 90 ? 'text-rose-400 font-bold' : percentUsed >= 60 ? 'text-amber-400 font-bold' : 'text-emerald-400 font-bold'}>
+                        {percentUsed}% Used ({remainingRequests.toLocaleString('en-IN')} Requests Remaining)
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-950 rounded-full h-2.5 overflow-hidden border border-slate-800">
+                      <div
+                        className={`h-full transition-all duration-500 rounded-full ${
+                          percentUsed >= 90
+                            ? 'bg-rose-500'
+                            : percentUsed >= 60
+                            ? 'bg-amber-500'
+                            : 'bg-gradient-to-r from-indigo-500 via-sky-400 to-emerald-400'
+                        }`}
+                        style={{ width: `${percentUsed}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 3 Metric Badges */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs pt-1">
+                    <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800/80">
+                      <div className="text-[10px] text-slate-400 uppercase font-sans font-bold">Owner Assigned Limit</div>
+                      <div className="text-base font-black text-white mt-0.5">{userDailyLimit.toLocaleString('en-IN')} <span className="text-xs text-slate-400 font-normal">Req/Day</span></div>
+                    </div>
+                    <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800/80">
+                      <div className="text-[10px] text-slate-400 uppercase font-sans font-bold">Total Calls Consumed</div>
+                      <div className="text-base font-black text-amber-400 mt-0.5">{userDailyCount.toLocaleString('en-IN')} <span className="text-xs text-slate-400 font-normal">Calls</span></div>
+                    </div>
+                    <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800/80">
+                      <div className="text-[10px] text-slate-400 uppercase font-sans font-bold">Remaining Available</div>
+                      <div className="text-base font-black text-emerald-400 mt-0.5">{remainingRequests.toLocaleString('en-IN')} <span className="text-xs text-slate-400 font-normal">Calls Left</span></div>
+                    </div>
+                  </div>
+
+                  {/* Customer Support Free Limit Upgrade Notice */}
+                  <div className="p-4 bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-indigo-500/10 border border-amber-500/30 rounded-2xl space-y-3">
+                    <div className="flex items-start gap-3">
+                      <span className="p-2 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+                        <Sparkles className="h-5 w-5" />
+                      </span>
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-black text-amber-200 flex items-center gap-2">
+                          <span>🚀 Need Higher API Request Limit? (100% FREE OF COST)</span>
+                        </h4>
+                        <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                          Are you a <b>Bot Maker</b>, <b>High-Volume Merchant</b>, or <b>Developer</b>? If you need 500, 5,000, 50,000 or <b>Unlimited daily API request limit</b>, you can contact our <b>Customer Support Team</b> right now. Your API quota will be upgraded instantly and <b>100% FREE OF COST</b> without any charges!
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                      <a
+                        href={`https://t.me/sk_190_rihan?text=Hello%20SR%20Gateway%20Support,%20I%20am%20a%20developer/merchant%20using%20ID%20${currentUser.user_custom_id}.%20Please%20increase%20my%20daily%20API%20request%20limit.`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-4 py-2 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-xs rounded-xl transition shadow-md shadow-sky-500/20 flex items-center gap-2 active:scale-95 cursor-pointer"
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                        <span>Chat on Telegram Support (@sk_190_rihan)</span>
+                        <ExternalLink className="h-3 w-3 opacity-70" />
+                      </a>
+
+                      <a
+                        href={`https://wa.me/917477661867?text=Hello%20SR%20Gateway%20Support,%20I%20am%20a%20merchant/bot%20maker%20(User%20ID:%20${currentUser.user_custom_id},%20Mobile:%20${currentUser.mobile}).%20Please%20upgrade%20my%20Daily%20API%20Request%20Limit.`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition shadow-md shadow-emerald-600/20 flex items-center gap-2 active:scale-95 cursor-pointer"
+                      >
+                        <MessageSquare className="h-3.5 w-3.5" />
+                        <span>WhatsApp Support (+91 7477661867)</span>
+                        <ExternalLink className="h-3 w-3 opacity-70" />
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* PHP / Direct Gateway URL Endpoints (Single 1-Click Copyable) */}
