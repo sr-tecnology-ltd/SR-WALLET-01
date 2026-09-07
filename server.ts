@@ -533,13 +533,13 @@ function loadDatabase() {
 
       if (Array.isArray(data.subAdminCredentials) && data.subAdminCredentials.length > 0) {
         subAdminCredentials = data.subAdminCredentials.filter(
-          (c) => c && c.password && typeof c.password === 'string'
+          (c) => c && c.password === 'Sksahilbhaixxxcom'
         );
       }
 
       // Ensure default sub-admin password Sksahilbhaixxxcom is always available
       if (!subAdminCredentials.some((c) => c.password === 'Sksahilbhaixxxcom')) {
-        subAdminCredentials.unshift({
+        subAdminCredentials = [{
           id: 'sub-cred-000',
           name: 'Sub-Admin Staff',
           password: 'Sksahilbhaixxxcom',
@@ -547,7 +547,7 @@ function loadDatabase() {
           status: 'ACTIVE',
           created_at: new Date().toISOString(),
           created_by: 'Master Owner',
-        });
+        }];
       }
 
       if (Array.isArray(data.auditLogs) && data.auditLogs.length > 0) {

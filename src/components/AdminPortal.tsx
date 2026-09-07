@@ -355,12 +355,15 @@ export const AdminPortal: React.FC = () => {
   const [isPassAuthed, setIsPassAuthed] = useState<boolean>(() => {
     if (isMasterOwner) {
       const ownerPass = sessionStorage.getItem('sr_owner_pass');
-      return sessionStorage.getItem('sr_owner_authed') === 'true' && ownerPass === MASTER_ADMIN_PASS;
+      return (
+        sessionStorage.getItem('sr_owner_authed') === 'true' &&
+        (ownerPass === MASTER_ADMIN_PASS || ownerPass?.toLowerCase() === MASTER_ADMIN_PASS.toLowerCase())
+      );
     } else {
       const subAdminPass = sessionStorage.getItem('sr_subadmin_pass');
       return (
         sessionStorage.getItem('sr_subadmin_authed') === 'true' &&
-        !!subAdminPass
+        (subAdminPass === DEFAULT_SUB_ADMIN_PASS || subAdminPass?.toLowerCase() === DEFAULT_SUB_ADMIN_PASS.toLowerCase())
       );
     }
   });
@@ -368,12 +371,15 @@ export const AdminPortal: React.FC = () => {
   useEffect(() => {
     if (isMasterOwner) {
       const ownerPass = sessionStorage.getItem('sr_owner_pass');
-      setIsPassAuthed(sessionStorage.getItem('sr_owner_authed') === 'true' && ownerPass === MASTER_ADMIN_PASS);
+      setIsPassAuthed(
+        sessionStorage.getItem('sr_owner_authed') === 'true' &&
+        (ownerPass === MASTER_ADMIN_PASS || ownerPass?.toLowerCase() === MASTER_ADMIN_PASS.toLowerCase())
+      );
     } else {
       const subAdminPass = sessionStorage.getItem('sr_subadmin_pass');
       setIsPassAuthed(
         sessionStorage.getItem('sr_subadmin_authed') === 'true' &&
-        !!subAdminPass
+        (subAdminPass === DEFAULT_SUB_ADMIN_PASS || subAdminPass?.toLowerCase() === DEFAULT_SUB_ADMIN_PASS.toLowerCase())
       );
     }
     setAdminPassInput('');

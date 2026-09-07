@@ -53,25 +53,44 @@ function WalletAppContent() {
       const params = new URLSearchParams(rawSearch);
       const pathname = window.location.pathname.toLowerCase();
 
+      // Explicitly blocked/removed common guesses: #admin, #woner, #owner, #subadmin
+      if (
+        rawHash === '#admin' ||
+        rawHash === '#woner' ||
+        rawHash === '#owner' ||
+        rawHash === '#subadmin' ||
+        rawHash === '#ownersahil' ||
+        params.get('portal') === 'admin' ||
+        params.get('portal') === 'owner' ||
+        params.get('portal') === 'woner' ||
+        params.get('portal') === 'subadmin' ||
+        params.get('portal') === 'ownersahil'
+      ) {
+        // Clear the URL hash/query without opening any portal
+        try {
+          window.history.replaceState(null, '', window.location.pathname);
+        } catch {
+          window.location.hash = '';
+        }
+        if (activeRole === 'OWNER' || activeRole === 'ADMIN') {
+          switchUser('user-001');
+        }
+        return;
+      }
+
       // Secret Master Owner Portal: `#ownersahil hai.com`, `#ownersahilhai.com`, `#ownersahil-hai.com`
       const isSecretOwnerRoute =
         rawHash === '#ownersahil hai.com' ||
         rawHash === '#ownersahilhai.com' ||
         rawHash === '#ownersahil-hai.com' ||
         rawHash === '#ownersahil%20hai.com' ||
-        rawHash === '#ownersahil' ||
-        rawHash === '#owner' ||
-        pathname === '/ownersahilhai.com' ||
-        params.get('portal') === 'ownersahil' ||
-        params.get('portal') === 'owner';
+        pathname === '/ownersahilhai.com';
 
       // Secret Sub-Admin Portal: `#sradminxyzbcsqr`
       const isSecretAdminRoute =
         rawHash === '#sradminxyzbcsqr' ||
-        rawHash === '#subadmin' ||
         pathname === '/sradminxyzbcsqr' ||
-        params.get('portal') === 'sradminxyzbcsqr' ||
-        params.get('portal') === 'subadmin';
+        params.get('portal') === 'sradminxyzbcsqr';
 
       if (isSecretOwnerRoute) {
         if (activeRole !== 'OWNER') {
