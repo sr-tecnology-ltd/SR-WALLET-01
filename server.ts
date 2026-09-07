@@ -259,7 +259,7 @@ let appSettings: Record<string, any> = {
   whatsapp_support_url: 'https://wa.me/917477661867',
   app_url: process.env.APP_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'https://sr-gateway-in.up.railway.app'),
   otp_telegram_bot_username: process.env.TELEGRAM_BOT_USERNAME || '@SRGatewayBot',
-  otp_telegram_bot_token: process.env.TELEGRAM_BOT_TOKEN || '8853576053:AAHQ_USjZRB4zH7J4_p3ceSASQpXC1LN-2c',
+  otp_telegram_bot_token: process.env.TELEGRAM_BOT_TOKEN || '8853576053:AAF9BgVNtGL_d0Jw8U321n8-YULJ_s-QoqA',
   admin_upi_id: 'sk190rihan@mvhdfc',
   admin_qr_url: 'https://cdn.phototourl.com/free/2026-08-27-63157f0f-6206-4166-a6c1-150d1d4bb343.png',
   admin_bank_name: 'AIRTEL PAYMENT BANK',
@@ -967,7 +967,7 @@ function isRealTelegramToken(tok?: string | null): boolean {
   return true;
 }
 
-const DEFAULT_FALLBACK_TELEGRAM_BOT_TOKEN = '8853576053:AAHQ_USjZRB4zH7J4_p3ceSASQpXC1LN-2c';
+const DEFAULT_FALLBACK_TELEGRAM_BOT_TOKEN = '8853576053:AAF9BgVNtGL_d0Jw8U321n8-YULJ_s-QoqA';
 
 // Helper: Resolve active Telegram bot token prioritizing non-empty, non-example credentials
 function getTelegramBotToken(customToken?: string | null): string {
@@ -981,7 +981,8 @@ function getTelegramBotToken(customToken?: string | null): string {
 async function sendTelegramNotification(
   targetChat: string | number,
   messageHtml: string,
-  customToken?: string
+  customToken?: string,
+  replyMarkup?: any
 ): Promise<{ ok: boolean; status?: string; message_id?: number; description?: string; error?: string }> {
   if (!targetChat) {
     return { ok: false, error: 'MISSING_CHAT_ID', description: 'Target Telegram chat_id or username is empty.' };
@@ -1017,14 +1018,19 @@ async function sendTelegramNotification(
   }
 
   try {
+    const reqBody: any = {
+      chat_id: isNumericChat ? (Number(formattedChat) || formattedChat) : formattedChat,
+      text: messageHtml,
+      parse_mode: 'HTML',
+    };
+    if (replyMarkup) {
+      reqBody.reply_markup = replyMarkup;
+    }
+
     const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: isNumericChat ? (Number(formattedChat) || formattedChat) : formattedChat,
-        text: messageHtml,
-        parse_mode: 'HTML',
-      }),
+      body: JSON.stringify(reqBody),
     });
 
     const data: any = await response.json();
@@ -4076,12 +4082,29 @@ app.delete('/api/v1/keys/revoke/:keyId', (req: Request, res: Response) => {
 });
 
 // 11. Admin & System State Endpoints
+function getSanitizedSettingsForRole(role?: string) {
+  const isOwner = role === 'OWNER';
+  if (isOwner) {
+    return appSettings;
+  }
+  // Sub-Admin (ADMIN) or public users: Hide sensitive secrets (SMTP passwords, emails, bot token)
+  const sanitized = { ...appSettings };
+  sanitized.otp_telegram_bot_token = '';
+  sanitized.smtp_pass = '';
+  sanitized.smtp_user = '';
+  sanitized.smtp_host = '';
+  sanitized.smtp_from_email = '';
+  return sanitized;
+}
+
 app.get('/api/v1/settings', (req: Request, res: Response) => {
-  res.json({ status: 'success', code: 200, settings: appSettings });
+  const role = (req.headers['x-user-role'] as string) || (req.query?.role as string);
+  res.json({ status: 'success', code: 200, settings: getSanitizedSettingsForRole(role) });
 });
 
 app.get('/api/v1/admin/settings', (req: Request, res: Response) => {
-  res.json({ status: 'success', code: 200, settings: appSettings });
+  const role = (req.headers['x-user-role'] as string) || (req.query?.role as string);
+  res.json({ status: 'success', code: 200, settings: getSanitizedSettingsForRole(role) });
 });
 
 const handleUpdateAdminSettings = (req: Request, res: Response) => {
@@ -4104,6 +4127,14 @@ const handleUpdateAdminSettings = (req: Request, res: Response) => {
     'otp_telegram_bot_token',
     'smtp_pass',
     'smtp_user',
+    'smtp_host',
+    'smtp_port',
+    'smtp_from_name',
+    'smtp_from_email',
+    'signup_bonus_enabled',
+    'signup_bonus_amount',
+    'welcome_bonus_min_txn',
+    'welcome_bonus_expiry_hours',
     'maintenance_mode_enabled'
   ];
 
@@ -4113,7 +4144,7 @@ const handleUpdateAdminSettings = (req: Request, res: Response) => {
         return res.status(403).json({
           status: 'error',
           code: 403,
-          message: 'Security Restriction: Sub-Admin (Staff) is not permitted to modify core Gateway UPI, Bank credentials, fees, or security secrets. Only Master Owner has permission.',
+          message: 'Security Restriction: Sub-Admin (Staff) is not permitted to modify core Gateway UPI, Bank credentials, Welcome Bonus, SMTP or Telegram secrets. Only Master Owner has permission.',
         });
       }
     }
@@ -4125,7 +4156,7 @@ const handleUpdateAdminSettings = (req: Request, res: Response) => {
     status: 'success',
     code: 200,
     message: 'Admin system settings updated successfully',
-    settings: appSettings,
+    settings: getSanitizedSettingsForRole(userRole),
   });
 };
 
@@ -6042,6 +6073,165 @@ function isUpdateAlreadyProcessed(key: string): boolean {
 
 async function processTelegramMessageUpdate(update: any) {
   try {
+    const activeToken = getTelegramBotToken();
+    const portalUrl = appSettings.app_url || process.env.APP_URL || 'https://ais-dev-vs72ytgafqlcchjzyem3au-15102117223.asia-east1.run.app';
+
+    // 1. Handle Callback Query (from inline keyboard button taps)
+    if (update?.callback_query) {
+      const cq = update.callback_query;
+      const cqId = cq.id;
+      const cqData = (cq.data || '').trim();
+      const cqChatId = cq.message?.chat?.id || cq.from?.id;
+      const cqFrom = cq.from || {};
+      const cqSenderName = [cqFrom.first_name, cqFrom.last_name].filter(Boolean).join(' ') || cqFrom.username || 'User';
+
+      // Immediate answer to stop button loading spinner on Telegram client
+      try {
+        await fetch(`https://api.telegram.org/bot${activeToken}/answerCallbackQuery`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ callback_query_id: cqId }),
+        });
+      } catch (e) {
+        // Ignore answer error
+      }
+
+      if (!cqChatId) return;
+
+      const { user, wallet, isLinked } = resolveTelegramUser(cqChatId, cqFrom.username, cqFrom.id);
+
+      const standardKeyboard = {
+        inline_keyboard: [
+          [
+            { text: '🌐 Open SR Gateway Web Portal', url: portalUrl },
+          ],
+          [
+            { text: '💰 Check Balance', callback_data: 'check_balance' },
+            { text: '📥 Deposit Money', callback_data: 'deposit_money' },
+          ],
+          [
+            { text: '💸 Transfer / Pay', callback_data: 'transfer_money' },
+            { text: '📜 Mini Statement', callback_data: 'mini_statement' },
+          ],
+          [
+            { text: '🔐 Get Login OTP', callback_data: 'generate_otp' },
+            { text: '💬 Support Chat', url: 'https://t.me/sk_190_rihan' },
+          ],
+        ],
+      };
+
+      if (cqData === 'check_balance') {
+        if (!isLinked || !user || !wallet) {
+          await sendTelegramNotification(
+            cqChatId,
+            `⚠️ <b>Telegram Account Not Linked</b>\n\n` +
+            `Your Telegram account is not linked to any SR Gateway wallet yet.\n\n` +
+            `🆔 <b>Your Chat ID:</b> <code>${cqChatId}</code>\n\n` +
+            `👉 <b>How to link:</b> Open SR Gateway Web Portal, navigate to <b>Telegram Bot OTP & Alerts</b>, and enter your Chat ID.`,
+            activeToken,
+            standardKeyboard
+          );
+          return;
+        }
+
+        const balMsg =
+          `💰 <b>SR GATEWAY Wallet Balance</b>\n\n` +
+          `👤 <b>Account Holder:</b> ${user.full_name}\n` +
+          `🆔 <b>User ID:</b> <code>${user.user_custom_id}</code>\n` +
+          `📱 <b>Mobile:</b> ${user.mobile || 'Registered'}\n` +
+          `🟢 <b>Available Balance:</b> <b>₹${Number(wallet.available_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>\n` +
+          `🔒 <b>Locked Balance:</b> ₹${Number(wallet.locked_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
+          `💵 <b>Total Balance:</b> ₹${(Number(wallet.available_balance) + Number(wallet.locked_balance)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n\n` +
+          `🕒 <i>Live Server Time: ${new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</i>`;
+
+        await sendTelegramNotification(cqChatId, balMsg, activeToken, standardKeyboard);
+        return;
+      }
+
+      if (cqData === 'deposit_money') {
+        const depositMsg =
+          `📥 <b>SR GATEWAY UPI Deposit</b>\n\n` +
+          `Pay directly using any UPI App (Google Pay, PhonePe, Paytm, BHIM):\n\n` +
+          `🔹 <b>UPI ID:</b> <code>${appSettings.admin_upi_id}</code>\n` +
+          `🔹 <b>Payee Name:</b> <b>SR GATEWAY INDIA</b>\n\n` +
+          `After paying, submit the 12-digit UTR/Ref No. on the web portal for instant balance crediting!`;
+
+        await sendTelegramNotification(cqChatId, depositMsg, activeToken, standardKeyboard);
+        return;
+      }
+
+      if (cqData === 'transfer_money') {
+        const transferMsg =
+          `💸 <b>User-to-User Money Transfer</b>\n\n` +
+          `Send money instantly to any registered user using command:\n\n` +
+          `<code>/pay &lt;recipient_mobile/user_id&gt; &lt;amount&gt; [note]</code>\n\n` +
+          `<b>Example:</b>\n` +
+          `<code>/pay 7477661867 500 Fast Transfer</code>\n\n` +
+          `Zero fees • Instant live settlement on SR Gateway.`;
+
+        await sendTelegramNotification(cqChatId, transferMsg, activeToken, standardKeyboard);
+        return;
+      }
+
+      if (cqData === 'mini_statement') {
+        if (!isLinked || !user) {
+          await sendTelegramNotification(
+            cqChatId,
+            `📜 <b>No Linked Account</b>\n\nPlease link your Telegram in the web portal to view transaction history.`,
+            activeToken,
+            standardKeyboard
+          );
+          return;
+        }
+
+        const userTxns = transactions
+          .filter((t) => t.user_id === user.user_custom_id || t.user_id === user.id)
+          .slice(0, 5);
+
+        if (userTxns.length === 0) {
+          await sendTelegramNotification(cqChatId, `📜 No recent transactions found for your wallet.`, activeToken, standardKeyboard);
+          return;
+        }
+
+        let historyText = `📜 <b>Recent Wallet Transactions (Last 5):</b>\n\n`;
+        userTxns.forEach((tx) => {
+          const isCredit = tx.type === 'DEPOSIT' || tx.type === 'TRANSFER_IN';
+          const icon = isCredit ? '🟢' : '🔴';
+          const sign = isCredit ? '+' : '-';
+          historyText += `${icon} <b>${sign}₹${tx.amount}</b> | ${tx.type}\n`;
+          historyText += `   🆔 <code>${tx.id}</code>\n`;
+          historyText += `   📝 ${tx.description}\n\n`;
+        });
+
+        await sendTelegramNotification(cqChatId, historyText, activeToken, standardKeyboard);
+        return;
+      }
+
+      if (cqData === 'generate_otp') {
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        telegramOtps[cqChatId.toString()] = {
+          otp,
+          expiresAt: Date.now() + 300000,
+        };
+
+        await sendTelegramNotification(
+          cqChatId,
+          `🔐 <b>SR GATEWAY Verification OTP:</b>\n\n` +
+          `Your verification code is: <b>${otp}</b>\n\n` +
+          `⏰ <b>Valid for 5 minutes only.</b>\n` +
+          `⚠️ Do not share this OTP with anyone.`,
+          activeToken,
+          standardKeyboard
+        );
+        return;
+      }
+
+      if (cqData === 'menu') {
+        // Fallback to start menu
+      }
+    }
+
+    // 2. Handle Text Message Update
     const updateId = update?.update_id;
     const message = update?.message || update?.edited_message || update?.channel_post;
     if (!message || !message.text) return;
@@ -6061,19 +6251,38 @@ async function processTelegramMessageUpdate(update: any) {
     const username = from.username ? `@${from.username}` : '';
     const text = message.text.trim();
     const lowerText = text.toLowerCase().trim();
-    const activeToken = getTelegramBotToken();
 
     console.log(`[TELEGRAM INCOMING] ChatID: ${chatId} | From: ${senderName} (${username || 'no-username'}) | Text: "${text}"`);
-
-    const replyTelegram = async (replyText: string) => {
-      await sendTelegramNotification(chatId.toString(), replyText, activeToken);
-    };
 
     // Auto-resolve user using all candidates: Chat ID, Telegram User ID, and Username
     const { user, wallet, isLinked } = resolveTelegramUser(chatId, from.username, from.id);
 
-    // Command: /start or /help or /id or /whoami or /chatid
-    if (lowerText.startsWith('/start') || lowerText.startsWith('/help') || lowerText.startsWith('/id') || lowerText.startsWith('/whoami') || lowerText.startsWith('/chatid')) {
+    const mainKeyboard = {
+      inline_keyboard: [
+        [
+          { text: '🌐 Open SR Gateway Web Portal', url: portalUrl },
+        ],
+        [
+          { text: '💰 Check Balance', callback_data: 'check_balance' },
+          { text: '📥 Deposit Money', callback_data: 'deposit_money' },
+        ],
+        [
+          { text: '💸 Transfer / Pay', callback_data: 'transfer_money' },
+          { text: '📜 Mini Statement', callback_data: 'mini_statement' },
+        ],
+        [
+          { text: '🔐 Get Login OTP', callback_data: 'generate_otp' },
+          { text: '💬 Support Chat', url: 'https://t.me/sk_190_rihan' },
+        ],
+      ],
+    };
+
+    const replyTelegram = async (replyText: string, customMarkup?: any) => {
+      await sendTelegramNotification(chatId.toString(), replyText, activeToken, customMarkup || mainKeyboard);
+    };
+
+    // Command: /start or /help or /id or /whoami or /chatid or /open
+    if (lowerText.startsWith('/start') || lowerText.startsWith('/help') || lowerText.startsWith('/id') || lowerText.startsWith('/whoami') || lowerText.startsWith('/chatid') || lowerText.startsWith('/open')) {
       const usernameText = from.username ? `@${from.username}` : (username || '@username');
 
       const welcomeMsg =
@@ -6093,9 +6302,10 @@ async function processTelegramMessageUpdate(update: any) {
         `<b>Available Bot Commands:</b>\n` +
         `• /balance - Check live wallet balance\n` +
         `• /pay &lt;number&gt; &lt;amount&gt; [note] - Instant User-to-User Transfer\n` +
-        `• /history - View recent wallet transactions\n\n` +
-        `🌐 <b>Official Web Portal:</b> ${appSettings.app_url || 'https://srgateway-5jj4.onrender.com'}\n` +
-        `⚡ Need help? Contact 24/7 support on our gateway portal.`;
+        `• /deposit - View UPI deposit address\n` +
+        `• /history - View recent transactions\n` +
+        `• /otp - Generate 6-digit login verification OTP\n\n` +
+        `👇 <b>Tap the buttons below to open portal or use quick actions:</b>`;
 
       await replyTelegram(welcomeMsg);
       return;
@@ -6108,7 +6318,7 @@ async function processTelegramMessageUpdate(update: any) {
           `⚠️ <b>Telegram Account Not Linked</b>\n\n` +
           `Your Telegram account is not linked to any SR Gateway wallet yet.\n\n` +
           `🆔 <b>Your Chat ID:</b> <code>${chatId}</code>\n\n` +
-          `👉 <b>How to link:</b> Open SR Gateway Web Portal (${appSettings.app_url || 'https://srgateway-5jj4.onrender.com'}), navigate to <b>Telegram Bot OTP & Alerts</b>, and enter your Chat ID.`
+          `👉 <b>How to link:</b> Open SR Gateway Web Portal, navigate to <b>Telegram Bot OTP & Alerts</b>, and enter your Chat ID.`
         );
         return;
       }
@@ -6118,7 +6328,7 @@ async function processTelegramMessageUpdate(update: any) {
         `👤 <b>Account Holder:</b> ${user.full_name}\n` +
         `🆔 <b>User ID:</b> <code>${user.user_custom_id}</code>\n` +
         `📱 <b>Mobile:</b> ${user.mobile || 'Registered'}\n` +
-        `🟢 <b>Available Balance:</b> ₹${Number(wallet.available_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
+        `🟢 <b>Available Balance:</b> <b>₹${Number(wallet.available_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>\n` +
         `🔒 <b>Locked Balance:</b> ₹${Number(wallet.locked_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
         `💵 <b>Total Balance:</b> ₹${(Number(wallet.available_balance) + Number(wallet.locked_balance)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n\n` +
         `🕒 <i>Server Time: ${new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</i>`;
@@ -6142,7 +6352,7 @@ async function processTelegramMessageUpdate(update: any) {
         await replyTelegram(
           `⚠️ <b>Invalid Command Format</b>\n\n` +
           `Usage:\n<code>/pay &lt;recipient_mobile/user_id&gt; &lt;amount&gt; [note]</code>\n\n` +
-          `Example:\n<code>/pay 9876543210 100 Dinner_Bill</code>`
+          `Example:\n<code>/pay 7477661867 100 Dinner_Bill</code>`
         );
         return;
       }
@@ -6236,8 +6446,9 @@ async function processTelegramMessageUpdate(update: any) {
 
     // Default response for unrecognized text message
     await replyTelegram(
-      `👋 Hello <b>${senderName}</b>! Your Telegram Chat ID is: <code>${chatId}</code>\n\n` +
-      `Send <code>/start</code> to view menu or <code>/balance</code> to check balance.`
+      `👋 Hello <b>${senderName}</b>!\n\n` +
+      `🆔 <b>Your Telegram Chat ID:</b> <code>${chatId}</code>\n\n` +
+      `Send <code>/start</code> to view menu or tap the buttons below:`
     );
   } catch (err) {
     console.error('Error in processTelegramMessageUpdate:', err);
@@ -6258,7 +6469,33 @@ async function startTelegramPollingWorker() {
 
   // Clear any existing webhook to enable direct getUpdates
   try {
-    await fetch(`https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=true`);
+    await fetch(`https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=false`);
+  } catch (e) {
+    // Ignore
+  }
+
+  // Register commands and menu button with Telegram
+  try {
+    const commands = [
+      { command: 'start', description: '🚀 Open SR Gateway Main Menu & Welcome' },
+      { command: 'balance', description: '💰 Check Real-Time Wallet Balance' },
+      { command: 'pay', description: '💸 Instant User-to-User Transfer' },
+      { command: 'deposit', description: '📥 Add Money / UPI Deposit Details' },
+      { command: 'history', description: '📜 View Recent Wallet Transactions' },
+      { command: 'otp', description: '🔐 Generate Login & Link Verification OTP' },
+      { command: 'help', description: 'ℹ️ Support & Bot Instructions' },
+    ];
+    await fetch(`https://api.telegram.org/bot${token}/setMyCommands`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ commands }),
+    }).catch(() => null);
+
+    await fetch(`https://api.telegram.org/bot${token}/setChatMenuButton`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ menu_button: { type: 'commands' } }),
+    }).catch(() => null);
   } catch (e) {
     // Ignore
   }
@@ -6287,10 +6524,13 @@ async function startTelegramPollingWorker() {
         }
       } else if (data && !data.ok) {
         if (data.error_code === 409) {
-          // Conflict: Another bot instance is polling or webhook is active. Back off to avoid log spam and CPU burn.
-          console.warn('[TELEGRAM POLLING NOTICE] Another bot instance is active. Retrying in 30s...');
+          // Conflict: Webhook is active or another instance called getUpdates. Auto-delete webhook and retry shortly.
+          console.warn('[TELEGRAM POLLING NOTICE] 409 Conflict. Clearing webhook and retrying in 5s...');
+          try {
+            await fetch(`https://api.telegram.org/bot${currentToken}/deleteWebhook?drop_pending_updates=false`);
+          } catch (e) {}
           if (isPollingActive) {
-            pollingIntervalTimeout = setTimeout(pollLoop, 30000);
+            pollingIntervalTimeout = setTimeout(pollLoop, 5000);
           }
           return;
         } else if (data.error_code === 401) {
@@ -6306,7 +6546,7 @@ async function startTelegramPollingWorker() {
     }
 
     if (isPollingActive) {
-      pollingIntervalTimeout = setTimeout(pollLoop, 2000);
+      pollingIntervalTimeout = setTimeout(pollLoop, 1500);
     }
   };
 
@@ -6527,10 +6767,8 @@ app.post('/api/v1/telegram-bot/simulate-command', async (req: Request, res: Resp
 });
 
 
-app.put('/api/v1/admin/settings', (req: Request, res: Response) => {
-  appSettings = { ...appSettings, ...req.body };
-  res.json({ status: 'success', code: 200, message: 'Global app settings updated', settings: appSettings });
-});
+// Forward to secure handleUpdateAdminSettings
+app.put('/api/v1/admin/settings', handleUpdateAdminSettings);
 
 // Admin Email Alert Testing Endpoint
 app.post('/api/v1/admin/test-email', async (req: Request, res: Response) => {
@@ -7372,32 +7610,17 @@ app.get('/api/v1/admin/bot-health', async (req: Request, res: Response) => {
 // ==========================================
 
 async function startServer() {
-  // Initialize Telegram Bot (prefer webhook for Railway/cloud production, fallback to long-polling)
+  // Initialize Telegram Bot with reliable polling worker (clears any dead external webhooks)
   const token = getTelegramBotToken();
   if (isRealTelegramToken(token)) {
     try {
-      const hookInfo: any = await fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`).then((r) => r.json()).catch(() => null);
-      if (hookInfo?.result?.url && hookInfo.result.url.length > 0) {
-        console.log(`[TELEGRAM] Webhook is active and receiving updates: ${hookInfo.result.url}`);
-      } else {
-        const defaultDomain = process.env.RAILWAY_PUBLIC_DOMAIN
-          ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
-          : (process.env.NODE_ENV === 'production' && !process.env.AIS_ENV ? 'https://sr-gateway-in.up.railway.app' : null);
-
-        if (defaultDomain) {
-          const whUrl = `${defaultDomain}/api/v1/telegram-webhook`;
-          console.log(`[TELEGRAM] Auto-configuring Webhook on: ${whUrl}`);
-          await fetch(`https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(whUrl)}&drop_pending_updates=true`).catch(() => null);
-        } else {
-          startTelegramPollingWorker();
-        }
-      }
+      // Clear any dead/stale webhook so Telegram getUpdates works smoothly
+      await fetch(`https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=false`).catch(() => null);
     } catch (e) {
-      startTelegramPollingWorker();
+      // Ignore
     }
-  } else {
-    startTelegramPollingWorker();
   }
+  startTelegramPollingWorker();
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

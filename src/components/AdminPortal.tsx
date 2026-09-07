@@ -3266,67 +3266,72 @@ export const AdminPortal: React.FC = () => {
               )}
             </div>
 
-            {/* Signup Welcome Bonus Configuration (Admin Controlled) */}
-            <div className="bg-slate-950 border border-purple-500/30 rounded-2xl p-5 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400">
-                    <Gift className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <h4 className="font-extrabold text-white text-xs flex items-center gap-2">
-                      <span>Dynamic Welcome Bonus Control</span>
-                      {settingsForm.signup_bonus_enabled && Number(settingsForm.signup_bonus_amount) > 0 ? (
-                        <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
-                          ACTIVE (₹{settingsForm.signup_bonus_amount})
+            {/* Signup Welcome Bonus Configuration (Master Owner Only) */}
+            {isMasterOwner && (
+              <div className="bg-slate-950 border border-purple-500/30 rounded-2xl p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400">
+                      <Gift className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-white text-xs flex items-center gap-2">
+                        <span>Dynamic Welcome Bonus Control</span>
+                        <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
+                          OWNER ONLY
                         </span>
-                      ) : (
-                        <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-bold">
-                          DISABLED (₹0)
-                        </span>
-                      )}
-                    </h4>
-                    <p className="text-[10px] text-slate-400 font-mono">
-                      Dynamic bonus auto-credited when a user makes their 1st transaction (Min. ₹1 Send/Transfer) within 24 hours of registration. If no transaction is done within 24h, the bonus expires.
-                    </p>
+                        {settingsForm.signup_bonus_enabled && Number(settingsForm.signup_bonus_amount) > 0 ? (
+                          <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+                            ACTIVE (₹{settingsForm.signup_bonus_amount})
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-bold">
+                            DISABLED (₹0)
+                          </span>
+                        )}
+                      </h4>
+                      <p className="text-[10px] text-slate-400 font-mono">
+                        Dynamic bonus auto-credited when a user makes their 1st transaction (Min. ₹1 Send/Transfer) within 24 hours of registration. If no transaction is done within 24h, the bonus expires.
+                      </p>
+                    </div>
                   </div>
+                  <input
+                    type="checkbox"
+                    checked={settingsForm.signup_bonus_enabled}
+                    onChange={(e) => handleSettingChange('signup_bonus_enabled', e.target.checked)}
+                    className="w-5 h-5 accent-purple-500 cursor-pointer"
+                  />
                 </div>
-                <input
-                  type="checkbox"
-                  checked={settingsForm.signup_bonus_enabled}
-                  onChange={(e) => handleSettingChange('signup_bonus_enabled', e.target.checked)}
-                  className="w-5 h-5 accent-purple-500 cursor-pointer"
-                />
-              </div>
 
-              {settingsForm.signup_bonus_enabled && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <label className="block text-slate-300 font-bold mb-1 font-mono text-[11px]">
-                      Welcome Bonus Amount (₹)
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 50 or 100"
-                      value={settingsForm.signup_bonus_amount}
-                      onChange={(e) =>
-                        handleSettingChange('signup_bonus_amount', Math.max(0, Number(e.target.value)))
-                      }
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-purple-300 font-mono font-bold focus:border-purple-500 focus:outline-none"
-                    />
-                    <p className="text-[10px] text-slate-500 font-mono mt-1">
-                      Set ₹50, ₹100, or any custom amount to auto-unlock on 1st transaction within 24 hours
-                    </p>
+                {settingsForm.signup_bonus_enabled && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1 font-mono text-[11px]">
+                        Welcome Bonus Amount (₹)
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 50 or 100"
+                        value={settingsForm.signup_bonus_amount}
+                        onChange={(e) =>
+                          handleSettingChange('signup_bonus_amount', Math.max(0, Number(e.target.value)))
+                        }
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-purple-300 font-mono font-bold focus:border-purple-500 focus:outline-none"
+                      />
+                      <p className="text-[10px] text-slate-500 font-mono mt-1">
+                        Set ₹50, ₹100, or any custom amount to auto-unlock on 1st transaction within 24 hours
+                      </p>
+                    </div>
+                    <div className="flex items-center p-3 bg-purple-950/20 border border-purple-500/20 rounded-xl">
+                      <Sparkles className="h-4 w-4 text-purple-400 shrink-0 mr-2" />
+                      <span className="text-[11px] text-purple-200">
+                        When enabled, new users see the ₹{settingsForm.signup_bonus_amount || 0} Welcome Bonus offer. Making their 1st transfer (Min. ₹1) within 24 hours automatically credits ₹{settingsForm.signup_bonus_amount || 0} with instant Telegram & Email alert!
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center p-3 bg-purple-950/20 border border-purple-500/20 rounded-xl">
-                    <Sparkles className="h-4 w-4 text-purple-400 shrink-0 mr-2" />
-                    <span className="text-[11px] text-purple-200">
-                      When enabled, new users see the ₹{settingsForm.signup_bonus_amount || 0} Welcome Bonus offer. Making their 1st transfer (Min. ₹1) within 24 hours automatically credits ₹{settingsForm.signup_bonus_amount || 0} with instant Telegram & Email alert!
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             {/* Notice Banner Editor */}
             <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-3">
@@ -3646,25 +3651,43 @@ export const AdminPortal: React.FC = () => {
                   </p>
                 </div>
 
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1 font-mono text-[11px]">
-                    Telegram Bot API Token (HTTP API)
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="password"
-                      placeholder="Paste HTTP API token from @BotFather"
-                      value={settingsForm.otp_telegram_bot_token || ''}
-                      onChange={(e) =>
-                        handleSettingChange('otp_telegram_bot_token', e.target.value)
-                      }
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-emerald-400 font-mono font-bold focus:border-cyan-500 focus:outline-none"
-                    />
+                {isMasterOwner ? (
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1 font-mono text-[11px] flex items-center justify-between">
+                      <span>Telegram Bot API Token (HTTP API)</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        Owner Only
+                      </span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="password"
+                        placeholder="Paste HTTP API token from @BotFather"
+                        value={settingsForm.otp_telegram_bot_token || ''}
+                        onChange={(e) =>
+                          handleSettingChange('otp_telegram_bot_token', e.target.value)
+                        }
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-emerald-400 font-mono font-bold focus:border-cyan-500 focus:outline-none"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-mono mt-1">
+                      Token from @BotFather for sending OTPs and alerts (e.g. 8853576053:AAF9...)
+                    </p>
                   </div>
-                  <p className="text-[10px] text-slate-500 font-mono mt-1">
-                    Token from @BotFather for sending OTPs and alerts (e.g. 7829103847:AAHx...)
-                  </p>
-                </div>
+                ) : (
+                  <div>
+                    <label className="block text-slate-400 font-bold mb-1 font-mono text-[11px] flex items-center justify-between">
+                      <span>Telegram Bot API Token</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 font-bold">
+                        🔒 Hidden for Sub-Admin
+                      </span>
+                    </label>
+                    <div className="p-2.5 bg-slate-900/60 border border-slate-800 rounded-xl text-xs font-mono text-slate-400 flex items-center gap-2">
+                      <Lock className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                      <span>Security Protection: Bot API Token is restricted to Master Owner.</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Telegram Webhook & Cloud Gateway Status */}
@@ -3950,196 +3973,220 @@ export const AdminPortal: React.FC = () => {
                 </div>
               </div>
 
-              {/* SMTP Connection Configuration */}
-              <div className="p-4 bg-slate-900/80 rounded-2xl border border-slate-800 space-y-3">
-                <div className="font-bold text-white text-xs font-mono flex items-center gap-2 text-slate-200">
-                  <KeyRound className="h-3.5 w-3.5 text-emerald-400" />
-                  <span>SMTP Mail Server Parameters (Gmail SMTP / Custom Server)</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
-                  <div>
-                    <label className="block text-slate-400 text-[10px] uppercase mb-1">SMTP Host</label>
-                    <input
-                      type="text"
-                      placeholder="smtp.gmail.com"
-                      value={settingsForm.smtp_host || 'smtp.gmail.com'}
-                      onChange={(e) => handleSettingChange('smtp_host', e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-slate-400 text-[10px] uppercase mb-1">SMTP Port</label>
-                    <input
-                      type="number"
-                      placeholder="587"
-                      value={settingsForm.smtp_port || 587}
-                      onChange={(e) => handleSettingChange('smtp_port', Number(e.target.value))}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-slate-400 text-[10px] uppercase mb-1">SMTP Username / Gmail ID</label>
-                    <input
-                      type="text"
-                      placeholder="support@srgateway.in or gmail"
-                      value={settingsForm.smtp_user || ''}
-                      onChange={(e) => handleSettingChange('smtp_user', e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-300 font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-slate-400 text-[10px] uppercase mb-1">App Password / Secret</label>
-                    <input
-                      type="password"
-                      placeholder="Google App Password (16-char)"
-                      value={settingsForm.smtp_pass || ''}
-                      onChange={(e) => handleSettingChange('smtp_pass', e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-amber-300 font-bold"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
-                  <div>
-                    <label className="block text-slate-400 text-[10px] uppercase mb-1">Sender Brand Display Name</label>
-                    <input
-                      type="text"
-                      placeholder="SR GATEWAY Security & Alerts"
-                      value={settingsForm.smtp_from_name || 'SR GATEWAY Alerts'}
-                      onChange={(e) => handleSettingChange('smtp_from_name', e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-slate-400 text-[10px] uppercase mb-1">Sender From Email Address (Gmail / Verified Email)</label>
-                    <input
-                      type="text"
-                      placeholder="sr.notify.hub@gmail.com"
-                      value={settingsForm.smtp_from_email || settingsForm.smtp_user || 'sr.notify.hub@gmail.com'}
-                      onChange={(e) => handleSettingChange('smtp_from_email', e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Live SMTP Dispatch & Testing Console */}
-              <div className="p-4 bg-emerald-950/20 border border-emerald-500/20 rounded-2xl space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="font-bold text-emerald-300 text-xs font-mono flex items-center gap-2">
-                    <Send className="h-3.5 w-3.5 text-emerald-400" />
-                    <span>Live Test Email Notification Sender</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={fetchEmailLogs}
-                    className="text-[10px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-mono"
-                  >
-                    <RefreshCw className={`h-3 w-3 ${isLoadingEmailLogs ? 'animate-spin' : ''}`} />
-                    <span>Refresh Logs</span>
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                  <div className="sm:col-span-2">
-                    <label className="block text-slate-400 text-[10px] font-mono uppercase mb-1">Test Recipient Gmail ID</label>
-                    <input
-                      type="email"
-                      placeholder="sr.notify.hub@gmail.com"
-                      value={testEmailRecipient}
-                      onChange={(e) => setTestEmailRecipient(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-300 font-mono font-bold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-400 text-[10px] font-mono uppercase mb-1">Test Event Type</label>
-                    <select
-                      value={testEmailType}
-                      onChange={(e: any) => setTestEmailType(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
-                    >
-                      <option value="LOGIN_ALERT">🔐 Login Alert Email</option>
-                      <option value="DEPOSIT_ALERT">💰 Deposit Credited Email</option>
-                      <option value="WITHDRAW_ALERT">💸 Withdrawal Payout Email</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1">
-                  <button
-                    type="button"
-                    disabled={isSendingTestEmail}
-                    onClick={handleSendTestEmail}
-                    className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl flex items-center gap-2 transition shadow-lg shadow-emerald-500/20 active:scale-95 disabled:opacity-50"
-                  >
-                    <Send className={`h-3.5 w-3.5 ${isSendingTestEmail ? 'animate-pulse' : ''}`} />
-                    <span>{isSendingTestEmail ? 'Dispatching Live Email...' : 'Send Live Test Email 🚀'}</span>
-                  </button>
-
-                  {testEmailResult && (
-                    <div
-                      className={`text-[11px] font-mono px-3 py-1.5 rounded-xl border flex items-center gap-2 ${
-                        testEmailResult.success
-                          ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-                          : 'bg-rose-500/10 text-rose-300 border-rose-500/30'
-                      }`}
-                    >
-                      {testEmailResult.success ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
-                      <span>{testEmailResult.message}</span>
-                      {testEmailResult.mode && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
-                          {testEmailResult.mode}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Email Dispatch Audit Log Preview */}
-                {emailLogsList.length > 0 && (
-                  <div className="mt-4 pt-3 border-t border-slate-800/80 space-y-2">
-                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                      <span className="flex items-center gap-1.5">
-                        <Inbox className="h-3 w-3 text-emerald-400" />
-                        <span>Recent Email Dispatch Ledger ({emailLogsList.length})</span>
+              {/* SMTP Connection Configuration & Dispatch Testing */}
+              {isMasterOwner ? (
+                <>
+                  <div className="p-4 bg-slate-900/80 rounded-2xl border border-slate-800 space-y-3">
+                    <div className="font-bold text-white text-xs font-mono flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-slate-200">
+                        <KeyRound className="h-3.5 w-3.5 text-emerald-400" />
+                        <span>SMTP Mail Server Parameters (Gmail SMTP / Custom Server)</span>
+                      </div>
+                      <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
+                        MASTER OWNER ONLY
                       </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
+                      <div>
+                        <label className="block text-slate-400 text-[10px] uppercase mb-1">SMTP Host</label>
+                        <input
+                          type="text"
+                          placeholder="smtp.gmail.com"
+                          value={settingsForm.smtp_host || 'smtp.gmail.com'}
+                          onChange={(e) => handleSettingChange('smtp_host', e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 text-[10px] uppercase mb-1">SMTP Port</label>
+                        <input
+                          type="number"
+                          placeholder="587"
+                          value={settingsForm.smtp_port || 587}
+                          onChange={(e) => handleSettingChange('smtp_port', Number(e.target.value))}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 text-[10px] uppercase mb-1">SMTP Username / Gmail ID</label>
+                        <input
+                          type="text"
+                          placeholder="support@srgateway.in or gmail"
+                          value={settingsForm.smtp_user || ''}
+                          onChange={(e) => handleSettingChange('smtp_user', e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-300 font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 text-[10px] uppercase mb-1">App Password / Secret</label>
+                        <input
+                          type="password"
+                          placeholder="Google App Password (16-char)"
+                          value={settingsForm.smtp_pass || ''}
+                          onChange={(e) => handleSettingChange('smtp_pass', e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-amber-300 font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
+                      <div>
+                        <label className="block text-slate-400 text-[10px] uppercase mb-1">Sender Brand Display Name</label>
+                        <input
+                          type="text"
+                          placeholder="SR GATEWAY Security & Alerts"
+                          value={settingsForm.smtp_from_name || 'SR GATEWAY Alerts'}
+                          onChange={(e) => handleSettingChange('smtp_from_name', e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 text-[10px] uppercase mb-1">Sender From Email Address (Gmail / Verified Email)</label>
+                        <input
+                          type="text"
+                          placeholder="sr.notify.hub@gmail.com"
+                          value={settingsForm.smtp_from_email || settingsForm.smtp_user || 'sr.notify.hub@gmail.com'}
+                          onChange={(e) => handleSettingChange('smtp_from_email', e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Live SMTP Dispatch & Testing Console */}
+                  <div className="p-4 bg-emerald-950/20 border border-emerald-500/20 rounded-2xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="font-bold text-emerald-300 text-xs font-mono flex items-center gap-2">
+                        <Send className="h-3.5 w-3.5 text-emerald-400" />
+                        <span>Live Test Email Notification Sender</span>
+                      </div>
                       <button
                         type="button"
-                        onClick={handleClearEmailLogs}
-                        className="text-rose-400 hover:text-rose-300 flex items-center gap-1 text-[10px]"
+                        onClick={fetchEmailLogs}
+                        className="text-[10px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-mono"
                       >
-                        <Trash2 className="h-3 w-3" />
-                        <span>Clear History</span>
+                        <RefreshCw className={`h-3 w-3 ${isLoadingEmailLogs ? 'animate-spin' : ''}`} />
+                        <span>Refresh Logs</span>
                       </button>
                     </div>
 
-                    <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1 font-mono text-[10px]">
-                      {emailLogsList.slice(0, 8).map((log: any) => (
-                        <div
-                          key={log.id}
-                          className="p-2 bg-slate-950/80 rounded-lg border border-slate-800/70 flex items-center justify-between gap-2"
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                      <div className="sm:col-span-2">
+                        <label className="block text-slate-400 text-[10px] font-mono uppercase mb-1">Test Recipient Gmail ID</label>
+                        <input
+                          type="email"
+                          placeholder="sr.notify.hub@gmail.com"
+                          value={testEmailRecipient}
+                          onChange={(e) => setTestEmailRecipient(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-300 font-mono font-bold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-400 text-[10px] font-mono uppercase mb-1">Test Event Type</label>
+                        <select
+                          value={testEmailType}
+                          onChange={(e: any) => setTestEmailType(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
                         >
-                          <div className="flex items-center gap-2 truncate">
-                            <span
-                              className={`px-1.5 py-0.5 rounded font-bold ${
-                                log.status === 'SENT' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
-                              }`}
-                            >
-                              {log.type}
+                          <option value="LOGIN_ALERT">🔐 Login Alert Email</option>
+                          <option value="DEPOSIT_ALERT">💰 Deposit Credited Email</option>
+                          <option value="WITHDRAW_ALERT">💸 Withdrawal Payout Email</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1">
+                      <button
+                        type="button"
+                        disabled={isSendingTestEmail}
+                        onClick={handleSendTestEmail}
+                        className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl flex items-center gap-2 transition shadow-lg shadow-emerald-500/20 active:scale-95 disabled:opacity-50"
+                      >
+                        <Send className={`h-3.5 w-3.5 ${isSendingTestEmail ? 'animate-pulse' : ''}`} />
+                        <span>{isSendingTestEmail ? 'Dispatching Live Email...' : 'Send Live Test Email 🚀'}</span>
+                      </button>
+
+                      {testEmailResult && (
+                        <div
+                          className={`text-[11px] font-mono px-3 py-1.5 rounded-xl border flex items-center gap-2 ${
+                            testEmailResult.success
+                              ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                              : 'bg-rose-500/10 text-rose-300 border-rose-500/30'
+                          }`}
+                        >
+                          {testEmailResult.success ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                          <span>{testEmailResult.message}</span>
+                          {testEmailResult.mode && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+                              {testEmailResult.mode}
                             </span>
-                            <span className="text-slate-200 truncate">{log.to}</span>
-                            <span className="text-slate-500 truncate hidden sm:inline">{log.subject}</span>
-                          </div>
-                          <div className="text-slate-400 shrink-0">
-                            {new Date(log.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                          </div>
+                          )}
                         </div>
-                      ))}
+                      )}
+                    </div>
+
+                    {/* Email Dispatch Audit Log Preview */}
+                    {emailLogsList.length > 0 && (
+                      <div className="mt-4 pt-3 border-t border-slate-800/80 space-y-2">
+                        <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                          <span className="flex items-center gap-1.5">
+                            <Inbox className="h-3 w-3 text-emerald-400" />
+                            <span>Recent Email Dispatch Ledger ({emailLogsList.length})</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleClearEmailLogs}
+                            className="text-rose-400 hover:text-rose-300 flex items-center gap-1 text-[10px]"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            <span>Clear History</span>
+                          </button>
+                        </div>
+
+                        <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1 font-mono text-[10px]">
+                          {emailLogsList.slice(0, 8).map((log: any) => (
+                            <div
+                              key={log.id}
+                              className="p-2 bg-slate-950/80 rounded-lg border border-slate-800/70 flex items-center justify-between gap-2"
+                            >
+                              <div className="flex items-center gap-2 truncate">
+                                <span
+                                  className={`px-1.5 py-0.5 rounded font-bold ${
+                                    log.status === 'SENT' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
+                                  }`}
+                                >
+                                  {log.type}
+                                </span>
+                                <span className="text-slate-200 truncate">{log.to}</span>
+                                <span className="text-slate-500 truncate hidden sm:inline">{log.subject}</span>
+                              </div>
+                              <div className="text-slate-400 shrink-0">
+                                {new Date(log.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="p-4 bg-slate-900/60 rounded-2xl border border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <Lock className="h-4 w-4 text-amber-400 shrink-0" />
+                    <div>
+                      <div className="text-xs text-slate-200 font-bold">SMTP Mail Server &amp; Secret Credentials</div>
+                      <div className="text-[10px] text-slate-400 font-mono">
+                        SMTP host, port, username, and app password are encrypted &amp; hidden for Sub-Admin. Only Master Owner can view or modify mail secrets.
+                      </div>
                     </div>
                   </div>
-                )}
-              </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 font-bold shrink-0">
+                    🔒 Master Owner Only
+                  </span>
+                </div>
+              )}
             </div>
 
             {isSubAdmin ? (
