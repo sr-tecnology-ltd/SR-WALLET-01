@@ -1029,7 +1029,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Call server endpoint directly to ensure database persistence
     let serverWallet: Wallet | null = null;
-    const adminPass = sessionStorage.getItem('sr_admin_pass') || '6294041668@Ss';
+    const adminPass = sessionStorage.getItem('sr_admin_pass') || 'Sksahilbhaixxxcom';
     const adminName = sessionStorage.getItem('sr_admin_name') || currentUser?.full_name || 'Administrator';
     const adminId = sessionStorage.getItem('sr_admin_id') || currentUser?.id || 'admin-001';
 
@@ -1145,7 +1145,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!deposit) return { success: false, message: 'Deposit request not found.' };
     if (deposit.status !== 'PENDING') return { success: false, message: 'This request has already been processed.' };
 
-    const adminPass = sessionStorage.getItem('sr_admin_pass') || '6294041668@Ss';
+    const adminPass = sessionStorage.getItem('sr_admin_pass') || 'Sksahilbhaixxxcom';
     const adminName = sessionStorage.getItem('sr_admin_name') || currentUser?.full_name || 'Administrator';
     const adminId = sessionStorage.getItem('sr_admin_id') || currentUser?.id || 'admin-001';
 
@@ -1388,7 +1388,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const userWallet = wallets[resolvedId] || wallets[resolvedCustomId] || { available_balance: 0, locked_balance: 0 };
 
     let serverWallet: Wallet | null = null;
-    const adminPass = sessionStorage.getItem('sr_admin_pass') || '6294041668@Ss';
+    const adminPass = sessionStorage.getItem('sr_admin_pass') || 'Sksahilbhaixxxcom';
     const adminName = sessionStorage.getItem('sr_admin_name') || currentUser?.full_name || 'Administrator';
     const adminId = sessionStorage.getItem('sr_admin_id') || currentUser?.id || 'admin-001';
 
@@ -1497,7 +1497,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const userWallet = wallets[resolvedId] || wallets[resolvedCustomId] || { available_balance: 0, locked_balance: 0 };
 
     let serverWallet: Wallet | null = null;
-    const adminPass = sessionStorage.getItem('sr_admin_pass') || '6294041668@Ss';
+    const adminPass = sessionStorage.getItem('sr_admin_pass') || 'Sksahilbhaixxxcom';
     const adminName = sessionStorage.getItem('sr_admin_name') || currentUser?.full_name || 'Administrator';
     const adminId = sessionStorage.getItem('sr_admin_id') || currentUser?.id || 'admin-001';
 

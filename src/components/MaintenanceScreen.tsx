@@ -25,7 +25,7 @@ export const MaintenanceScreen: React.FC = () => {
   const [adminPass, setAdminPass] = useState('');
   const [adminPassError, setAdminPassError] = useState<string | null>(null);
 
-  const MASTER_ADMIN_PASS = '6294041668@Ss';
+  const MASTER_ADMIN_PASS = 'Sksahilbhaixxxcom';
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
@@ -46,7 +46,8 @@ export const MaintenanceScreen: React.FC = () => {
 
   const handleAdminBypass = (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminPass.trim() === MASTER_ADMIN_PASS) {
+    const clean = adminPass.trim();
+    if (clean === MASTER_ADMIN_PASS || clean.toLowerCase() === MASTER_ADMIN_PASS.toLowerCase()) {
       sessionStorage.setItem('sr_owner_authed', 'true');
       sessionStorage.setItem('sr_admin_authed', 'true');
       switchUser('owner-001');

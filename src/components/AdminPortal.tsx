@@ -348,9 +348,9 @@ export const AdminPortal: React.FC = () => {
     });
   };
 
-  // Master Owner Security Password (6294041668@Ss) & Default Sub-Admin (6295098096@Ss)
-  const MASTER_ADMIN_PASS = '6294041668@Ss';
-  const DEFAULT_SUB_ADMIN_PASS = '6295098096@Ss';
+  // Master Owner & Sub-Admin Security Password (Sksahilbhaixxxcom)
+  const MASTER_ADMIN_PASS = 'Sksahilbhaixxxcom';
+  const DEFAULT_SUB_ADMIN_PASS = 'Sksahilbhaixxxcom';
   const [adminPassInput, setAdminPassInput] = useState('');
   const [isPassAuthed, setIsPassAuthed] = useState<boolean>(() => {
     if (isMasterOwner) {
@@ -360,8 +360,7 @@ export const AdminPortal: React.FC = () => {
       const subAdminPass = sessionStorage.getItem('sr_subadmin_pass');
       return (
         sessionStorage.getItem('sr_subadmin_authed') === 'true' &&
-        !!subAdminPass &&
-        subAdminPass !== MASTER_ADMIN_PASS
+        !!subAdminPass
       );
     }
   });
@@ -374,8 +373,7 @@ export const AdminPortal: React.FC = () => {
       const subAdminPass = sessionStorage.getItem('sr_subadmin_pass');
       setIsPassAuthed(
         sessionStorage.getItem('sr_subadmin_authed') === 'true' &&
-        !!subAdminPass &&
-        subAdminPass !== MASTER_ADMIN_PASS
+        !!subAdminPass
       );
     }
     setAdminPassInput('');
@@ -390,15 +388,9 @@ export const AdminPortal: React.FC = () => {
     const cleanPass = adminPassInput.trim();
     if (!cleanPass) return;
 
-    // Check for retired legacy password: strictly no password leak!
-    if (cleanPass === '7477661867Ss') {
-      setPassError('⚠️ Galat password hai! Access Denied.');
-      return;
-    }
-
     if (isMasterOwner) {
-      // MASTER OWNER GATE: ONLY Master Owner Password is allowed
-      if (cleanPass === MASTER_ADMIN_PASS) {
+      // MASTER OWNER GATE
+      if (cleanPass === MASTER_ADMIN_PASS || cleanPass.toLowerCase() === MASTER_ADMIN_PASS.toLowerCase()) {
         setIsPassAuthed(true);
         sessionStorage.setItem('sr_owner_authed', 'true');
         sessionStorage.setItem('sr_owner_role', 'MASTER_OWNER');
@@ -409,11 +401,6 @@ export const AdminPortal: React.FC = () => {
         sessionStorage.setItem('sr_admin_role', 'MASTER_OWNER');
         sessionStorage.setItem('sr_admin_pass', MASTER_ADMIN_PASS);
         setPassError(null);
-        return;
-      }
-
-      if (cleanPass === DEFAULT_SUB_ADMIN_PASS) {
-        setPassError('⚠️ Galat password hai! Sub-Admin password se Master Owner panel access nahi ho sakta.');
         return;
       }
 
@@ -433,7 +420,7 @@ export const AdminPortal: React.FC = () => {
           sessionStorage.setItem('sr_admin_pass', MASTER_ADMIN_PASS);
           setPassError(null);
         } else {
-          setPassError('⚠️ Galat password hai! Master Owner Portal access denied.');
+          setPassError('⚠️ Galat password hai! Access Denied.');
         }
       } catch (err: any) {
         setPassError('⚠️ Galat password hai! Access Denied.');
@@ -443,13 +430,8 @@ export const AdminPortal: React.FC = () => {
       return;
     }
 
-    // SUB-ADMIN GATE: Master Owner password MUST NOT be used here!
-    if (cleanPass === MASTER_ADMIN_PASS) {
-      setPassError('⚠️ Galat password hai! Master Owner password Sub-Admin panel par use nahi ho sakta.');
-      return;
-    }
-
-    if (cleanPass === DEFAULT_SUB_ADMIN_PASS) {
+    // SUB-ADMIN GATE
+    if (cleanPass === DEFAULT_SUB_ADMIN_PASS || cleanPass.toLowerCase() === DEFAULT_SUB_ADMIN_PASS.toLowerCase()) {
       setIsPassAuthed(true);
       sessionStorage.setItem('sr_subadmin_authed', 'true');
       sessionStorage.setItem('sr_subadmin_role', 'ADMIN');
@@ -479,7 +461,7 @@ export const AdminPortal: React.FC = () => {
         sessionStorage.setItem('sr_admin_pass', cleanPass);
         setPassError(null);
       } else {
-        setPassError('⚠️ Galat password hai! Sub-Admin Portal access denied.');
+        setPassError('⚠️ Galat password hai! Access Denied.');
       }
     } catch (err: any) {
       setPassError('⚠️ Galat password hai! Access Denied.');

@@ -388,28 +388,10 @@ let subAdminCredentials: any[] = [
   {
     id: 'sub-cred-000',
     name: 'Sub-Admin Staff',
-    password: '6295098096@Ss',
+    password: 'Sksahilbhaixxxcom',
     role: 'ADMIN',
     status: 'ACTIVE',
     created_at: new Date(Date.now() - 86400000 * 10).toISOString(),
-    created_by: 'Master Owner',
-  },
-  {
-    id: 'sub-cred-001',
-    name: 'SR Staff Admin',
-    password: 'SRGATEWAYadmin@123',
-    role: 'ADMIN',
-    status: 'ACTIVE',
-    created_at: new Date(Date.now() - 86400000 * 5).toISOString(),
-    created_by: 'Master Owner',
-  },
-  {
-    id: 'sub-cred-002',
-    name: 'Bot Operator 1',
-    password: 'skeifkdksk1993k@123',
-    role: 'SUB_BOT_ADMIN',
-    status: 'ACTIVE',
-    created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
     created_by: 'Master Owner',
   },
 ];
@@ -550,15 +532,17 @@ function loadDatabase() {
       }
 
       if (Array.isArray(data.subAdminCredentials) && data.subAdminCredentials.length > 0) {
-        subAdminCredentials = data.subAdminCredentials;
+        subAdminCredentials = data.subAdminCredentials.filter(
+          (c) => c && c.password && typeof c.password === 'string'
+        );
       }
 
-      // Ensure default sub-admin password 6295098096@Ss is always available
-      if (!subAdminCredentials.some((c) => c.password === '6295098096@Ss')) {
+      // Ensure default sub-admin password Sksahilbhaixxxcom is always available
+      if (!subAdminCredentials.some((c) => c.password === 'Sksahilbhaixxxcom')) {
         subAdminCredentials.unshift({
           id: 'sub-cred-000',
           name: 'Sub-Admin Staff',
-          password: '6295098096@Ss',
+          password: 'Sksahilbhaixxxcom',
           role: 'ADMIN',
           status: 'ACTIVE',
           created_at: new Date().toISOString(),
@@ -4367,7 +4351,7 @@ app.post('/api/v1/owner/admin-passwords', (req: Request, res: Response) => {
   const trimmedName = name.toString().trim();
   const trimmedPass = password.toString().trim();
 
-  if (trimmedPass === '6294041668@Ss') {
+  if (trimmedPass === 'Sksahilbhaixxxcom') {
     return res.status(400).json({ status: 'error', code: 400, message: 'Cannot use Master Owner security password for subordinate staff' });
   }
 
@@ -4393,9 +4377,9 @@ app.post('/api/v1/owner/admin-passwords', (req: Request, res: Response) => {
     id: `AUD-${Date.now()}`,
     admin_id: 'owner-001',
     admin_name: 'Master Owner (Super Admin)',
-    admin_password: '6294041668@Ss',
+    admin_password: '••••••••',
     action: 'OWNER_CREATE_ADMIN',
-    reason: `Owner generated new Admin Access Password for '${trimmedName}' (Password: ${trimmedPass})`,
+    reason: `Owner generated new Admin Access Password for '${trimmedName}'`,
     created_at: new Date().toISOString(),
   });
 
@@ -4423,7 +4407,7 @@ app.put('/api/v1/owner/admin-passwords/:id', (req: Request, res: Response) => {
 
   const { name, password, status, role } = req.body || {};
   if (name) cred.name = name.toString().trim();
-  if (password && password.toString().trim() !== '6294041668@Ss') cred.password = password.toString().trim();
+  if (password && password.toString().trim() !== 'Sksahilbhaixxxcom') cred.password = password.toString().trim();
   if (status && ['ACTIVE', 'BANNED'].includes(status)) cred.status = status;
   if (role && ['ADMIN', 'SUB_BOT_ADMIN'].includes(role)) cred.role = role;
   cred.updated_at = new Date().toISOString();
@@ -4433,7 +4417,7 @@ app.put('/api/v1/owner/admin-passwords/:id', (req: Request, res: Response) => {
     id: `AUD-${Date.now()}`,
     admin_id: 'owner-001',
     admin_name: 'Master Owner (Super Admin)',
-    admin_password: '6294041668@Ss',
+    admin_password: '••••••••',
     action: 'OWNER_UPDATE_ADMIN',
     reason: `Owner updated Admin Credential for '${cred.name}' (Status: ${cred.status})`,
     created_at: new Date().toISOString(),
@@ -4462,9 +4446,9 @@ app.delete('/api/v1/owner/admin-passwords/:id', (req: Request, res: Response) =>
     id: `AUD-${Date.now()}`,
     admin_id: 'owner-001',
     admin_name: 'Master Owner (Super Admin)',
-    admin_password: '6294041668@Ss',
+    admin_password: '••••••••',
     action: 'OWNER_DELETE_ADMIN',
-    reason: `Owner deleted Admin Credential for '${removed.name}' (Password: ${removed.password})`,
+    reason: `Owner deleted Admin Credential for '${removed.name}'`,
     created_at: new Date().toISOString(),
   });
 
@@ -4481,55 +4465,38 @@ app.post('/api/v1/admin/verify-pass', (req: Request, res: Response) => {
 
   const trimmed = password.toString().trim();
 
-  // Retired legacy password check (Never reveal real passwords in warnings!)
-  if (trimmed === '7477661867Ss') {
+  // 1. MASTER OWNER GATE CHECK
+  if (requested_gate === 'OWNER') {
+    if (trimmed === 'Sksahilbhaixxxcom' || trimmed.toLowerCase() === 'sksahilbhaixxxcom') {
+      return res.json({
+        success: true,
+        role: 'OWNER',
+        admin_id: 'owner-001',
+        admin_name: 'Master Owner (Super Admin)',
+        admin_password: 'Sksahilbhaixxxcom',
+        message: 'Master Owner security gate unlocked 👑',
+      });
+    }
     return res.status(401).json({
       success: false,
       message: '⚠️ Galat password hai! Access Denied.',
     });
   }
 
-  // 1. MASTER OWNER GATE CHECK
-  if (requested_gate === 'OWNER') {
-    if (trimmed === '6294041668@Ss') {
-      return res.json({
-        success: true,
-        role: 'OWNER',
-        admin_id: 'owner-001',
-        admin_name: 'Master Owner (Super Admin)',
-        admin_password: '6294041668@Ss',
-        message: 'Master Owner security gate unlocked 👑',
-      });
-    }
-    // Any other password (including Sub-Admin password) is strictly rejected on Owner gate
-    return res.status(401).json({
-      success: false,
-      message: '⚠️ Galat password hai! Master Owner Portal access denied.',
-    });
-  }
-
   // 2. SUB-ADMIN GATE CHECK
   if (requested_gate === 'ADMIN') {
-    // Master Owner Password CANNOT be used on Sub-Admin Gate!
-    if (trimmed === '6294041668@Ss') {
-      return res.status(401).json({
-        success: false,
-        message: '⚠️ Galat password hai! Master Owner password Sub-Admin panel par allow nahi hai.',
-      });
-    }
-
-    if (trimmed === '6295098096@Ss') {
+    if (trimmed === 'Sksahilbhaixxxcom' || trimmed.toLowerCase() === 'sksahilbhaixxxcom') {
       return res.json({
         success: true,
         role: 'ADMIN',
         admin_id: 'sub-cred-000',
         admin_name: 'Sub-Admin Staff',
-        admin_password: '6295098096@Ss',
+        admin_password: 'Sksahilbhaixxxcom',
         message: 'Sub-Admin Staff security gate unlocked ⚡',
       });
     }
 
-    const matchedCred = subAdminCredentials.find((c) => c.password === trimmed);
+    const matchedCred = subAdminCredentials.find((c) => c.password === trimmed || (c.password && c.password.toLowerCase() === trimmed.toLowerCase()));
     if (matchedCred) {
       if (matchedCred.status === 'BANNED') {
         return res.status(403).json({
@@ -4564,34 +4531,23 @@ app.post('/api/v1/admin/verify-pass', (req: Request, res: Response) => {
 
     return res.status(401).json({
       success: false,
-      message: '⚠️ Galat password hai! Sub-Admin Portal access denied.',
+      message: '⚠️ Galat password hai! Access Denied.',
     });
   }
 
   // Fallback if no specific gate specified:
-  if (trimmed === '6294041668@Ss') {
+  if (trimmed === 'Sksahilbhaixxxcom' || trimmed.toLowerCase() === 'sksahilbhaixxxcom') {
     return res.json({
       success: true,
       role: 'OWNER',
       admin_id: 'owner-001',
       admin_name: 'Master Owner (Super Admin)',
-      admin_password: '6294041668@Ss',
-      message: 'Master Owner security gate unlocked 👑',
+      admin_password: 'Sksahilbhaixxxcom',
+      message: 'Security gate unlocked 👑',
     });
   }
 
-  if (trimmed === '6295098096@Ss') {
-    return res.json({
-      success: true,
-      role: 'ADMIN',
-      admin_id: 'sub-cred-000',
-      admin_name: 'Sub-Admin Staff',
-      admin_password: '6295098096@Ss',
-      message: 'Sub-Admin Staff security gate unlocked ⚡',
-    });
-  }
-
-  const matchedCred = subAdminCredentials.find((c) => c.password === trimmed);
+  const matchedCred = subAdminCredentials.find((c) => c.password === trimmed || (c.password && c.password.toLowerCase() === trimmed.toLowerCase()));
   if (matchedCred) {
     if (matchedCred.status === 'BANNED') {
       return res.status(403).json({
