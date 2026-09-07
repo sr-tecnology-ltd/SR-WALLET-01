@@ -5,9 +5,9 @@ import { MessageSquare, ExternalLink, ShieldCheck, HelpCircle, PhoneCall, Mail }
 export const SupportSection: React.FC = () => {
   const { settings } = useWallet();
 
-  const botHandle = settings.support_telegram_bot_username || '@SRGateway_Support_Bot';
+  const botHandle = settings.support_telegram_bot_username || '@srsaportbot';
   const botCleanHandle = botHandle.startsWith('@') ? botHandle : `@${botHandle}`;
-  const supportBotUrl = `https://t.me/${botCleanHandle.replace('@', '')}`;
+  const supportBotUrl = 'https://t.me/srsaportbot';
 
   return (
     <div className="space-y-6 text-slate-100 max-w-4xl mx-auto">

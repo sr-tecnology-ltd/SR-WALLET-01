@@ -140,7 +140,7 @@ interface WalletContextType {
   ownerCreateAdminPassword: (data: { name: string; password: string; role?: 'ADMIN' | 'SUB_BOT_ADMIN' }) => Promise<{ success: boolean; message: string; credential?: SubAdminCredential }>;
   ownerUpdateAdminPassword: (id: string, data: { name?: string; password?: string; status?: 'ACTIVE' | 'BANNED'; role?: 'ADMIN' | 'SUB_BOT_ADMIN' }) => Promise<{ success: boolean; message: string; credential?: SubAdminCredential }>;
   ownerDeleteAdminPassword: (id: string) => Promise<{ success: boolean; message: string }>;
-  adminVerifyGatePassword: (password: string) => Promise<{ success: boolean; message: string; role?: string; admin_id?: string; admin_name?: string; admin_password?: string }>;
+  adminVerifyGatePassword: (password: string, requestedGate?: 'OWNER' | 'ADMIN') => Promise<{ success: boolean; message: string; role?: string; admin_id?: string; admin_name?: string; admin_password?: string }>;
   restoreFullDatabase: (jsonPayload: any) => Promise<{ success: boolean; message: string; usersCount?: number }>;
   refreshFromBackend: () => Promise<void>;
   generateSRTxnId: (suffix?: string) => string;
@@ -669,6 +669,32 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const toggleRoleMode = () => {
     if (activeRole === 'OWNER' || activeRole === 'ADMIN') {
+      // Clear all gate session storage
+      sessionStorage.removeItem('sr_owner_authed');
+      sessionStorage.removeItem('sr_owner_role');
+      sessionStorage.removeItem('sr_owner_id');
+      sessionStorage.removeItem('sr_owner_name');
+      sessionStorage.removeItem('sr_owner_pass');
+
+      sessionStorage.removeItem('sr_subadmin_authed');
+      sessionStorage.removeItem('sr_subadmin_role');
+      sessionStorage.removeItem('sr_subadmin_id');
+      sessionStorage.removeItem('sr_subadmin_name');
+      sessionStorage.removeItem('sr_subadmin_pass');
+
+      sessionStorage.removeItem('sr_admin_authed');
+      sessionStorage.removeItem('sr_admin_role');
+      sessionStorage.removeItem('sr_admin_id');
+      sessionStorage.removeItem('sr_admin_name');
+      sessionStorage.removeItem('sr_admin_pass');
+
+      // Clear portal URL hash or search params
+      try {
+        if (window.location.hash || window.location.search) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+      } catch {}
+
       // Switch back to regular User
       const regularUser = profiles.find((p) => p.role === 'USER') || profiles.find((p) => p.id !== 'owner-001' && p.id !== 'admin-001');
       if (regularUser) {
@@ -679,14 +705,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         localStorage.setItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`, 'user-001');
       }
     } else {
-      // From USER -> Switch to OWNER
-      const ownerUser = profiles.find((p) => p.role === 'OWNER') || profiles.find((p) => p.id === 'owner-001');
-      if (ownerUser) {
-        setActiveUserId(ownerUser.id);
-        localStorage.setItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`, ownerUser.id);
-      } else {
-        setActiveUserId('owner-001');
-        localStorage.setItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`, 'owner-001');
+      // From USER -> Switch to regular user default
+      const regularUser = profiles.find((p) => p.role === 'USER') || profiles.find((p) => p.id !== 'owner-001' && p.id !== 'admin-001');
+      if (regularUser) {
+        setActiveUserId(regularUser.id);
+        localStorage.setItem(`${LOCAL_STORAGE_KEY}_ACTIVE_USER_ID`, regularUser.id);
       }
     }
   };
@@ -3684,20 +3707,33 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const adminVerifyGatePassword = async (password: string) => {
+  const adminVerifyGatePassword = async (password: string, requestedGate?: 'OWNER' | 'ADMIN') => {
     try {
       const res = await fetch('/api/v1/admin/verify-pass', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ password, requested_gate: requestedGate }),
       });
       const result = await res.json();
       if (res.ok && result.success) {
+        if (result.role === 'OWNER') {
+          sessionStorage.setItem('sr_owner_authed', 'true');
+          sessionStorage.setItem('sr_owner_role', 'MASTER_OWNER');
+          sessionStorage.setItem('sr_owner_id', result.admin_id || 'owner-001');
+          sessionStorage.setItem('sr_owner_name', result.admin_name || 'Master Administrator');
+          sessionStorage.setItem('sr_owner_pass', result.admin_password || password);
+        } else {
+          sessionStorage.setItem('sr_subadmin_authed', 'true');
+          sessionStorage.setItem('sr_subadmin_role', result.role || 'ADMIN');
+          sessionStorage.setItem('sr_subadmin_id', result.admin_id || 'sub-cred-000');
+          sessionStorage.setItem('sr_subadmin_name', result.admin_name || 'Sub-Admin Staff');
+          sessionStorage.setItem('sr_subadmin_pass', result.admin_password || password);
+        }
         sessionStorage.setItem('sr_admin_authed', 'true');
         sessionStorage.setItem('sr_admin_role', result.role);
         sessionStorage.setItem('sr_admin_id', result.admin_id);
         sessionStorage.setItem('sr_admin_name', result.admin_name);
-        sessionStorage.setItem('sr_admin_pass', result.admin_password);
+        sessionStorage.setItem('sr_admin_pass', result.admin_password || password);
         return {
           success: true,
           message: result.message,
@@ -3707,9 +3743,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           admin_password: result.admin_password,
         };
       }
-      return { success: false, message: result.message || 'Invalid password or account suspended' };
+      return { success: false, message: result.message || '⚠️ Invalid password. Access Denied!' };
     } catch (e: any) {
-      return { success: false, message: e.message || 'Network error verifying password' };
+      return { success: false, message: '⚠️ Network error verifying password' };
     }
   };
 

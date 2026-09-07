@@ -46,13 +46,14 @@ export const MaintenanceScreen: React.FC = () => {
 
   const handleAdminBypass = (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminPass === MASTER_ADMIN_PASS || adminPass === 'admin') {
+    if (adminPass.trim() === MASTER_ADMIN_PASS) {
+      sessionStorage.setItem('sr_owner_authed', 'true');
       sessionStorage.setItem('sr_admin_authed', 'true');
-      switchUser('admin-001');
+      switchUser('owner-001');
       setShowAdminModal(false);
       setAdminPassError(null);
     } else {
-      setAdminPassError('❌ Invalid Master Admin Password. Access Denied!');
+      setAdminPassError('⚠️ Galat password hai! Access Denied.');
     }
   };
 

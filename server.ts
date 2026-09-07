@@ -253,8 +253,9 @@ let appSettings: Record<string, any> = {
   telegram_channel_enabled: true,
   telegram_channel_name: 'SR TECHNOLOGY LTD',
   telegram_channel_url: 'https://t.me/SRTECHNOLOGYLTD1',
-  support_url: 'https://t.me/SRGatewayBot',
-  support_telegram_username: '@SRGatewayBot',
+  support_url: 'https://t.me/srsaportbot',
+  support_telegram_username: '@srsaportbot',
+  support_telegram_bot_username: '@srsaportbot',
   whatsapp_support_number: '+91 7477661867',
   whatsapp_support_url: 'https://wa.me/917477661867',
   app_url: process.env.APP_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'https://sr-gateway-in.up.railway.app'),
@@ -498,8 +499,9 @@ function loadDatabase() {
       if (appSettings.email_alerts_enabled === undefined) appSettings.email_alerts_enabled = true;
       if (!appSettings.whatsapp_support_number) appSettings.whatsapp_support_number = '+91 7477661867';
       if (!appSettings.whatsapp_support_url) appSettings.whatsapp_support_url = 'https://wa.me/917477661867';
-      if (!appSettings.support_telegram_username) appSettings.support_telegram_username = '@SRGatewayBot';
-      if (!appSettings.support_url) appSettings.support_url = 'https://t.me/SRGatewayBot';
+      if (!appSettings.support_telegram_username) appSettings.support_telegram_username = '@srsaportbot';
+      if (!appSettings.support_telegram_bot_username) appSettings.support_telegram_bot_username = '@srsaportbot';
+      if (!appSettings.support_url) appSettings.support_url = 'https://t.me/srsaportbot';
 
       if (Array.isArray(data.users)) {
         for (const u of data.users) {
@@ -4472,22 +4474,101 @@ app.delete('/api/v1/owner/admin-passwords/:id', (req: Request, res: Response) =>
 
 // Admin Gatekeeper Password Verification API
 app.post('/api/v1/admin/verify-pass', (req: Request, res: Response) => {
-  const { password } = req.body || {};
+  const { password, requested_gate } = req.body || {};
   if (!password) {
-    return res.status(400).json({ success: false, message: 'Security Password is required' });
+    return res.status(400).json({ success: false, message: '⚠️ Security Password is required' });
   }
 
   const trimmed = password.toString().trim();
 
-  // Retired legacy password check (Forces logout on all devices)
+  // Retired legacy password check (Never reveal real passwords in warnings!)
   if (trimmed === '7477661867Ss') {
     return res.status(401).json({
       success: false,
-      message: '⚠️ This security password has been retired. All sessions have been logged out. Please use the new Master Owner (6294041668@Ss) or Sub-Admin (6295098096@Ss) password.',
+      message: '⚠️ Galat password hai! Access Denied.',
     });
   }
 
-  // 1. Master Owner Password Check (6294041668@Ss)
+  // 1. MASTER OWNER GATE CHECK
+  if (requested_gate === 'OWNER') {
+    if (trimmed === '6294041668@Ss') {
+      return res.json({
+        success: true,
+        role: 'OWNER',
+        admin_id: 'owner-001',
+        admin_name: 'Master Owner (Super Admin)',
+        admin_password: '6294041668@Ss',
+        message: 'Master Owner security gate unlocked 👑',
+      });
+    }
+    // Any other password (including Sub-Admin password) is strictly rejected on Owner gate
+    return res.status(401).json({
+      success: false,
+      message: '⚠️ Galat password hai! Master Owner Portal access denied.',
+    });
+  }
+
+  // 2. SUB-ADMIN GATE CHECK
+  if (requested_gate === 'ADMIN') {
+    // Master Owner Password CANNOT be used on Sub-Admin Gate!
+    if (trimmed === '6294041668@Ss') {
+      return res.status(401).json({
+        success: false,
+        message: '⚠️ Galat password hai! Master Owner password Sub-Admin panel par allow nahi hai.',
+      });
+    }
+
+    if (trimmed === '6295098096@Ss') {
+      return res.json({
+        success: true,
+        role: 'ADMIN',
+        admin_id: 'sub-cred-000',
+        admin_name: 'Sub-Admin Staff',
+        admin_password: '6295098096@Ss',
+        message: 'Sub-Admin Staff security gate unlocked ⚡',
+      });
+    }
+
+    const matchedCred = subAdminCredentials.find((c) => c.password === trimmed);
+    if (matchedCred) {
+      if (matchedCred.status === 'BANNED') {
+        return res.status(403).json({
+          success: false,
+          message: '⚠️ This Sub-Admin password has been deactivated/banned by the Master Owner. Access denied.',
+        });
+      }
+
+      matchedCred.last_login_at = new Date().toISOString();
+
+      auditLogs.unshift({
+        id: `AUD-${Date.now()}`,
+        admin_id: matchedCred.id,
+        admin_name: matchedCred.name,
+        admin_password: '••••••••',
+        action: 'ADMIN_LOGIN',
+        reason: `Sub-Admin '${matchedCred.name}' logged in to Admin Panel`,
+        created_at: new Date().toISOString(),
+      });
+
+      saveDatabase();
+
+      return res.json({
+        success: true,
+        role: 'ADMIN',
+        admin_id: matchedCred.id,
+        admin_name: matchedCred.name,
+        admin_password: matchedCred.password,
+        message: `Welcome ${matchedCred.name}! SR Gateway Admin Control Panel Unlocked ⚡`,
+      });
+    }
+
+    return res.status(401).json({
+      success: false,
+      message: '⚠️ Galat password hai! Sub-Admin Portal access denied.',
+    });
+  }
+
+  // Fallback if no specific gate specified:
   if (trimmed === '6294041668@Ss') {
     return res.json({
       success: true,
@@ -4499,7 +4580,6 @@ app.post('/api/v1/admin/verify-pass', (req: Request, res: Response) => {
     });
   }
 
-  // 2. Default Sub-Admin Password Check (6295098096@Ss)
   if (trimmed === '6295098096@Ss') {
     return res.json({
       success: true,
@@ -4511,26 +4591,24 @@ app.post('/api/v1/admin/verify-pass', (req: Request, res: Response) => {
     });
   }
 
-  // 2. Active Sub-Admin & Sub-Bot Admin Passwords Check
   const matchedCred = subAdminCredentials.find((c) => c.password === trimmed);
   if (matchedCred) {
     if (matchedCred.status === 'BANNED') {
       return res.status(403).json({
         success: false,
-        message: `This Sub-Admin password (${matchedCred.name}) has been deactivated/banned by the Master Owner. Access denied.`,
+        message: '⚠️ This Sub-Admin password has been deactivated/banned by the Master Owner. Access denied.',
       });
     }
 
     matchedCred.last_login_at = new Date().toISOString();
 
-    // Record login in auditLogs with specific password & name
     auditLogs.unshift({
       id: `AUD-${Date.now()}`,
       admin_id: matchedCred.id,
       admin_name: matchedCred.name,
-      admin_password: matchedCred.password,
+      admin_password: '••••••••',
       action: 'ADMIN_LOGIN',
-      reason: `Sub-Admin '${matchedCred.name}' logged in to Admin Panel using access password`,
+      reason: `Sub-Admin '${matchedCred.name}' logged in to Admin Panel`,
       created_at: new Date().toISOString(),
     });
 
@@ -4548,7 +4626,7 @@ app.post('/api/v1/admin/verify-pass', (req: Request, res: Response) => {
 
   return res.status(401).json({
     success: false,
-    message: '❌ Incorrect Admin Password. Access Denied!',
+    message: '⚠️ Galat password hai! Access Denied.',
   });
 });
 
@@ -6107,15 +6185,11 @@ async function processTelegramMessageUpdate(update: any) {
           ],
           [
             { text: '💰 Check Balance', callback_data: 'check_balance' },
-            { text: '📥 Deposit Money', callback_data: 'deposit_money' },
-          ],
-          [
-            { text: '💸 Transfer / Pay', callback_data: 'transfer_money' },
             { text: '📜 Mini Statement', callback_data: 'mini_statement' },
           ],
           [
-            { text: '🔐 Get Login OTP', callback_data: 'generate_otp' },
-            { text: '💬 Support Chat', url: 'https://t.me/sk_190_rihan' },
+            { text: '💸 Transfer / Pay', callback_data: 'transfer_money' },
+            { text: '💬 Support Chat', url: 'https://t.me/srsaportbot' },
           ],
         ],
       };
@@ -6264,15 +6338,11 @@ async function processTelegramMessageUpdate(update: any) {
         ],
         [
           { text: '💰 Check Balance', callback_data: 'check_balance' },
-          { text: '📥 Deposit Money', callback_data: 'deposit_money' },
-        ],
-        [
-          { text: '💸 Transfer / Pay', callback_data: 'transfer_money' },
           { text: '📜 Mini Statement', callback_data: 'mini_statement' },
         ],
         [
-          { text: '🔐 Get Login OTP', callback_data: 'generate_otp' },
-          { text: '💬 Support Chat', url: 'https://t.me/sk_190_rihan' },
+          { text: '💸 Transfer / Pay', callback_data: 'transfer_money' },
+          { text: '💬 Support Chat', url: 'https://t.me/srsaportbot' },
         ],
       ],
     };

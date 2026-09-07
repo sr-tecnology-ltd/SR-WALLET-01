@@ -689,24 +689,13 @@ export const DeveloperApiSection: React.FC = () => {
 
                     <div className="flex flex-wrap items-center gap-2.5 pt-1">
                       <a
-                        href={`https://t.me/sk_190_rihan?text=Hello%20SR%20Gateway%20Support,%20I%20am%20a%20developer/merchant%20using%20ID%20${currentUser.user_custom_id}.%20Please%20increase%20my%20daily%20API%20request%20limit.`}
+                        href={`https://t.me/srsaportbot?text=Hello%20SR%20Gateway%20Support,%20I%20am%20a%20developer/merchant%20using%20ID%20${currentUser.user_custom_id}.%20Please%20increase%20my%20daily%20API%20request%20limit.`}
                         target="_blank"
                         rel="noreferrer"
                         className="px-4 py-2 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-xs rounded-xl transition shadow-md shadow-sky-500/20 flex items-center gap-2 active:scale-95 cursor-pointer"
                       >
                         <Send className="h-3.5 w-3.5" />
-                        <span>Chat on Telegram Support (@sk_190_rihan)</span>
-                        <ExternalLink className="h-3 w-3 opacity-70" />
-                      </a>
-
-                      <a
-                        href={`https://wa.me/917477661867?text=Hello%20SR%20Gateway%20Support,%20I%20am%20a%20merchant/bot%20maker%20(User%20ID:%20${currentUser.user_custom_id},%20Mobile:%20${currentUser.mobile}).%20Please%20upgrade%20my%20Daily%20API%20Request%20Limit.`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition shadow-md shadow-emerald-600/20 flex items-center gap-2 active:scale-95 cursor-pointer"
-                      >
-                        <MessageSquare className="h-3.5 w-3.5" />
-                        <span>WhatsApp Support (+91 7477661867)</span>
+                        <span>Chat on Telegram Support (@srsaportbot)</span>
                         <ExternalLink className="h-3 w-3 opacity-70" />
                       </a>
                     </div>
@@ -726,7 +715,7 @@ export const DeveloperApiSection: React.FC = () => {
             {/* GET Query Template URL */}
             <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-emerald-400">1. Instant Transfer URL (Template with Placeholders):</span>
+                <span className="font-bold text-emerald-400">1. Use this endpoint for telegram bot for api call:</span>
                 <button
                   onClick={() => copyUrl(requestedApiTemplate, 'template')}
                   className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded-lg text-[11px] font-bold flex items-center gap-1 transition"

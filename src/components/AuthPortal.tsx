@@ -1224,47 +1224,14 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
               <p className="font-bold text-amber-300 mb-1 flex items-center gap-1.5">
                 <span>🛡️ Official Security Support System</span>
               </p>
-              Agar aap apna login password bhool gaye hain, toh admin/customer support se directly WhatsApp ya Telegram par contact karke 2 minute me verify karwake apna password recover/reset karwa sakte hain.
+              Agar aap apna login password bhool gaye hain, toh customer support se directly Telegram (@srsaportbot) par contact karke 2 minute me verify karwake apna password recover/reset karwa sakte hain.
             </div>
 
             {/* Support Channels Grid */}
             <div className="space-y-3">
-              {/* WhatsApp Support Card */}
-              <a
-                href={
-                  settings.whatsapp_support_url ||
-                  `https://wa.me/${(settings.whatsapp_support_number || '7477661867').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
-                    `Hello SR Gateway Support, I forgot my account login password. My Registered Mobile / User ID is: ${loginIdentifier || ''}. Please help me verify and reset my password.`
-                  )}`
-                }
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group flex items-center justify-between p-4 bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-500/40 hover:border-emerald-400 rounded-2xl transition duration-200 shadow-lg"
-              >
-                <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-bold text-lg shrink-0">
-                    💬
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-bold text-white group-hover:text-emerald-300 transition">
-                        WhatsApp Customer Support
-                      </h4>
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                        24x7 DIRECT CHAT
-                      </span>
-                    </div>
-                    <p className="text-xs font-mono text-emerald-400 font-bold mt-0.5">
-                      {settings.whatsapp_support_number || '+91 7477661867'}
-                    </p>
-                  </div>
-                </div>
-                <ExternalLink className="h-4 w-4 text-emerald-400 group-hover:translate-x-0.5 transition shrink-0" />
-              </a>
-
               {/* Telegram Support Card */}
               <a
-                href={settings.support_url || 'https://t.me/SRGatewayBot'}
+                href={settings.support_url || 'https://t.me/srsaportbot'}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group flex items-center justify-between p-4 bg-sky-950/40 hover:bg-sky-900/50 border border-sky-500/40 hover:border-sky-400 rounded-2xl transition duration-200 shadow-lg"
@@ -1283,7 +1250,7 @@ export const AuthPortal: React.FC<AuthPortalProps> = ({ initialMode = 'login' })
                       </span>
                     </div>
                     <p className="text-xs font-mono text-sky-400 font-bold mt-0.5">
-                      {settings.support_telegram_username || '@SRGatewayBot'}
+                      {settings.support_telegram_username || '@srsaportbot'}
                     </p>
                   </div>
                 </div>

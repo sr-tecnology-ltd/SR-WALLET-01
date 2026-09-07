@@ -59,14 +59,19 @@ function WalletAppContent() {
         rawHash === '#ownersahilhai.com' ||
         rawHash === '#ownersahil-hai.com' ||
         rawHash === '#ownersahil%20hai.com' ||
+        rawHash === '#ownersahil' ||
+        rawHash === '#owner' ||
         pathname === '/ownersahilhai.com' ||
-        params.get('portal') === 'ownersahil';
+        params.get('portal') === 'ownersahil' ||
+        params.get('portal') === 'owner';
 
       // Secret Sub-Admin Portal: `#sradminxyzbcsqr`
       const isSecretAdminRoute =
         rawHash === '#sradminxyzbcsqr' ||
+        rawHash === '#subadmin' ||
         pathname === '/sradminxyzbcsqr' ||
-        params.get('portal') === 'sradminxyzbcsqr';
+        params.get('portal') === 'sradminxyzbcsqr' ||
+        params.get('portal') === 'subadmin';
 
       if (isSecretOwnerRoute) {
         if (activeRole !== 'OWNER') {
@@ -75,6 +80,13 @@ function WalletAppContent() {
       } else if (isSecretAdminRoute) {
         if (activeRole !== 'ADMIN') {
           switchUser('admin-001');
+        }
+      } else {
+        // If neither secret route is present in URL, and session is not authenticated, keep on normal User
+        const isOwnerAuthed = sessionStorage.getItem('sr_owner_authed') === 'true';
+        const isSubAdminAuthed = sessionStorage.getItem('sr_subadmin_authed') === 'true';
+        if (!isOwnerAuthed && !isSubAdminAuthed && (activeRole === 'OWNER' || activeRole === 'ADMIN')) {
+          switchUser('user-001');
         }
       }
     };
