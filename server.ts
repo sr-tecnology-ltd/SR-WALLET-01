@@ -270,12 +270,66 @@ function getAdminSessionFromReq(req: Request): AdminSession | null {
   return session;
 }
 
+// Security verification codes for saving settings / executing any admin mutations
+const SUBADMIN_SECURITY_CODE = (process.env.SUBADMIN_SECURITY_CODE || 'serifakhatun1').trim();
+const OWNER_SECURITY_CODE = (process.env.OWNER_SECURITY_CODE || 'serifakhatun190').trim();
+
+function validateAdminSecurityCode(req: Request, requiredRole: 'ADMIN' | 'OWNER'): { valid: boolean; message?: string } {
+  const clientCode = (
+    (req.headers['x-security-code'] as string) ||
+    (req.body && req.body.security_code) ||
+    (req.query && (req.query.security_code as string)) ||
+    ''
+  ).trim();
+
+  if (!clientCode) {
+    return {
+      valid: false,
+      message: '⚠️ Security Code required to perform this action. Access Denied.',
+    };
+  }
+
+  if (requiredRole === 'OWNER') {
+    if (clientCode === OWNER_SECURITY_CODE) {
+      return { valid: true };
+    }
+    return {
+      valid: false,
+      message: '⚠️ Invalid Master Owner Security Code! Authorization Denied.',
+    };
+  }
+
+  // Admin / Sub-admin role: either sub-admin code or owner code is acceptable
+  if (clientCode === SUBADMIN_SECURITY_CODE || clientCode === OWNER_SECURITY_CODE) {
+    return { valid: true };
+  }
+
+  return {
+    valid: false,
+    message: '⚠️ Invalid Sub-Admin Security Code! Authorization Denied.',
+  };
+}
+
 const requireAdminAuth = (req: Request, res: Response, next: any) => {
   const session = getAdminSessionFromReq(req);
   if (!session || (session.role !== 'ADMIN' && session.role !== 'OWNER')) {
     return res.status(401).json({ status: 'error', code: 401, message: 'Unauthorized: Valid Admin session token required' });
   }
   (req as any).adminSession = session;
+
+  // Enforce security code on mutating endpoints (POST, PUT, DELETE, PATCH)
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method) && !req.path.endsWith('/audit-logs')) {
+    const isOwner = session.role === 'OWNER';
+    const validation = validateAdminSecurityCode(req, isOwner ? 'OWNER' : 'ADMIN');
+    if (!validation.valid) {
+      return res.status(403).json({
+        status: 'error',
+        code: 403,
+        message: validation.message,
+      });
+    }
+  }
+
   next();
 };
 
@@ -285,6 +339,19 @@ const requireOwnerAuth = (req: Request, res: Response, next: any) => {
     return res.status(403).json({ status: 'error', code: 403, message: 'Forbidden: Master Owner session token required' });
   }
   (req as any).adminSession = session;
+
+  // Enforce Master Owner security code on mutating endpoints (POST, PUT, DELETE, PATCH)
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method) && !req.path.endsWith('/audit-logs')) {
+    const validation = validateAdminSecurityCode(req, 'OWNER');
+    if (!validation.valid) {
+      return res.status(403).json({
+        status: 'error',
+        code: 403,
+        message: validation.message,
+      });
+    }
+  }
+
   next();
 };
 
@@ -4092,7 +4159,7 @@ app.post('/api/v1/checkout/pay', (req: Request, res: Response) => {
 });
 
 // 10. Developer API Keys Management
-app.post('/api/v1/keys/generate', (req: Request, res: Response) => {
+app.post('/api/v1/keys/generate', requireAdminAuth, (req: Request, res: Response) => {
   const { user_id = 'SR-10029', key_name } = req.body;
   const keyPrefix = `sr_live_${Math.random().toString(36).substring(2, 8)}`;
   const secretKey = `sr_secret_live_${Math.random().toString(36).substring(2)}_${Date.now()}`;
@@ -4128,7 +4195,7 @@ app.get('/api/v1/keys/list', (req: Request, res: Response) => {
   });
 });
 
-app.delete('/api/v1/keys/revoke/:keyId', (req: Request, res: Response) => {
+app.delete('/api/v1/keys/revoke/:keyId', requireAdminAuth, (req: Request, res: Response) => {
   apiKeys = apiKeys.filter((k) => k.id !== req.params.keyId);
   res.json({
     status: 'success',
@@ -4136,10 +4203,6 @@ app.delete('/api/v1/keys/revoke/:keyId', (req: Request, res: Response) => {
     message: 'API Key revoked successfully',
   });
 });
-
-// Security verification codes for saving settings / actions
-const SUBADMIN_SECURITY_CODE = 'serifakhatun1';
-const OWNER_SECURITY_CODE = 'serifakhatun190';
 
 // 11. Admin & System State Endpoints
 function getSanitizedSettingsForRole(role?: string) {
@@ -4184,15 +4247,15 @@ const handleUpdateAdminSettings = (req: Request, res: Response) => {
       return res.status(403).json({
         status: 'error',
         code: 403,
-        message: '⚠️ Security Verification Failed: Invalid Master Owner Security Code! Enter "serifakhatun190" to save changes.',
+        message: '⚠️ Security Verification Failed: Invalid Master Owner Security Code! Access Denied.',
       });
     }
   } else if (userRole === 'ADMIN') {
-    if (clientSecurityCode !== SUBADMIN_SECURITY_CODE) {
+    if (clientSecurityCode !== SUBADMIN_SECURITY_CODE && clientSecurityCode !== OWNER_SECURITY_CODE) {
       return res.status(403).json({
         status: 'error',
         code: 403,
-        message: '⚠️ Security Verification Failed: Invalid Sub-Admin Security Code! Enter "serifakhatun1" to save changes.',
+        message: '⚠️ Security Verification Failed: Invalid Sub-Admin Security Code! Access Denied.',
       });
     }
   }
@@ -4676,6 +4739,25 @@ app.post('/api/v1/admin/verify-pass', (req: Request, res: Response) => {
     success: false,
     message: '⚠️ Galat password hai! Access Denied.',
   });
+});
+
+// Admin Security Code Verification API (checks entered security code without leaking anything)
+app.post('/api/v1/admin/verify-security-code', (req: Request, res: Response) => {
+  const session = getAdminSessionFromReq(req);
+  if (!session || (session.role !== 'ADMIN' && session.role !== 'OWNER')) {
+    return res.status(401).json({ status: 'error', code: 401, message: 'Unauthorized session' });
+  }
+  const isOwner = session.role === 'OWNER';
+  const validation = validateAdminSecurityCode(req, isOwner ? 'OWNER' : 'ADMIN');
+  if (!validation.valid) {
+    return res.status(403).json({
+      status: 'error',
+      code: 403,
+      valid: false,
+      message: validation.message || '⚠️ Invalid Security Code! Authorization Denied.',
+    });
+  }
+  return res.json({ status: 'success', code: 200, valid: true, message: 'Security Code verified successfully.' });
 });
 
 // Admin Audit Logs Endpoints

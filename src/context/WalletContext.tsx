@@ -182,6 +182,7 @@ export const getAdminAuthHeaders = (extraHeaders?: Record<string, string>): Reco
   const adminRole = typeof window !== 'undefined' ? (sessionStorage.getItem('sr_admin_role') || sessionStorage.getItem('sr_owner_role') || sessionStorage.getItem('sr_subadmin_role') || 'ADMIN') : 'ADMIN';
   const adminId = typeof window !== 'undefined' ? (sessionStorage.getItem('sr_admin_id') || sessionStorage.getItem('sr_owner_id') || sessionStorage.getItem('sr_subadmin_id') || 'admin-001') : 'admin-001';
   const adminName = typeof window !== 'undefined' ? (sessionStorage.getItem('sr_admin_name') || sessionStorage.getItem('sr_owner_name') || sessionStorage.getItem('sr_subadmin_name') || 'Administrator') : 'Administrator';
+  const securityCode = typeof window !== 'undefined' ? (sessionStorage.getItem('sr_security_code') || '') : '';
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -192,6 +193,7 @@ export const getAdminAuthHeaders = (extraHeaders?: Record<string, string>): Reco
   if (adminRole) headers['x-user-role'] = adminRole;
   if (adminId) headers['x-admin-id'] = adminId;
   if (adminName) headers['x-admin-name'] = adminName;
+  if (securityCode && !headers['x-security-code']) headers['x-security-code'] = securityCode;
   return headers;
 };
 

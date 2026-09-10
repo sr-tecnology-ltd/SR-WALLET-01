@@ -186,41 +186,42 @@ export const AdminPortal: React.FC = () => {
     fetchSubAdmins();
   }, [fetchSubAdmins, allProfiles]);
 
-  const handleCreateSubAdmin = async (e: React.FormEvent) => {
+  const handleCreateSubAdmin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAdminFullName.trim() || !newAdminMobile.trim()) {
       setAddSubAdminError('Please provide Full Name and Mobile Number.');
       return;
     }
-    setIsSubmittingAdmin(true);
-    setAddSubAdminError(null);
-    try {
-      const res = await ownerCreateSubAdmin({
-        full_name: newAdminFullName.trim(),
-        mobile: newAdminMobile.trim(),
-        email: newAdminEmail.trim() || undefined,
-        password: newAdminPassword.trim() || 'Staff@123',
-        rpin: newAdminRpin.trim() || '1234',
-        telegram_chat_id: newAdminTelegramChatId.trim() || undefined,
-      });
-      if (res.success) {
-        showAlert(res.message || '✅ Sub-Admin created successfully!');
-        setIsAddSubAdminModalOpen(false);
-        setNewAdminFullName('');
-        setNewAdminMobile('');
-        setNewAdminEmail('');
-        setNewAdminPassword('Staff@123');
-        setNewAdminRpin('1234');
-        setNewAdminTelegramChatId('');
-        await fetchSubAdmins();
-      } else {
-        setAddSubAdminError(res.message);
+    requestSecurityApproval(`Create Sub-Admin: ${newAdminFullName.trim()}`, async () => {
+      setIsSubmittingAdmin(true);
+      setAddSubAdminError(null);
+      try {
+        const res = await ownerCreateSubAdmin({
+          full_name: newAdminFullName.trim(),
+          mobile: newAdminMobile.trim(),
+          email: newAdminEmail.trim() || undefined,
+          password: newAdminPassword.trim() || 'Staff@123',
+          rpin: newAdminRpin.trim() || '1234',
+          telegram_chat_id: newAdminTelegramChatId.trim() || undefined,
+        });
+        if (res.success) {
+          showAlert(res.message || '✅ Sub-Admin created successfully!');
+          setIsAddSubAdminModalOpen(false);
+          setNewAdminFullName('');
+          setNewAdminMobile('');
+          setNewAdminEmail('');
+          setNewAdminPassword('Staff@123');
+          setNewAdminRpin('1234');
+          setNewAdminTelegramChatId('');
+          await fetchSubAdmins();
+        } else {
+          setAddSubAdminError(res.message);
+          throw new Error(res.message);
+        }
+      } finally {
+        setIsSubmittingAdmin(false);
       }
-    } catch (err: any) {
-      setAddSubAdminError(err?.message || 'Failed to create sub-admin');
-    } finally {
-      setIsSubmittingAdmin(false);
-    }
+    });
   };
 
   const handleOpenEditSubAdmin = (admin: UserProfile) => {
@@ -236,62 +237,53 @@ export const AdminPortal: React.FC = () => {
     });
   };
 
-  const handleSaveSubAdminEdit = async (e: React.FormEvent) => {
+  const handleSaveSubAdminEdit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedAdminForEdit) return;
-    setIsSavingAdminEdit(true);
-    try {
-      const res = await ownerUpdateSubAdmin(selectedAdminForEdit.id, editAdminForm);
+    requestSecurityApproval(`Update Sub-Admin Account: ${selectedAdminForEdit.full_name}`, async () => {
+      setIsSavingAdminEdit(true);
+      try {
+        const res = await ownerUpdateSubAdmin(selectedAdminForEdit.id, editAdminForm);
+        if (res.success) {
+          showAlert(res.message || '✅ Sub-Admin updated successfully!');
+          setSelectedAdminForEdit(null);
+          await fetchSubAdmins();
+        } else {
+          showAlert('❌ Failed: ' + res.message);
+          throw new Error(res.message);
+        }
+      } finally {
+        setIsSavingAdminEdit(false);
+      }
+    });
+  };
+
+  const handleToggleSubAdminBan = (admin: UserProfile) => {
+    const newStatus = admin.status === 'BANNED' ? 'ACTIVE' : 'BANNED';
+    const actionLabel = newStatus === 'BANNED' ? 'Ban Sub-Admin' : 'Unban Sub-Admin';
+    requestSecurityApproval(`${actionLabel}: ${admin.full_name}`, async () => {
+      const res = await ownerUpdateSubAdmin(admin.id, { status: newStatus });
       if (res.success) {
-        showAlert(res.message || '✅ Sub-Admin updated successfully!');
-        setSelectedAdminForEdit(null);
+        showAlert(`✅ Sub-Admin ${admin.full_name} is now ${newStatus}!`);
         await fetchSubAdmins();
       } else {
         showAlert('❌ Failed: ' + res.message);
+        throw new Error(res.message);
       }
-    } catch (e: any) {
-      showAlert('❌ Error updating sub-admin: ' + e?.message);
-    } finally {
-      setIsSavingAdminEdit(false);
-    }
+    });
   };
 
-  const handleToggleSubAdminBan = async (admin: UserProfile) => {
-    const newStatus = admin.status === 'BANNED' ? 'ACTIVE' : 'BANNED';
-    const actionLabel = newStatus === 'BANNED' ? 'BAN' : 'UNBAN';
-    let confirmed = true;
-    try {
-      confirmed = window.confirm(`Are you sure you want to ${actionLabel} Sub-Admin ${admin.full_name} (${admin.user_custom_id})?`);
-    } catch {
-      confirmed = true;
-    }
-    if (!confirmed) return;
-
-    const res = await ownerUpdateSubAdmin(admin.id, { status: newStatus });
-    if (res.success) {
-      showAlert(`✅ Sub-Admin ${admin.full_name} is now ${newStatus}!`);
-      await fetchSubAdmins();
-    } else {
-      showAlert('❌ Failed: ' + res.message);
-    }
-  };
-
-  const handleDeleteSubAdmin = async (admin: UserProfile) => {
-    let confirmed = true;
-    try {
-      confirmed = window.confirm(`⚠️ PERMANENT ACTION:\nAre you sure you want to permanently REMOVE Sub-Admin ${admin.full_name} (${admin.user_custom_id})?\nTheir access to the staff portal will be revoked immediately.`);
-    } catch {
-      confirmed = true;
-    }
-    if (!confirmed) return;
-
-    const res = await ownerDeleteSubAdmin(admin.id);
-    if (res.success) {
-      showAlert(`✅ Sub-Admin ${admin.full_name} removed successfully!`);
-      await fetchSubAdmins();
-    } else {
-      showAlert('❌ Failed: ' + res.message);
-    }
+  const handleDeleteSubAdmin = (admin: UserProfile) => {
+    requestSecurityApproval(`Permanently Delete Sub-Admin: ${admin.full_name}`, async () => {
+      const res = await ownerDeleteSubAdmin(admin.id);
+      if (res.success) {
+        showAlert(`✅ Sub-Admin ${admin.full_name} removed successfully!`);
+        await fetchSubAdmins();
+      } else {
+        showAlert('❌ Failed: ' + res.message);
+        throw new Error(res.message);
+      }
+    });
   };
 
   // Search & Filter state
@@ -357,28 +349,37 @@ export const AdminPortal: React.FC = () => {
   const handleConfirmSecurityCode = async (e: React.FormEvent) => {
     e.preventDefault();
     const enteredCode = securityCodeInput.trim();
-    const expectedCode = isMasterOwner ? 'serifakhatun190' : 'serifakhatun1';
-
-    if (enteredCode !== expectedCode) {
-      setSecurityModalError(
-        isMasterOwner
-          ? '⚠️ Galat Master Security Code! Enter "serifakhatun190" to proceed.'
-          : '⚠️ Galat Sub-Admin Security Code! Enter "serifakhatun1" to proceed.'
-      );
+    if (!enteredCode) {
+      setSecurityModalError('⚠️ Please enter your security code to proceed.');
       return;
     }
 
     if (pendingSecurityAction) {
       setIsExecutingSecurityAction(true);
+      setSecurityModalError(null);
       try {
+        sessionStorage.setItem('sr_security_code', enteredCode);
+
+        // Verify with server backend first
+        const verifyRes = await fetch('/api/v1/admin/verify-security-code', {
+          method: 'POST',
+          headers: getAdminAuthHeaders({ 'x-security-code': enteredCode }),
+          body: JSON.stringify({ security_code: enteredCode }),
+        });
+        const verifyData = await verifyRes.json();
+        if (!verifyRes.ok || !verifyData.valid) {
+          throw new Error(verifyData.message || '⚠️ Invalid Security Code! Authorization Denied.');
+        }
+
         await pendingSecurityAction(enteredCode);
         setShowSecurityModal(false);
         setSecurityCodeInput('');
         setSecurityModalError(null);
         setPendingSecurityAction(null);
       } catch (err: any) {
-        setSecurityModalError(err?.message || 'Action execution failed');
+        setSecurityModalError(err?.message || '⚠️ Invalid Security Code! Authorization Denied.');
       } finally {
+        sessionStorage.removeItem('sr_security_code');
         setIsExecutingSecurityAction(false);
       }
     }
@@ -653,35 +654,41 @@ export const AdminPortal: React.FC = () => {
   const [wipeConfirmText, setWipeConfirmText] = useState<string>('');
   const [actionAlertMsg, setActionAlertMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const handleConfirmResetAllBalances = async () => {
-    setIsResetBalancesLoading(true);
-    try {
-      const res = await resetAllUserBalances();
-      setActionAlertMsg({ type: 'success', text: res.message || 'All user balances have been reset to ₹0.00' });
-      setIsResetBalancesModalOpen(false);
-      setResetConfirmText('');
-    } catch (e: any) {
-      setActionAlertMsg({ type: 'error', text: e?.message || 'Failed to reset user balances.' });
-    } finally {
-      setIsResetBalancesLoading(false);
-    }
+  const handleConfirmResetAllBalances = () => {
+    requestSecurityApproval('Reset All User Balances to ₹0.00', async () => {
+      setIsResetBalancesLoading(true);
+      try {
+        const res = await resetAllUserBalances();
+        setActionAlertMsg({ type: 'success', text: res.message || 'All user balances have been reset to ₹0.00' });
+        setIsResetBalancesModalOpen(false);
+        setResetConfirmText('');
+      } catch (e: any) {
+        setActionAlertMsg({ type: 'error', text: e?.message || 'Failed to reset user balances.' });
+        throw e;
+      } finally {
+        setIsResetBalancesLoading(false);
+      }
+    });
   };
 
-  const handleConfirmWipeAllUsers = async () => {
-    setIsWipeUsersLoading(true);
-    try {
-      const res = await wipeAllUserData();
-      setActionAlertMsg({ type: 'success', text: res.message || 'All user data wiped successfully. Users can now re-register.' });
-      setIsWipeUsersModalOpen(false);
-      setWipeConfirmText('');
-    } catch (e: any) {
-      setActionAlertMsg({ type: 'error', text: e?.message || 'Failed to wipe user data.' });
-    } finally {
-      setIsWipeUsersLoading(false);
-    }
+  const handleConfirmWipeAllUsers = () => {
+    requestSecurityApproval('PERMANENTLY WIPE ALL USERS DATA', async () => {
+      setIsWipeUsersLoading(true);
+      try {
+        const res = await wipeAllUserData();
+        setActionAlertMsg({ type: 'success', text: res.message || 'All user data wiped successfully. Users can now re-register.' });
+        setIsWipeUsersModalOpen(false);
+        setWipeConfirmText('');
+      } catch (e: any) {
+        setActionAlertMsg({ type: 'error', text: e?.message || 'Failed to wipe user data.' });
+        throw e;
+      } finally {
+        setIsWipeUsersLoading(false);
+      }
+    });
   };
 
-  const handleCreateUserSubmit = async (e: React.FormEvent) => {
+  const handleCreateUserSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserName.trim()) {
       setAddUserError('Please enter full name of user.');
@@ -702,35 +709,36 @@ export const AdminPortal: React.FC = () => {
       return;
     }
 
-    setIsCreatingUser(true);
-    setAddUserError(null);
-    try {
-      const result = await adminCreateUser({
-        fullName: newUserName.trim(),
-        mobile: cleanPhone,
-        email: newUserEmail.trim(),
-        password: newUserPassword.trim() || '123456',
-        rpin: cleanRpin,
-        initialBalance: Number(newUserBalance) || 0,
-        telegramChatId: newUserChatId.trim() || undefined,
-      });
-
-      if (result.success && result.user) {
-        setCreatedUserResult({
-          user: result.user,
+    requestSecurityApproval(`Create New User Account: ${newUserName.trim()}`, async () => {
+      setIsCreatingUser(true);
+      setAddUserError(null);
+      try {
+        const result = await adminCreateUser({
+          fullName: newUserName.trim(),
+          mobile: cleanPhone,
+          email: newUserEmail.trim(),
           password: newUserPassword.trim() || '123456',
           rpin: cleanRpin,
-          balance: Number(newUserBalance) || 0,
+          initialBalance: Number(newUserBalance) || 0,
+          telegramChatId: newUserChatId.trim() || undefined,
         });
-        showAlert(`✅ User ${result.user.full_name} (${result.user.user_custom_id}) created successfully!`);
-      } else {
-        setAddUserError(result.message || 'Failed to create user account.');
+
+        if (result.success && result.user) {
+          setCreatedUserResult({
+            user: result.user,
+            password: newUserPassword.trim() || '123456',
+            rpin: cleanRpin,
+            balance: Number(newUserBalance) || 0,
+          });
+          showAlert(`✅ User ${result.user.full_name} (${result.user.user_custom_id}) created successfully!`);
+        } else {
+          setAddUserError(result.message || 'Failed to create user account.');
+          throw new Error(result.message);
+        }
+      } finally {
+        setIsCreatingUser(false);
       }
-    } catch (err: any) {
-      setAddUserError(err?.message || 'Unexpected error creating user account.');
-    } finally {
-      setIsCreatingUser(false);
-    }
+    });
   };
 
   const handleCopyCreatedUserCreds = () => {
@@ -914,101 +922,167 @@ export const AdminPortal: React.FC = () => {
       });
   }, [allProfiles, userSearch]);
 
-  const handleAdminAddBalance = async () => {
+  const handleAdminAddBalance = () => {
     if (!selectedUserForModal || isAdjustingBalance) return;
-    setIsAdjustingBalance(true);
-    try {
-      const res = await addBalanceByAdmin(selectedUserForModal.id, modalAmount, modalReason || 'Manual Admin Top-up');
-      if (res.success) {
-        showAlert(res.message);
-        setAdminActionModal(null);
-        setModalReason('');
-        await refreshFromBackend();
-      } else {
-        showAlert(res.message);
+    requestSecurityApproval(`Credit ₹${modalAmount} to ${selectedUserForModal.full_name}`, async () => {
+      setIsAdjustingBalance(true);
+      try {
+        const res = await addBalanceByAdmin(selectedUserForModal.id, modalAmount, modalReason || 'Manual Admin Top-up');
+        if (res.success) {
+          showAlert(res.message);
+          setAdminActionModal(null);
+          setModalReason('');
+          await refreshFromBackend();
+        } else {
+          showAlert(res.message);
+          throw new Error(res.message);
+        }
+      } finally {
+        setIsAdjustingBalance(false);
       }
-    } finally {
-      setIsAdjustingBalance(false);
-    }
+    });
   };
 
-  const handleAdminCutBalance = async () => {
+  const handleAdminCutBalance = () => {
     if (!selectedUserForModal || isAdjustingBalance) return;
-    setIsAdjustingBalance(true);
-    try {
-      const res = await cutBalanceByAdmin(selectedUserForModal.id, modalAmount, modalReason || 'Manual Admin Adjustment');
-      if (res.success) {
-        showAlert(res.message);
-        setAdminActionModal(null);
-        setModalReason('');
-        await refreshFromBackend();
-      } else {
-        showAlert(res.message);
+    requestSecurityApproval(`Deduct ₹${modalAmount} from ${selectedUserForModal.full_name}`, async () => {
+      setIsAdjustingBalance(true);
+      try {
+        const res = await cutBalanceByAdmin(selectedUserForModal.id, modalAmount, modalReason || 'Manual Admin Adjustment');
+        if (res.success) {
+          showAlert(res.message);
+          setAdminActionModal(null);
+          setModalReason('');
+          await refreshFromBackend();
+        } else {
+          showAlert(res.message);
+          throw new Error(res.message);
+        }
+      } finally {
+        setIsAdjustingBalance(false);
       }
-    } finally {
-      setIsAdjustingBalance(false);
-    }
+    });
   };
 
   const handleAdminUpdateQuota = () => {
     if (!selectedUserForModal) return;
-    const res = updateUserRequestLimit(selectedUserForModal.id, userQuotaLimitInput);
-    if (res.success) {
-      showAlert(res.message);
-      setAdminActionModal(null);
-    } else {
-      showAlert(res.message);
-    }
+    requestSecurityApproval(`Update Daily Quota for ${selectedUserForModal.full_name} (${userQuotaLimitInput} txns)`, async () => {
+      const res = updateUserRequestLimit(selectedUserForModal.id, userQuotaLimitInput);
+      if (res.success) {
+        showAlert(res.message);
+        setAdminActionModal(null);
+      } else {
+        showAlert(res.message);
+        throw new Error(res.message);
+      }
+    });
   };
 
   const handleAdminResetQuotaCount = (targetUser?: UserProfile) => {
     const u = targetUser || selectedUserForModal;
     if (!u) return;
-    const res = resetUserDailyRequestCount(u.id);
-    if (res.success) {
-      showAlert(res.message);
-      setAdminActionModal(null);
-    } else {
-      showAlert(res.message);
-    }
+    requestSecurityApproval(`Reset Daily Request Count for ${u.full_name}`, async () => {
+      const res = resetUserDailyRequestCount(u.id);
+      if (res.success) {
+        showAlert(res.message);
+        setAdminActionModal(null);
+      } else {
+        showAlert(res.message);
+        throw new Error(res.message);
+      }
+    });
   };
 
-  const handleDepositApprove = async (id: string) => {
-    const res = await approveDeposit(id);
-    showAlert(res.message);
-    await refreshFromBackend();
+  const handleDepositApprove = (id: string) => {
+    const dep = deposits.find((d) => d.id === id);
+    const amtStr = dep ? `₹${dep.amount}` : '';
+    requestSecurityApproval(`Approve Deposit ${amtStr} (ID: ${id})`, async () => {
+      const res = await approveDeposit(id);
+      if (res.success) {
+        showAlert(res.message);
+        await refreshFromBackend();
+      } else {
+        showAlert(res.message);
+        throw new Error(res.message);
+      }
+    });
   };
 
-  const handleDepositReject = async () => {
+  const handleDepositReject = () => {
     if (!rejectDepositId) return;
-    const res = await rejectDeposit(rejectDepositId, depositRejectReason);
-    showAlert(res.message);
-    setRejectDepositId(null);
-    await refreshFromBackend();
+    requestSecurityApproval(`Reject Deposit (ID: ${rejectDepositId})`, async () => {
+      const res = await rejectDeposit(rejectDepositId, depositRejectReason);
+      if (res.success) {
+        showAlert(res.message);
+        setRejectDepositId(null);
+        await refreshFromBackend();
+      } else {
+        showAlert(res.message);
+        throw new Error(res.message);
+      }
+    });
   };
 
-  const handleWithdrawalApprove = async (id: string) => {
-    const res = await approveWithdrawal(id);
-    showAlert(res.message);
-    await refreshFromBackend();
+  const handleWithdrawalApprove = (id: string) => {
+    const wd = withdrawals.find((w) => w.id === id);
+    const amtStr = wd ? `₹${wd.amount}` : '';
+    requestSecurityApproval(`Approve Withdrawal ${amtStr} (ID: ${id})`, async () => {
+      const res = await approveWithdrawal(id);
+      if (res.success) {
+        showAlert(res.message);
+        await refreshFromBackend();
+      } else {
+        showAlert(res.message);
+        throw new Error(res.message);
+      }
+    });
   };
 
-  const handleWithdrawalMarkPaid = async () => {
+  const handleWithdrawalMarkPaid = () => {
     if (!markPaidWithdrawalId) return;
     const utr = markPaidUtr.trim() || `BANK-UTR-${Date.now().toString().slice(-8)}`;
-    const res = await markWithdrawalPaid(markPaidWithdrawalId, utr);
-    showAlert(res.message);
-    setMarkPaidWithdrawalId(null);
-    setMarkPaidUtr('');
-    await refreshFromBackend();
+    requestSecurityApproval(`Mark Withdrawal as Paid (UTR: ${utr})`, async () => {
+      const res = await markWithdrawalPaid(markPaidWithdrawalId, utr);
+      if (res.success) {
+        showAlert(res.message);
+        setMarkPaidWithdrawalId(null);
+        setMarkPaidUtr('');
+        await refreshFromBackend();
+      } else {
+        showAlert(res.message);
+        throw new Error(res.message);
+      }
+    });
   };
 
-  const handleWithdrawalReject = async () => {
+  const handleWithdrawalReject = () => {
     if (!rejectWithdrawalId) return;
-    const res = await rejectWithdrawal(rejectWithdrawalId, withdrawalRejectReason);
-    showAlert(res.message);
-    setRejectWithdrawalId(null);
-    await refreshFromBackend();
+    requestSecurityApproval(`Reject Withdrawal (ID: ${rejectWithdrawalId})`, async () => {
+      const res = await rejectWithdrawal(rejectWithdrawalId, withdrawalRejectReason);
+      if (res.success) {
+        showAlert(res.message);
+        setRejectWithdrawalId(null);
+        await refreshFromBackend();
+      } else {
+        showAlert(res.message);
+        throw new Error(res.message);
+      }
+    });
+  };
+
+  const handleToggleUserBan = (user: UserProfile) => {
+    const isBanning = user.status === 'ACTIVE';
+    const actionLabel = isBanning ? `Ban User Account: ${user.full_name}` : `Unban User Account: ${user.full_name}`;
+    requestSecurityApproval(actionLabel, async () => {
+      if (isBanning) {
+        await banUser(user.id, `${isSubAdmin ? 'Sub-Admin Staff' : 'Master Owner'} manual account restriction`);
+        showAlert(`🔒 User ${user.full_name} account suspended.`);
+      } else {
+        await unbanUser(user.id);
+        showAlert(`✅ User ${user.full_name} account restored.`);
+      }
+      await refreshFromBackend();
+    });
   };
 
   const saveSystemSettings = (e: React.FormEvent) => {
@@ -1064,23 +1138,24 @@ export const AdminPortal: React.FC = () => {
   };
 
   // Handle Save User Credentials (Password, RPIN, Chat ID, Phone, Email)
-  const handleSaveUserCredentials = async (e: React.FormEvent) => {
+  const handleSaveUserCredentials = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUserForModal) return;
-    setIsSavingCreds(true);
-    try {
-      const res = await adminUpdateUserCredentials(selectedUserForModal.id, credsForm);
-      if (res.success) {
-        showAlert(res.message || 'Credentials updated successfully!');
-        setAdminActionModal(null);
-      } else {
-        showAlert('❌ Failed: ' + res.message);
+    requestSecurityApproval(`Update Credentials for ${selectedUserForModal.full_name}`, async () => {
+      setIsSavingCreds(true);
+      try {
+        const res = await adminUpdateUserCredentials(selectedUserForModal.id, credsForm);
+        if (res.success) {
+          showAlert(res.message || 'Credentials updated successfully!');
+          setAdminActionModal(null);
+        } else {
+          showAlert('❌ Failed: ' + res.message);
+          throw new Error(res.message);
+        }
+      } finally {
+        setIsSavingCreds(false);
       }
-    } catch (e: any) {
-      showAlert('❌ Error updating credentials: ' + e?.message);
-    } finally {
-      setIsSavingCreds(false);
-    }
+    });
   };
 
   // Handle Export Database (Download .json file)
@@ -1125,49 +1200,33 @@ export const AdminPortal: React.FC = () => {
   };
 
   // Handle Restore Full Database from JSON
-  const handleRestoreDatabase = async (jsonString: string) => {
+  const handleRestoreDatabase = (jsonString: string) => {
     if (!jsonString || jsonString.trim() === '') {
       setImportFeedback({ type: 'error', message: 'Please provide valid JSON content to restore.' });
       return;
     }
-    try {
-      setIsImportingDb(true);
-      setImportFeedback(null);
-      const parsed = JSON.parse(jsonString.trim());
-      const userCount = Array.isArray(parsed.users) ? parsed.users.length : 0;
-      const walletCount = parsed.wallets ? Object.keys(parsed.wallets).length : 0;
-
-      let confirmed = true;
+    requestSecurityApproval('Restore & Overwrite Entire System Database', async () => {
       try {
-        confirmed = window.confirm(
-          `Are you sure you want to restore this database backup?\n\n` +
-          `• Users to load: ${userCount}\n` +
-          `• Wallets: ${walletCount}\n` +
-          `• Settings, Transactions & Ledgers included\n\n` +
-          `This will instantly sync with the server disk (/data/srgateway_database.json) and update all balances!`
-        );
-      } catch {
-        confirmed = true;
-      }
-
-      if (!confirmed) {
+        setIsImportingDb(true);
+        setImportFeedback(null);
+        const parsed = JSON.parse(jsonString.trim());
+        const userCount = Array.isArray(parsed.users) ? parsed.users.length : 0;
+        const res = await restoreFullDatabase(parsed);
+        if (res.success) {
+          setImportFeedback({ type: 'success', message: res.message || `Loaded ${userCount} users & wallets successfully!` });
+          showAlert(`✅ Database Restored! ${userCount} users & all balances synced!`);
+          setImportJsonText('');
+        } else {
+          setImportFeedback({ type: 'error', message: res.message || 'Database restore failed on server.' });
+          throw new Error(res.message);
+        }
+      } catch (e: any) {
+        setImportFeedback({ type: 'error', message: 'Invalid JSON format: ' + e?.message });
+        throw e;
+      } finally {
         setIsImportingDb(false);
-        return;
       }
-
-      const res = await restoreFullDatabase(parsed);
-      if (res.success) {
-        setImportFeedback({ type: 'success', message: res.message || `Loaded ${userCount} users & wallets successfully!` });
-        showAlert(`✅ Database Restored! ${userCount} users & all balances synced!`);
-        setImportJsonText('');
-      } else {
-        setImportFeedback({ type: 'error', message: res.message || 'Database restore failed on server.' });
-      }
-    } catch (e: any) {
-      setImportFeedback({ type: 'error', message: 'Invalid JSON format: ' + e?.message });
-    } finally {
-      setIsImportingDb(false);
-    }
+    });
   };
 
   // Handle file picker selection for database restore
@@ -1829,7 +1888,7 @@ export const AdminPortal: React.FC = () => {
                         {/* Ban / Unban User Account (Sub-Admin & Owner both have access) */}
                         {user.status === 'ACTIVE' ? (
                           <button
-                            onClick={() => banUser(user.id, `${isSubAdmin ? 'Sub-Admin Staff' : 'Master Owner'} manual account restriction`)}
+                            onClick={() => handleToggleUserBan(user)}
                             className="p-1.5 bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 rounded-xl transition border border-rose-500/30 cursor-pointer flex items-center gap-1 text-xs font-bold px-2.5"
                             title="Ban / Suspend User Account"
                           >
@@ -1838,7 +1897,7 @@ export const AdminPortal: React.FC = () => {
                           </button>
                         ) : (
                           <button
-                            onClick={() => unbanUser(user.id)}
+                            onClick={() => handleToggleUserBan(user)}
                             className="p-1.5 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 rounded-xl transition border border-emerald-500/30 cursor-pointer flex items-center gap-1 text-xs font-bold px-2.5"
                             title="Unban / Restore User Account"
                           >
@@ -4184,8 +4243,8 @@ export const AdminPortal: React.FC = () => {
                 <ShieldCheck className="h-4 w-4 text-cyan-400 shrink-0" />
                 <span>
                   {isMasterOwner
-                    ? 'Master Owner Save Protection: Clicking Save will prompt for Master Security Code (serifakhatun190).'
-                    : 'Sub-Admin Save Protection: Clicking Save will prompt for Sub-Admin Security Code (serifakhatun1).'}
+                    ? 'Master Owner Save Protection: Clicking Save requires entering your Master Security Code.'
+                    : 'Sub-Admin Save Protection: Clicking Save requires entering your Sub-Admin Security Code.'}
                 </span>
               </div>
 
