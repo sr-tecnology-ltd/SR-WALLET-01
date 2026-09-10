@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useWallet } from '../context/WalletContext';
+import { useWallet, getAdminAuthHeaders } from '../context/WalletContext';
 import {
   ShieldCheck,
   Users,
@@ -336,6 +336,54 @@ export const AdminPortal: React.FC = () => {
   const [importFeedback, setImportFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Security Code Action Verification Modal
+  const [showSecurityModal, setShowSecurityModal] = useState<boolean>(false);
+  const [securityCodeInput, setSecurityCodeInput] = useState<string>('');
+  const [showSecurityCodeText, setShowSecurityCodeText] = useState<boolean>(false);
+  const [securityModalError, setSecurityModalError] = useState<string | null>(null);
+  const [pendingSecurityAction, setPendingSecurityAction] = useState<((code: string) => Promise<void>) | null>(null);
+  const [securityActionTitle, setSecurityActionTitle] = useState<string>('Save Changes');
+  const [isExecutingSecurityAction, setIsExecutingSecurityAction] = useState<boolean>(false);
+
+  const requestSecurityApproval = (title: string, action: (code: string) => Promise<void>) => {
+    setSecurityCodeInput('');
+    setShowSecurityCodeText(false);
+    setSecurityModalError(null);
+    setSecurityActionTitle(title);
+    setPendingSecurityAction(() => action);
+    setShowSecurityModal(true);
+  };
+
+  const handleConfirmSecurityCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const enteredCode = securityCodeInput.trim();
+    const expectedCode = isMasterOwner ? 'serifakhatun190' : 'serifakhatun1';
+
+    if (enteredCode !== expectedCode) {
+      setSecurityModalError(
+        isMasterOwner
+          ? '⚠️ Galat Master Security Code! Enter "serifakhatun190" to proceed.'
+          : '⚠️ Galat Sub-Admin Security Code! Enter "serifakhatun1" to proceed.'
+      );
+      return;
+    }
+
+    if (pendingSecurityAction) {
+      setIsExecutingSecurityAction(true);
+      try {
+        await pendingSecurityAction(enteredCode);
+        setShowSecurityModal(false);
+        setSecurityCodeInput('');
+        setSecurityModalError(null);
+        setPendingSecurityAction(null);
+      } catch (err: any) {
+        setSecurityModalError(err?.message || 'Action execution failed');
+      } finally {
+        setIsExecutingSecurityAction(false);
+      }
+    }
+  };
+
   const toggleShowPassword = (userId: string) => {
     setShowUserPasswords((prev) => ({ ...prev, [userId]: !prev[userId] }));
   };
@@ -353,32 +401,38 @@ export const AdminPortal: React.FC = () => {
   const DEFAULT_SUB_ADMIN_PASS = 'Sksahilbhaixxxcom';
   const [adminPassInput, setAdminPassInput] = useState('');
   const [isPassAuthed, setIsPassAuthed] = useState<boolean>(() => {
+    const hasToken = typeof window !== 'undefined' && (sessionStorage.getItem('sr_admin_token') || sessionStorage.getItem('sr_owner_token'));
     if (isMasterOwner) {
       const ownerPass = sessionStorage.getItem('sr_owner_pass');
       return (
         sessionStorage.getItem('sr_owner_authed') === 'true' &&
+        hasToken &&
         (ownerPass === MASTER_ADMIN_PASS || ownerPass?.toLowerCase() === MASTER_ADMIN_PASS.toLowerCase())
       );
     } else {
       const subAdminPass = sessionStorage.getItem('sr_subadmin_pass');
       return (
         sessionStorage.getItem('sr_subadmin_authed') === 'true' &&
+        hasToken &&
         (subAdminPass === DEFAULT_SUB_ADMIN_PASS || subAdminPass?.toLowerCase() === DEFAULT_SUB_ADMIN_PASS.toLowerCase())
       );
     }
   });
 
   useEffect(() => {
+    const hasToken = typeof window !== 'undefined' && (sessionStorage.getItem('sr_admin_token') || sessionStorage.getItem('sr_owner_token'));
     if (isMasterOwner) {
       const ownerPass = sessionStorage.getItem('sr_owner_pass');
       setIsPassAuthed(
         sessionStorage.getItem('sr_owner_authed') === 'true' &&
+        !!hasToken &&
         (ownerPass === MASTER_ADMIN_PASS || ownerPass?.toLowerCase() === MASTER_ADMIN_PASS.toLowerCase())
       );
     } else {
       const subAdminPass = sessionStorage.getItem('sr_subadmin_pass');
       setIsPassAuthed(
         sessionStorage.getItem('sr_subadmin_authed') === 'true' &&
+        !!hasToken &&
         (subAdminPass === DEFAULT_SUB_ADMIN_PASS || subAdminPass?.toLowerCase() === DEFAULT_SUB_ADMIN_PASS.toLowerCase())
       );
     }
@@ -394,77 +448,13 @@ export const AdminPortal: React.FC = () => {
     const cleanPass = adminPassInput.trim();
     if (!cleanPass) return;
 
-    if (isMasterOwner) {
-      // MASTER OWNER GATE
-      if (cleanPass === MASTER_ADMIN_PASS || cleanPass.toLowerCase() === MASTER_ADMIN_PASS.toLowerCase()) {
-        setIsPassAuthed(true);
-        sessionStorage.setItem('sr_owner_authed', 'true');
-        sessionStorage.setItem('sr_owner_role', 'MASTER_OWNER');
-        sessionStorage.setItem('sr_owner_id', 'owner-001');
-        sessionStorage.setItem('sr_owner_name', 'Master Administrator');
-        sessionStorage.setItem('sr_owner_pass', MASTER_ADMIN_PASS);
-        sessionStorage.setItem('sr_admin_authed', 'true');
-        sessionStorage.setItem('sr_admin_role', 'MASTER_OWNER');
-        sessionStorage.setItem('sr_admin_pass', MASTER_ADMIN_PASS);
-        setPassError(null);
-        return;
-      }
-
-      setIsVerifyingPass(true);
-      setPassError(null);
-      try {
-        const res = await adminVerifyGatePassword(cleanPass, 'OWNER');
-        if (res.success && res.role === 'OWNER') {
-          setIsPassAuthed(true);
-          sessionStorage.setItem('sr_owner_authed', 'true');
-          sessionStorage.setItem('sr_owner_role', 'MASTER_OWNER');
-          sessionStorage.setItem('sr_owner_id', res.admin_id || 'owner-001');
-          sessionStorage.setItem('sr_owner_name', res.admin_name || 'Master Administrator');
-          sessionStorage.setItem('sr_owner_pass', MASTER_ADMIN_PASS);
-          sessionStorage.setItem('sr_admin_authed', 'true');
-          sessionStorage.setItem('sr_admin_role', 'MASTER_OWNER');
-          sessionStorage.setItem('sr_admin_pass', MASTER_ADMIN_PASS);
-          setPassError(null);
-        } else {
-          setPassError('⚠️ Galat password hai! Access Denied.');
-        }
-      } catch (err: any) {
-        setPassError('⚠️ Galat password hai! Access Denied.');
-      } finally {
-        setIsVerifyingPass(false);
-      }
-      return;
-    }
-
-    // SUB-ADMIN GATE
-    if (cleanPass === DEFAULT_SUB_ADMIN_PASS || cleanPass.toLowerCase() === DEFAULT_SUB_ADMIN_PASS.toLowerCase()) {
-      setIsPassAuthed(true);
-      sessionStorage.setItem('sr_subadmin_authed', 'true');
-      sessionStorage.setItem('sr_subadmin_role', 'ADMIN');
-      sessionStorage.setItem('sr_subadmin_id', 'sub-cred-000');
-      sessionStorage.setItem('sr_subadmin_name', 'Sub-Admin Staff');
-      sessionStorage.setItem('sr_subadmin_pass', DEFAULT_SUB_ADMIN_PASS);
-      sessionStorage.setItem('sr_admin_authed', 'true');
-      sessionStorage.setItem('sr_admin_role', 'ADMIN');
-      sessionStorage.setItem('sr_admin_pass', DEFAULT_SUB_ADMIN_PASS);
-      setPassError(null);
-      return;
-    }
-
     setIsVerifyingPass(true);
     setPassError(null);
     try {
-      const res = await adminVerifyGatePassword(cleanPass, 'ADMIN');
-      if (res.success && res.role !== 'OWNER') {
+      const gateType = isMasterOwner ? 'OWNER' : 'ADMIN';
+      const res = await adminVerifyGatePassword(cleanPass, gateType);
+      if (res.success && (isMasterOwner ? res.role === 'OWNER' : res.role !== 'OWNER')) {
         setIsPassAuthed(true);
-        sessionStorage.setItem('sr_subadmin_authed', 'true');
-        sessionStorage.setItem('sr_subadmin_role', res.role || 'ADMIN');
-        sessionStorage.setItem('sr_subadmin_id', res.admin_id || 'sub-cred-000');
-        sessionStorage.setItem('sr_subadmin_name', res.admin_name || 'Sub-Admin Staff');
-        sessionStorage.setItem('sr_subadmin_pass', cleanPass);
-        sessionStorage.setItem('sr_admin_authed', 'true');
-        sessionStorage.setItem('sr_admin_role', res.role || 'ADMIN');
-        sessionStorage.setItem('sr_admin_pass', cleanPass);
         setPassError(null);
       } else {
         setPassError('⚠️ Galat password hai! Access Denied.');
@@ -484,6 +474,7 @@ export const AdminPortal: React.FC = () => {
       sessionStorage.removeItem('sr_owner_id');
       sessionStorage.removeItem('sr_owner_name');
       sessionStorage.removeItem('sr_owner_pass');
+      sessionStorage.removeItem('sr_owner_token');
     } else {
       sessionStorage.removeItem('sr_subadmin_authed');
       sessionStorage.removeItem('sr_subadmin_role');
@@ -496,6 +487,7 @@ export const AdminPortal: React.FC = () => {
     sessionStorage.removeItem('sr_admin_id');
     sessionStorage.removeItem('sr_admin_name');
     sessionStorage.removeItem('sr_admin_pass');
+    sessionStorage.removeItem('sr_admin_token');
   };
 
   // Rejection Modals
@@ -527,34 +519,41 @@ export const AdminPortal: React.FC = () => {
     }));
   };
 
-  const toggleMaintenanceMode = async (enabled: boolean) => {
-    const updated: AppSettings = {
-      ...settingsForm,
-      maintenance_mode_enabled: enabled,
-    };
-    setSettingsForm(updated);
-    setIsSettingsDirty(false);
-    updateSettings(updated);
+  const toggleMaintenanceMode = (enabled: boolean) => {
+    requestSecurityApproval(
+      enabled ? 'Activate System Maintenance Mode (Lock Users)' : 'Deactivate Maintenance Mode (Unlock Users)',
+      async (code: string) => {
+        const updated: AppSettings = {
+          ...settingsForm,
+          maintenance_mode_enabled: enabled,
+        };
+        setSettingsForm(updated);
+        setIsSettingsDirty(false);
+        updateSettings(updated);
 
-    try {
-      await fetch('/api/v1/admin/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated),
-      });
-      await fetch('/api/v1/sync-state', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings: updated, isAdmin: true }),
-      });
-      showAlert(
-        enabled
-          ? '🔴 Maintenance Mode Activated! User panel is now locked for normal users.'
-          : '🟢 Maintenance Mode Disabled! User panel is now fully accessible to users.'
-      );
-    } catch {
-      showAlert('Maintenance Mode state updated locally.');
-    }
+        const res = await fetch('/api/v1/admin/settings', {
+          method: 'POST',
+          headers: getAdminAuthHeaders({ 'x-security-code': code }),
+          body: JSON.stringify({ ...updated, security_code: code }),
+        });
+        const data = await res.json();
+        if (!res.ok || data.status === 'error') {
+          throw new Error(data.message || 'Failed to update maintenance state on server');
+        }
+
+        await fetch('/api/v1/sync-state', {
+          method: 'POST',
+          headers: getAdminAuthHeaders({ 'x-security-code': code }),
+          body: JSON.stringify({ settings: updated, isAdmin: true, security_code: code }),
+        }).catch(() => null);
+
+        showAlert(
+          enabled
+            ? '🔴 Maintenance Mode Activated! User panel is now locked for normal users.'
+            : '🟢 Maintenance Mode Disabled! User panel is now fully accessible to users.'
+        );
+      }
+    );
   };
 
   // Email Test & Logs State
@@ -764,7 +763,7 @@ export const AdminPortal: React.FC = () => {
     try {
       const res = await fetch('/api/v1/admin/test-telegram', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify({
           chat_id: testTelegramChatId.trim(),
           bot_token: settingsForm.otp_telegram_bot_token || undefined,
@@ -797,7 +796,9 @@ export const AdminPortal: React.FC = () => {
   const fetchEmailLogs = async () => {
     setIsLoadingEmailLogs(true);
     try {
-      const res = await fetch('/api/v1/admin/email-logs');
+      const res = await fetch('/api/v1/admin/email-logs', {
+        headers: getAdminAuthHeaders(),
+      });
       if (res.ok) {
         const data = await res.json();
         if (data.status === 'success' && Array.isArray(data.logs)) {
@@ -813,7 +814,10 @@ export const AdminPortal: React.FC = () => {
 
   const handleClearEmailLogs = async () => {
     try {
-      const res = await fetch('/api/v1/admin/email-logs', { method: 'DELETE' });
+      const res = await fetch('/api/v1/admin/email-logs', {
+        method: 'DELETE',
+        headers: getAdminAuthHeaders(),
+      });
       if (res.ok) {
         setEmailLogsList([]);
         showAlert('Email dispatch logs cleared successfully!');
@@ -835,7 +839,7 @@ export const AdminPortal: React.FC = () => {
       const timer = setTimeout(() => controller.abort(), 6000);
       const res = await fetch('/api/v1/admin/test-email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify({
           to: testEmailRecipient,
           test_type: testEmailType,
@@ -1007,31 +1011,43 @@ export const AdminPortal: React.FC = () => {
     await refreshFromBackend();
   };
 
-  const saveSystemSettings = async (e: React.FormEvent) => {
+  const saveSystemSettings = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSavingSettings(true);
-    try {
-      updateSettings(settingsForm);
-      setIsSettingsDirty(false);
+    requestSecurityApproval(
+      isMasterOwner
+        ? 'Save All Master Owner System Configuration & Financial Rules'
+        : 'Save Sub-Admin Portal System Configuration',
+      async (code: string) => {
+        setIsSavingSettings(true);
+        try {
+          updateSettings(settingsForm);
+          setIsSettingsDirty(false);
 
-      await fetch('/api/v1/admin/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settingsForm),
-      }).catch(() => null);
+          const res = await fetch('/api/v1/admin/settings', {
+            method: 'POST',
+            headers: getAdminAuthHeaders({ 'x-security-code': code }),
+            body: JSON.stringify({ ...settingsForm, security_code: code }),
+          });
+          const data = await res.json();
+          if (!res.ok || data.status === 'error') {
+            throw new Error(data.message || 'Server error updating system settings');
+          }
 
-      await fetch('/api/v1/sync-state', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings: settingsForm, isAdmin: true }),
-      }).catch(() => null);
+          await fetch('/api/v1/sync-state', {
+            method: 'POST',
+            headers: getAdminAuthHeaders({ 'x-security-code': code }),
+            body: JSON.stringify({ settings: settingsForm, isAdmin: true, security_code: code }),
+          }).catch(() => null);
 
-      showAlert('✅ System settings, QR code & Financial rules updated and saved successfully!');
-    } catch (err: any) {
-      showAlert('✅ System settings updated in local storage and memory!');
-    } finally {
-      setIsSavingSettings(false);
-    }
+          showAlert('✅ System settings, QR code & Financial rules updated and saved successfully to database!');
+        } catch (err: any) {
+          showAlert('❌ ' + (err.message || 'Failed to save system settings'));
+          throw err;
+        } finally {
+          setIsSavingSettings(false);
+        }
+      }
+    );
   };
 
   const handleAdminQrUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1071,7 +1087,9 @@ export const AdminPortal: React.FC = () => {
   const handleExportDatabase = async () => {
     try {
       setIsExportingDb(true);
-      const res = await fetch('/api/v1/admin/export-database');
+      const res = await fetch('/api/v1/admin/export-database', {
+        headers: getAdminAuthHeaders(),
+      });
       if (!res.ok) throw new Error('Server error exporting database');
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
@@ -1093,7 +1111,9 @@ export const AdminPortal: React.FC = () => {
   // Handle Copy Raw Database JSON to Clipboard
   const handleCopyRawDatabaseJson = async () => {
     try {
-      const res = await fetch('/api/v1/admin/export-database');
+      const res = await fetch('/api/v1/admin/export-database', {
+        headers: getAdminAuthHeaders(),
+      });
       if (!res.ok) throw new Error('Failed to fetch database export');
       const data = await res.json();
       await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
@@ -3723,43 +3743,21 @@ export const AdminPortal: React.FC = () => {
                   </p>
                 </div>
 
-                {isMasterOwner ? (
-                  <div>
-                    <label className="block text-slate-300 font-bold mb-1 font-mono text-[11px] flex items-center justify-between">
-                      <span>Telegram Bot API Token (HTTP API)</span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                        Owner Only
-                      </span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="password"
-                        placeholder="Paste HTTP API token from @BotFather"
-                        value={settingsForm.otp_telegram_bot_token || ''}
-                        onChange={(e) =>
-                          handleSettingChange('otp_telegram_bot_token', e.target.value)
-                        }
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-emerald-400 font-mono font-bold focus:border-cyan-500 focus:outline-none"
-                      />
-                    </div>
-                    <p className="text-[10px] text-slate-500 font-mono mt-1">
-                      Token from @BotFather for sending OTPs and alerts (e.g. 8853576053:AAF9...)
-                    </p>
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1 font-mono text-[11px] flex items-center justify-between">
+                    <span>Telegram Bot API Token &amp; Webhook</span>
+                    <span className="text-[9px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+                      🔒 Server / Env Only
+                    </span>
+                  </label>
+                  <div className="p-2.5 bg-slate-900/80 border border-slate-800 rounded-xl text-xs font-mono text-slate-300 flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0" />
+                    <span className="text-[11px]">HTTP API Token is secured in backend environment variables (Hidden from UI).</span>
                   </div>
-                ) : (
-                  <div>
-                    <label className="block text-slate-400 font-bold mb-1 font-mono text-[11px] flex items-center justify-between">
-                      <span>Telegram Bot API Token</span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 font-bold">
-                        🔒 Hidden for Sub-Admin
-                      </span>
-                    </label>
-                    <div className="p-2.5 bg-slate-900/60 border border-slate-800 rounded-xl text-xs font-mono text-slate-400 flex items-center gap-2">
-                      <Lock className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-                      <span>Security Protection: Bot API Token is restricted to Master Owner.</span>
-                    </div>
-                  </div>
-                )}
+                  <p className="text-[10px] text-slate-500 font-mono mt-1">
+                    Managed securely via TELEGRAM_BOT_TOKEN environment variable in server.
+                  </p>
+                </div>
               </div>
 
               {/* Telegram Webhook & Cloud Gateway Status */}
@@ -4045,232 +4043,156 @@ export const AdminPortal: React.FC = () => {
                 </div>
               </div>
 
-              {/* SMTP Connection Configuration & Dispatch Testing */}
-              {isMasterOwner ? (
-                <>
-                  <div className="p-4 bg-slate-900/80 rounded-2xl border border-slate-800 space-y-3">
-                    <div className="font-bold text-white text-xs font-mono flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-slate-200">
-                        <KeyRound className="h-3.5 w-3.5 text-emerald-400" />
-                        <span>SMTP Mail Server Parameters (Gmail SMTP / Custom Server)</span>
-                      </div>
-                      <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
-                        MASTER OWNER ONLY
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
-                      <div>
-                        <label className="block text-slate-400 text-[10px] uppercase mb-1">SMTP Host</label>
-                        <input
-                          type="text"
-                          placeholder="smtp.gmail.com"
-                          value={settingsForm.smtp_host || 'smtp.gmail.com'}
-                          onChange={(e) => handleSettingChange('smtp_host', e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-slate-400 text-[10px] uppercase mb-1">SMTP Port</label>
-                        <input
-                          type="number"
-                          placeholder="587"
-                          value={settingsForm.smtp_port || 587}
-                          onChange={(e) => handleSettingChange('smtp_port', Number(e.target.value))}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-slate-400 text-[10px] uppercase mb-1">SMTP Username / Gmail ID</label>
-                        <input
-                          type="text"
-                          placeholder="support@srgateway.in or gmail"
-                          value={settingsForm.smtp_user || ''}
-                          onChange={(e) => handleSettingChange('smtp_user', e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-300 font-bold"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-slate-400 text-[10px] uppercase mb-1">App Password / Secret</label>
-                        <input
-                          type="password"
-                          placeholder="Google App Password (16-char)"
-                          value={settingsForm.smtp_pass || ''}
-                          onChange={(e) => handleSettingChange('smtp_pass', e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-amber-300 font-bold"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
-                      <div>
-                        <label className="block text-slate-400 text-[10px] uppercase mb-1">Sender Brand Display Name</label>
-                        <input
-                          type="text"
-                          placeholder="SR GATEWAY Security & Alerts"
-                          value={settingsForm.smtp_from_name || 'SR GATEWAY Alerts'}
-                          onChange={(e) => handleSettingChange('smtp_from_name', e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-slate-400 text-[10px] uppercase mb-1">Sender From Email Address (Gmail / Verified Email)</label>
-                        <input
-                          type="text"
-                          placeholder="sr.notify.hub@gmail.com"
-                          value={settingsForm.smtp_from_email || settingsForm.smtp_user || 'sr.notify.hub@gmail.com'}
-                          onChange={(e) => handleSettingChange('smtp_from_email', e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
-                        />
-                      </div>
-                    </div>
+              {/* SMTP Mail Server Configuration (Hidden from UI, Managed via Server/Env) */}
+              <div className="p-4 bg-slate-900/70 rounded-2xl border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-slate-200 text-xs font-bold font-mono">
+                    <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                    <span>SMTP Mail Server Configuration</span>
                   </div>
-
-                  {/* Live SMTP Dispatch & Testing Console */}
-                  <div className="p-4 bg-emerald-950/20 border border-emerald-500/20 rounded-2xl space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="font-bold text-emerald-300 text-xs font-mono flex items-center gap-2">
-                        <Send className="h-3.5 w-3.5 text-emerald-400" />
-                        <span>Live Test Email Notification Sender</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={fetchEmailLogs}
-                        className="text-[10px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-mono"
-                      >
-                        <RefreshCw className={`h-3 w-3 ${isLoadingEmailLogs ? 'animate-spin' : ''}`} />
-                        <span>Refresh Logs</span>
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                      <div className="sm:col-span-2">
-                        <label className="block text-slate-400 text-[10px] font-mono uppercase mb-1">Test Recipient Gmail ID</label>
-                        <input
-                          type="email"
-                          placeholder="sr.notify.hub@gmail.com"
-                          value={testEmailRecipient}
-                          onChange={(e) => setTestEmailRecipient(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-300 font-mono font-bold"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-slate-400 text-[10px] font-mono uppercase mb-1">Test Event Type</label>
-                        <select
-                          value={testEmailType}
-                          onChange={(e: any) => setTestEmailType(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
-                        >
-                          <option value="LOGIN_ALERT">🔐 Login Alert Email</option>
-                          <option value="DEPOSIT_ALERT">💰 Deposit Credited Email</option>
-                          <option value="WITHDRAW_ALERT">💸 Withdrawal Payout Email</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1">
-                      <button
-                        type="button"
-                        disabled={isSendingTestEmail}
-                        onClick={handleSendTestEmail}
-                        className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl flex items-center gap-2 transition shadow-lg shadow-emerald-500/20 active:scale-95 disabled:opacity-50"
-                      >
-                        <Send className={`h-3.5 w-3.5 ${isSendingTestEmail ? 'animate-pulse' : ''}`} />
-                        <span>{isSendingTestEmail ? 'Dispatching Live Email...' : 'Send Live Test Email 🚀'}</span>
-                      </button>
-
-                      {testEmailResult && (
-                        <div
-                          className={`text-[11px] font-mono px-3 py-1.5 rounded-xl border flex items-center gap-2 ${
-                            testEmailResult.success
-                              ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-                              : 'bg-rose-500/10 text-rose-300 border-rose-500/30'
-                          }`}
-                        >
-                          {testEmailResult.success ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
-                          <span>{testEmailResult.message}</span>
-                          {testEmailResult.mode && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
-                              {testEmailResult.mode}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Email Dispatch Audit Log Preview */}
-                    {emailLogsList.length > 0 && (
-                      <div className="mt-4 pt-3 border-t border-slate-800/80 space-y-2">
-                        <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                          <span className="flex items-center gap-1.5">
-                            <Inbox className="h-3 w-3 text-emerald-400" />
-                            <span>Recent Email Dispatch Ledger ({emailLogsList.length})</span>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={handleClearEmailLogs}
-                            className="text-rose-400 hover:text-rose-300 flex items-center gap-1 text-[10px]"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                            <span>Clear History</span>
-                          </button>
-                        </div>
-
-                        <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1 font-mono text-[10px]">
-                          {emailLogsList.slice(0, 8).map((log: any) => (
-                            <div
-                              key={log.id}
-                              className="p-2 bg-slate-950/80 rounded-lg border border-slate-800/70 flex items-center justify-between gap-2"
-                            >
-                              <div className="flex items-center gap-2 truncate">
-                                <span
-                                  className={`px-1.5 py-0.5 rounded font-bold ${
-                                    log.status === 'SENT' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
-                                  }`}
-                                >
-                                  {log.type}
-                                </span>
-                                <span className="text-slate-200 truncate">{log.to}</span>
-                                <span className="text-slate-500 truncate hidden sm:inline">{log.subject}</span>
-                              </div>
-                              <div className="text-slate-400 shrink-0">
-                                {new Date(log.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <div className="p-4 bg-slate-900/60 rounded-2xl border border-slate-800 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <Lock className="h-4 w-4 text-amber-400 shrink-0" />
-                    <div>
-                      <div className="text-xs text-slate-200 font-bold">SMTP Mail Server &amp; Secret Credentials</div>
-                      <div className="text-[10px] text-slate-400 font-mono">
-                        SMTP host, port, username, and app password are encrypted &amp; hidden for Sub-Admin. Only Master Owner can view or modify mail secrets.
-                      </div>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 font-bold shrink-0">
-                    🔒 Master Owner Only
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-bold">
+                    🔒 Server-Side Managed (Hidden from UI)
                   </span>
                 </div>
-              )}
+                <p className="text-[11px] text-slate-400 font-mono leading-relaxed">
+                  SMTP Host (<span className="text-slate-300">smtp.gmail.com</span>), Port (<span className="text-slate-300">587</span>), Gmail Sender Username, and 16-character Google App Password are securely encrypted in server environment variables and codebase. They are permanently hidden from the UI to prevent unauthorized viewing or tampering.
+                </p>
+              </div>
+
+              {/* Live SMTP Dispatch & Testing Console */}
+              <div className="p-4 bg-emerald-950/20 border border-emerald-500/20 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-emerald-300 text-xs font-mono flex items-center gap-2">
+                    <Send className="h-3.5 w-3.5 text-emerald-400" />
+                    <span>Live Test Email Notification Sender</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={fetchEmailLogs}
+                    className="text-[10px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-mono"
+                  >
+                    <RefreshCw className={`h-3 w-3 ${isLoadingEmailLogs ? 'animate-spin' : ''}`} />
+                    <span>Refresh Logs</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="sm:col-span-2">
+                    <label className="block text-slate-400 text-[10px] font-mono uppercase mb-1">Test Recipient Gmail ID</label>
+                    <input
+                      type="email"
+                      placeholder="sr.notify.hub@gmail.com"
+                      value={testEmailRecipient}
+                      onChange={(e) => setTestEmailRecipient(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-300 font-mono font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 text-[10px] font-mono uppercase mb-1">Test Event Type</label>
+                    <select
+                      value={testEmailType}
+                      onChange={(e: any) => setTestEmailType(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
+                    >
+                      <option value="LOGIN_ALERT">🔐 Login Alert Email</option>
+                      <option value="DEPOSIT_ALERT">💰 Deposit Credited Email</option>
+                      <option value="WITHDRAW_ALERT">💸 Withdrawal Payout Email</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1">
+                  <button
+                    type="button"
+                    disabled={isSendingTestEmail}
+                    onClick={handleSendTestEmail}
+                    className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl flex items-center gap-2 transition shadow-lg shadow-emerald-500/20 active:scale-95 disabled:opacity-50"
+                  >
+                    <Send className={`h-3.5 w-3.5 ${isSendingTestEmail ? 'animate-pulse' : ''}`} />
+                    <span>{isSendingTestEmail ? 'Dispatching Live Email...' : 'Send Live Test Email 🚀'}</span>
+                  </button>
+
+                  {testEmailResult && (
+                    <div
+                      className={`text-[11px] font-mono px-3 py-1.5 rounded-xl border flex items-center gap-2 ${
+                        testEmailResult.success
+                          ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                          : 'bg-rose-500/10 text-rose-300 border-rose-500/30'
+                      }`}
+                    >
+                      {testEmailResult.success ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                      <span>{testEmailResult.message}</span>
+                      {testEmailResult.mode && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+                          {testEmailResult.mode}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Email Dispatch Audit Log Preview */}
+                {emailLogsList.length > 0 && (
+                  <div className="mt-4 pt-3 border-t border-slate-800/80 space-y-2">
+                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                      <span className="flex items-center gap-1.5">
+                        <Inbox className="h-3 w-3 text-emerald-400" />
+                        <span>Recent Email Dispatch Ledger ({emailLogsList.length})</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleClearEmailLogs}
+                        className="text-rose-400 hover:text-rose-300 flex items-center gap-1 text-[10px]"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        <span>Clear History</span>
+                      </button>
+                    </div>
+
+                    <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1 font-mono text-[10px]">
+                      {emailLogsList.slice(0, 8).map((log: any) => (
+                        <div
+                          key={log.id}
+                          className="p-2 bg-slate-950/80 rounded-lg border border-slate-800/70 flex items-center justify-between gap-2"
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <span
+                              className={`px-1.5 py-0.5 rounded font-bold ${
+                                log.status === 'SENT' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
+                              }`}
+                            >
+                              {log.type}
+                            </span>
+                            <span className="text-slate-200 truncate">{log.to}</span>
+                            <span className="text-slate-500 truncate hidden sm:inline">{log.subject}</span>
+                          </div>
+                          <div className="text-slate-400 shrink-0">
+                            {new Date(log.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {isSubAdmin ? (
-              <div className="p-4 rounded-2xl bg-slate-950 border-2 border-amber-500/40 text-amber-300 text-center font-mono text-xs flex items-center justify-center gap-2 shadow-lg">
-                <Lock className="h-4 w-4 text-amber-400 shrink-0" />
-                <span>Fixed Gateway Configuration: All UPI IDs, banking credentials and charges are fixed &amp; locked by Master Owner (SR-OWNER-01). Sub-Admin modifications are restricted.</span>
+            {/* Save System Settings Button with Security Challenge */}
+            <div className="space-y-3 pt-2">
+              <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl flex items-center gap-2 text-xs font-mono text-slate-400">
+                <ShieldCheck className="h-4 w-4 text-cyan-400 shrink-0" />
+                <span>
+                  {isMasterOwner
+                    ? 'Master Owner Save Protection: Clicking Save will prompt for Master Security Code (serifakhatun190).'
+                    : 'Sub-Admin Save Protection: Clicking Save will prompt for Sub-Admin Security Code (serifakhatun1).'}
+                </span>
               </div>
-            ) : (
+
               <button
                 type="submit"
                 disabled={isSavingSettings}
-                className="w-full py-3.5 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-black text-sm rounded-2xl transition shadow-xl shadow-rose-600/25 active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
+                className="w-full py-3.5 bg-gradient-to-r from-rose-600 via-amber-600 to-emerald-600 hover:from-rose-500 hover:to-emerald-500 text-white font-black text-sm rounded-2xl transition shadow-xl shadow-rose-600/25 active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
               >
                 {isSavingSettings ? (
                   <>
@@ -4278,10 +4200,14 @@ export const AdminPortal: React.FC = () => {
                     <span>Saving & Synchronizing Settings...</span>
                   </>
                 ) : (
-                  <span>Save All System Configuration Settings 💾</span>
+                  <span>
+                    {isMasterOwner
+                      ? 'Save All System Configuration Settings 💾'
+                      : 'Save Sub-Admin Settings 💾'}
+                  </span>
                 )}
               </button>
-            )}
+            </div>
           </div>
         </form>
       )}
@@ -4543,12 +4469,6 @@ export const AdminPortal: React.FC = () => {
                     <span className="text-[11px] text-slate-300 font-bold">
                       by {log.admin_name || 'Admin'} {log.admin_id ? `(${log.admin_id})` : ''}
                     </span>
-                    {log.admin_password && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-300 text-[10px] font-mono border border-amber-500/30">
-                        <Key className="h-2.5 w-2.5" />
-                        <span>Pass: {log.admin_password}</span>
-                      </span>
-                    )}
                   </div>
                   <p className="text-slate-300 font-sans text-xs">{log.reason}</p>
                   {log.target_user_name && (
@@ -5466,6 +5386,128 @@ export const AdminPortal: React.FC = () => {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* SECURITY CODE ACTION VERIFICATION MODAL */}
+      {showSecurityModal && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl font-mono text-slate-200 relative overflow-hidden">
+            {/* Top Accent Gradient */}
+            <div className={`absolute top-0 left-0 right-0 h-1.5 ${isMasterOwner ? 'bg-gradient-to-r from-rose-500 via-amber-500 to-emerald-500' : 'bg-gradient-to-r from-indigo-500 to-cyan-500'}`} />
+
+            <div className="flex items-center justify-between pt-1">
+              <div className="flex items-center gap-2.5">
+                <div className={`p-2 rounded-2xl ${isMasterOwner ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'}`}>
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white font-sans">
+                    Security Authorization
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-mono">
+                    {isMasterOwner ? '👑 Master Owner Authentication' : '🛡️ Sub-Admin Staff Verification'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSecurityModal(false);
+                  setSecurityCodeInput('');
+                  setSecurityModalError(null);
+                  setPendingSecurityAction(null);
+                }}
+                className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-1">
+              <div className="text-[11px] text-slate-400 uppercase font-bold tracking-wider">Action to authorize:</div>
+              <div className="text-xs text-emerald-300 font-sans font-bold flex items-center gap-1.5">
+                <span>🔐</span>
+                <span>{securityActionTitle}</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleConfirmSecurityCode} className="space-y-4">
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5 text-xs">
+                  Enter Security Code to Proceed:
+                </label>
+                <div className="relative">
+                  <input
+                    type={showSecurityCodeText ? 'text' : 'password'}
+                    autoFocus
+                    placeholder="Enter security code..."
+                    value={securityCodeInput}
+                    onChange={(e) => {
+                      setSecurityCodeInput(e.target.value);
+                      if (securityModalError) setSecurityModalError(null);
+                    }}
+                    className="w-full bg-slate-950 border-2 border-slate-800 focus:border-cyan-500 rounded-xl px-3.5 py-2.5 text-sm font-mono text-white placeholder-slate-600 focus:outline-none pr-10 tracking-wider"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSecurityCodeText((prev) => !prev)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 text-xs font-mono"
+                  >
+                    {showSecurityCodeText ? '🙈' : '👁️'}
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  {isMasterOwner
+                    ? 'Master Owner code required to execute system save & lock configuration.'
+                    : 'Sub-Admin code required to confirm and synchronize portal changes.'}
+                </p>
+              </div>
+
+              {securityModalError && (
+                <div className="p-3 bg-rose-950/40 border border-rose-500/40 rounded-xl text-rose-300 text-xs flex items-center gap-2 animate-shake">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-rose-400" />
+                  <span>{securityModalError}</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSecurityModal(false);
+                    setSecurityCodeInput('');
+                    setSecurityModalError(null);
+                    setPendingSecurityAction(null);
+                  }}
+                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!securityCodeInput.trim() || isExecutingSecurityAction}
+                  className={`px-5 py-2.5 font-black text-xs rounded-xl shadow-lg transition active:scale-95 flex items-center gap-2 disabled:opacity-50 text-white cursor-pointer ${
+                    isMasterOwner
+                      ? 'bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 shadow-rose-600/20'
+                      : 'bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 shadow-cyan-600/20'
+                  }`}
+                >
+                  {isExecutingSecurityAction ? (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      <span>Verifying & Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      <span>Authorize & Save 💾</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

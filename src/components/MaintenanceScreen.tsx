@@ -16,7 +16,7 @@ import {
 import { useWallet } from '../context/WalletContext';
 
 export const MaintenanceScreen: React.FC = () => {
-  const { settings, switchUser, refreshFromBackend } = useWallet();
+  const { settings, switchUser, refreshFromBackend, adminVerifyGatePassword } = useWallet();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
 
@@ -24,8 +24,7 @@ export const MaintenanceScreen: React.FC = () => {
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [adminPass, setAdminPass] = useState('');
   const [adminPassError, setAdminPassError] = useState<string | null>(null);
-
-  const MASTER_ADMIN_PASS = 'Sksahilbhaixxxcom';
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
@@ -44,17 +43,27 @@ export const MaintenanceScreen: React.FC = () => {
     }
   };
 
-  const handleAdminBypass = (e: React.FormEvent) => {
+  const handleAdminBypass = async (e: React.FormEvent) => {
     e.preventDefault();
     const clean = adminPass.trim();
-    if (clean === MASTER_ADMIN_PASS || clean.toLowerCase() === MASTER_ADMIN_PASS.toLowerCase()) {
-      sessionStorage.setItem('sr_owner_authed', 'true');
-      sessionStorage.setItem('sr_admin_authed', 'true');
-      switchUser('owner-001');
-      setShowAdminModal(false);
-      setAdminPassError(null);
-    } else {
+    if (!clean) return;
+
+    setIsVerifying(true);
+    setAdminPassError(null);
+    try {
+      const res = await adminVerifyGatePassword(clean, 'OWNER');
+      if (res.success && res.role === 'OWNER') {
+        switchUser('owner-001');
+        setShowAdminModal(false);
+        setAdminPassError(null);
+        setAdminPass('');
+      } else {
+        setAdminPassError('⚠️ Galat password hai! Access Denied.');
+      }
+    } catch {
       setAdminPassError('⚠️ Galat password hai! Access Denied.');
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -267,9 +276,10 @@ export const MaintenanceScreen: React.FC = () => {
 
               <button
                 type="submit"
-                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs transition"
+                disabled={isVerifying}
+                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs transition disabled:opacity-50"
               >
-                Unlock Admin Console
+                {isVerifying ? 'Verifying Security Token...' : 'Unlock Admin Console'}
               </button>
             </form>
           </div>

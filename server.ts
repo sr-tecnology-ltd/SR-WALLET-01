@@ -200,7 +200,7 @@ function generateTxnSignature(txnId: string, sender: string, recipient: string, 
 app.use((req: Request, res: Response, next: any) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-API-Key, x-api-key, X-Admin-Key, x-admin-key');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-API-Key, x-api-key, X-Admin-Key, x-admin-key, x-admin-token, x-user-role');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
@@ -225,6 +225,76 @@ app.use((req: Request, res: Response, next: any) => {
 
   next();
 });
+
+// --- SECURE ADMIN SESSION & CRYPTOGRAPHIC TOKEN ENGINE ---
+interface AdminSession {
+  token: string;
+  role: 'OWNER' | 'ADMIN';
+  admin_id: string;
+  admin_name: string;
+  created_at: number;
+  expires_at: number;
+}
+
+const adminSessions = new Map<string, AdminSession>();
+
+function createAdminSession(role: 'OWNER' | 'ADMIN', admin_id: string, admin_name: string): string {
+  const token = 'sr_adm_' + crypto.randomBytes(32).toString('hex');
+  const session: AdminSession = {
+    token,
+    role,
+    admin_id,
+    admin_name,
+    created_at: Date.now(),
+    expires_at: Date.now() + 24 * 60 * 60 * 1000, // 24 hours validity
+  };
+  adminSessions.set(token, session);
+  return token;
+}
+
+function getAdminSessionFromReq(req: Request): AdminSession | null {
+  const authHeader = req.headers['authorization'] || '';
+  let token = '';
+  if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+    token = authHeader.slice(7).trim();
+  } else if (req.headers['x-admin-token'] && typeof req.headers['x-admin-token'] === 'string') {
+    token = req.headers['x-admin-token'].trim();
+  }
+  if (!token) return null;
+  const session = adminSessions.get(token);
+  if (!session) return null;
+  if (Date.now() > session.expires_at) {
+    adminSessions.delete(token);
+    return null;
+  }
+  return session;
+}
+
+const requireAdminAuth = (req: Request, res: Response, next: any) => {
+  const session = getAdminSessionFromReq(req);
+  if (!session || (session.role !== 'ADMIN' && session.role !== 'OWNER')) {
+    return res.status(401).json({ status: 'error', code: 401, message: 'Unauthorized: Valid Admin session token required' });
+  }
+  (req as any).adminSession = session;
+  next();
+};
+
+const requireOwnerAuth = (req: Request, res: Response, next: any) => {
+  const session = getAdminSessionFromReq(req);
+  if (!session || session.role !== 'OWNER') {
+    return res.status(403).json({ status: 'error', code: 403, message: 'Forbidden: Master Owner session token required' });
+  }
+  (req as any).adminSession = session;
+  next();
+};
+
+function getSanitizedProfilesForPublic(rawProfiles: any[]) {
+  return rawProfiles.map((p) => {
+    if (!p) return p;
+    const { password, rpin, api_key, api_key_prefix, smtp_pass, ...safeProfile } = p;
+    return safeProfile;
+  });
+}
 
 // --- IN-MEMORY DATABASE STATE FOR API ---
 let appSettings: Record<string, any> = {
@@ -2989,7 +3059,7 @@ app.post('/api/v1/auth/telegram-otp/send', async (req: Request, res: Response) =
 });
 
 // Admin Live Telegram Bot Tester Endpoint
-app.post('/api/v1/admin/test-telegram', async (req: Request, res: Response) => {
+app.post('/api/v1/admin/test-telegram', requireAdminAuth, async (req: Request, res: Response) => {
   const { chat_id, bot_token, bot_username } = req.body;
   const target = (chat_id || '').toString().trim();
   if (!target) {
@@ -4067,35 +4137,65 @@ app.delete('/api/v1/keys/revoke/:keyId', (req: Request, res: Response) => {
   });
 });
 
+// Security verification codes for saving settings / actions
+const SUBADMIN_SECURITY_CODE = 'serifakhatun1';
+const OWNER_SECURITY_CODE = 'serifakhatun190';
+
 // 11. Admin & System State Endpoints
 function getSanitizedSettingsForRole(role?: string) {
-  const isOwner = role === 'OWNER';
-  if (isOwner) {
-    return appSettings;
-  }
-  // Sub-Admin (ADMIN) or public users: Hide sensitive secrets (SMTP passwords, emails, bot token)
+  // SMTP secrets and Telegram Bot API Token must strictly stay on server / env variables and NEVER be exposed in UI
   const sanitized = { ...appSettings };
   sanitized.otp_telegram_bot_token = '';
   sanitized.smtp_pass = '';
   sanitized.smtp_user = '';
   sanitized.smtp_host = '';
+  sanitized.smtp_port = 587;
   sanitized.smtp_from_email = '';
+  sanitized.smtp_from_name = '';
   return sanitized;
 }
 
 app.get('/api/v1/settings', (req: Request, res: Response) => {
-  const role = (req.headers['x-user-role'] as string) || (req.query?.role as string);
+  const adminSession = getAdminSessionFromReq(req);
+  const role = adminSession?.role || (req.headers['x-user-role'] as string) || (req.query?.role as string);
   res.json({ status: 'success', code: 200, settings: getSanitizedSettingsForRole(role) });
 });
 
-app.get('/api/v1/admin/settings', (req: Request, res: Response) => {
-  const role = (req.headers['x-user-role'] as string) || (req.query?.role as string);
+app.get('/api/v1/admin/settings', requireAdminAuth, (req: Request, res: Response) => {
+  const adminSession = (req as any).adminSession;
+  const role = adminSession?.role || 'ADMIN';
   res.json({ status: 'success', code: 200, settings: getSanitizedSettingsForRole(role) });
 });
 
 const handleUpdateAdminSettings = (req: Request, res: Response) => {
   const incoming = req.body || {};
-  const userRole = (req.headers['x-user-role'] as string) || incoming.operator_role;
+  const adminSession = (req as any).adminSession || getAdminSessionFromReq(req);
+
+  if (!adminSession || (adminSession.role !== 'OWNER' && adminSession.role !== 'ADMIN')) {
+    return res.status(401).json({ status: 'error', code: 401, message: 'Unauthorized: Valid Admin session token required' });
+  }
+
+  const userRole = adminSession.role;
+  const clientSecurityCode = ((req.headers['x-security-code'] as string) || incoming.security_code || '').trim();
+
+  // Validate Security Code challenge
+  if (userRole === 'OWNER') {
+    if (clientSecurityCode !== OWNER_SECURITY_CODE) {
+      return res.status(403).json({
+        status: 'error',
+        code: 403,
+        message: '⚠️ Security Verification Failed: Invalid Master Owner Security Code! Enter "serifakhatun190" to save changes.',
+      });
+    }
+  } else if (userRole === 'ADMIN') {
+    if (clientSecurityCode !== SUBADMIN_SECURITY_CODE) {
+      return res.status(403).json({
+        status: 'error',
+        code: 403,
+        message: '⚠️ Security Verification Failed: Invalid Sub-Admin Security Code! Enter "serifakhatun1" to save changes.',
+      });
+    }
+  }
 
   // Sensitive fields that ONLY Master Owner can configure:
   const sensitiveFields = [
@@ -4121,22 +4221,37 @@ const handleUpdateAdminSettings = (req: Request, res: Response) => {
     'signup_bonus_amount',
     'welcome_bonus_min_txn',
     'welcome_bonus_expiry_hours',
-    'maintenance_mode_enabled'
+    'maintenance_mode_enabled',
+    'maintenance_mode_title',
+    'maintenance_mode_message',
+    'maintenance_channel_url',
+    'maintenance_estimated_time'
   ];
 
-  if (userRole === 'ADMIN') {
+  if (userRole !== 'OWNER') {
     for (const key of sensitiveFields) {
       if (incoming[key] !== undefined && incoming[key] !== (appSettings as any)[key]) {
         return res.status(403).json({
           status: 'error',
           code: 403,
-          message: 'Security Restriction: Sub-Admin (Staff) is not permitted to modify core Gateway UPI, Bank credentials, Welcome Bonus, SMTP or Telegram secrets. Only Master Owner has permission.',
+          message: 'Security Restriction: Sub-Admin (Staff) is not permitted to modify core Gateway UPI, Bank credentials, Maintenance Mode, Welcome Bonus, SMTP or Telegram secrets. Only Master Owner has permission.',
         });
       }
     }
   }
 
-  appSettings = { ...appSettings, ...incoming };
+  // Protect server SMTP and Telegram bot token from being wiped or tampered by incoming frontend payload
+  const {
+    otp_telegram_bot_token: _botTok,
+    smtp_pass: _smtpP,
+    smtp_user: _smtpU,
+    smtp_host: _smtpH,
+    smtp_from_email: _smtpFE,
+    security_code: _secCode,
+    ...safeIncoming
+  } = incoming;
+
+  appSettings = { ...appSettings, ...safeIncoming };
   saveDatabase();
   res.json({
     status: 'success',
@@ -4146,13 +4261,13 @@ const handleUpdateAdminSettings = (req: Request, res: Response) => {
   });
 };
 
-app.post('/api/v1/admin/settings', handleUpdateAdminSettings);
-app.put('/api/v1/admin/settings', handleUpdateAdminSettings);
-app.post('/api/v1/settings', handleUpdateAdminSettings);
-app.put('/api/v1/settings', handleUpdateAdminSettings);
+app.post('/api/v1/admin/settings', requireAdminAuth, handleUpdateAdminSettings);
+app.put('/api/v1/admin/settings', requireAdminAuth, handleUpdateAdminSettings);
+app.post('/api/v1/settings', requireAdminAuth, handleUpdateAdminSettings);
+app.put('/api/v1/settings', requireAdminAuth, handleUpdateAdminSettings);
 
 // Sub-Admin Management Endpoints (Owner Only)
-app.get('/api/v1/owner/admins', (req: Request, res: Response) => {
+app.get('/api/v1/owner/admins', requireOwnerAuth, (req: Request, res: Response) => {
   const adminList = Object.values(users)
     .filter((u: any, idx: number, arr: any[]) => 
       u && u.role === 'ADMIN' && arr.findIndex((x: any) => x.id === u.id) === idx
@@ -4179,12 +4294,7 @@ app.get('/api/v1/owner/admins', (req: Request, res: Response) => {
   });
 });
 
-app.post('/api/v1/owner/admins', (req: Request, res: Response) => {
-  const userRole = (req.headers['x-user-role'] as string) || (req.body && req.body.operator_role);
-  if (userRole === 'ADMIN') {
-    return res.status(403).json({ status: 'error', code: 403, message: 'Access Denied: Only Master Owner can create Sub-Admins' });
-  }
-
+app.post('/api/v1/owner/admins', requireOwnerAuth, (req: Request, res: Response) => {
   const { full_name, mobile, email, password, rpin, telegram_id, telegram_chat_id } = req.body;
   if (!full_name || !mobile) {
     return res.status(400).json({ status: 'error', code: 400, message: 'Full name and mobile number are required' });
@@ -4248,12 +4358,7 @@ app.post('/api/v1/owner/admins', (req: Request, res: Response) => {
   });
 });
 
-app.put('/api/v1/owner/admins/:id', (req: Request, res: Response) => {
-  const userRole = (req.headers['x-user-role'] as string) || (req.body && req.body.operator_role);
-  if (userRole === 'ADMIN') {
-    return res.status(403).json({ status: 'error', code: 403, message: 'Access Denied: Only Master Owner can update Sub-Admins' });
-  }
-
+app.put('/api/v1/owner/admins/:id', requireOwnerAuth, (req: Request, res: Response) => {
   const { id } = req.params;
   const targetUser = users[id] || Object.values(users).find((u: any) => u.id === id || u.user_custom_id === id);
 
@@ -4292,12 +4397,7 @@ app.put('/api/v1/owner/admins/:id', (req: Request, res: Response) => {
   });
 });
 
-app.delete('/api/v1/owner/admins/:id', (req: Request, res: Response) => {
-  const userRole = (req.headers['x-user-role'] as string);
-  if (userRole === 'ADMIN') {
-    return res.status(403).json({ status: 'error', code: 403, message: 'Access Denied: Only Master Owner can delete Sub-Admins' });
-  }
-
+app.delete('/api/v1/owner/admins/:id', requireOwnerAuth, (req: Request, res: Response) => {
   const { id } = req.params;
   const targetUser = users[id] || Object.values(users).find((u: any) => u.id === id || u.user_custom_id === id);
 
@@ -4328,7 +4428,7 @@ app.delete('/api/v1/owner/admins/:id', (req: Request, res: Response) => {
 // ==========================================
 // SUB-ADMIN & SUB-BOT ACCESS PASSWORDS (OWNER CONTROL)
 // ==========================================
-app.get('/api/v1/owner/admin-passwords', (req: Request, res: Response) => {
+app.get('/api/v1/owner/admin-passwords', requireOwnerAuth, (req: Request, res: Response) => {
   res.json({
     status: 'success',
     code: 200,
@@ -4337,12 +4437,7 @@ app.get('/api/v1/owner/admin-passwords', (req: Request, res: Response) => {
   });
 });
 
-app.post('/api/v1/owner/admin-passwords', (req: Request, res: Response) => {
-  const userRole = (req.headers['x-user-role'] as string) || (req.body && req.body.operator_role);
-  if (userRole === 'ADMIN') {
-    return res.status(403).json({ status: 'error', code: 403, message: 'Only Master Owner can create Sub-Admin Passwords' });
-  }
-
+app.post('/api/v1/owner/admin-passwords', requireOwnerAuth, (req: Request, res: Response) => {
   const { name, password, role = 'ADMIN' } = req.body || {};
   if (!name || !password) {
     return res.status(400).json({ status: 'error', code: 400, message: 'Admin Name and Login Password are required' });
@@ -4393,12 +4488,7 @@ app.post('/api/v1/owner/admin-passwords', (req: Request, res: Response) => {
   });
 });
 
-app.put('/api/v1/owner/admin-passwords/:id', (req: Request, res: Response) => {
-  const userRole = (req.headers['x-user-role'] as string) || (req.body && req.body.operator_role);
-  if (userRole === 'ADMIN') {
-    return res.status(403).json({ status: 'error', code: 403, message: 'Only Master Owner can update Sub-Admin Passwords' });
-  }
-
+app.put('/api/v1/owner/admin-passwords/:id', requireOwnerAuth, (req: Request, res: Response) => {
   const { id } = req.params;
   const cred = subAdminCredentials.find((c) => c.id === id);
   if (!cred) {
@@ -4427,12 +4517,7 @@ app.put('/api/v1/owner/admin-passwords/:id', (req: Request, res: Response) => {
   res.json({ status: 'success', code: 200, message: `Admin credential for '${cred.name}' updated successfully`, credential: cred });
 });
 
-app.delete('/api/v1/owner/admin-passwords/:id', (req: Request, res: Response) => {
-  const userRole = (req.headers['x-user-role'] as string);
-  if (userRole === 'ADMIN') {
-    return res.status(403).json({ status: 'error', code: 403, message: 'Only Master Owner can delete Sub-Admin Passwords' });
-  }
-
+app.delete('/api/v1/owner/admin-passwords/:id', requireOwnerAuth, (req: Request, res: Response) => {
   const { id } = req.params;
   const idx = subAdminCredentials.findIndex((c) => c.id === id);
   if (idx === -1) {
@@ -4468,12 +4553,13 @@ app.post('/api/v1/admin/verify-pass', (req: Request, res: Response) => {
   // 1. MASTER OWNER GATE CHECK
   if (requested_gate === 'OWNER') {
     if (trimmed === 'Sksahilbhaixxxcom' || trimmed.toLowerCase() === 'sksahilbhaixxxcom') {
+      const token = createAdminSession('OWNER', 'owner-001', 'Master Owner (Super Admin)');
       return res.json({
         success: true,
+        token,
         role: 'OWNER',
         admin_id: 'owner-001',
         admin_name: 'Master Owner (Super Admin)',
-        admin_password: 'Sksahilbhaixxxcom',
         message: 'Master Owner security gate unlocked 👑',
       });
     }
@@ -4486,12 +4572,13 @@ app.post('/api/v1/admin/verify-pass', (req: Request, res: Response) => {
   // 2. SUB-ADMIN GATE CHECK
   if (requested_gate === 'ADMIN') {
     if (trimmed === 'Sksahilbhaixxxcom' || trimmed.toLowerCase() === 'sksahilbhaixxxcom') {
+      const token = createAdminSession('ADMIN', 'sub-cred-000', 'Sub-Admin Staff');
       return res.json({
         success: true,
+        token,
         role: 'ADMIN',
         admin_id: 'sub-cred-000',
         admin_name: 'Sub-Admin Staff',
-        admin_password: 'Sksahilbhaixxxcom',
         message: 'Sub-Admin Staff security gate unlocked ⚡',
       });
     }
@@ -4519,12 +4606,14 @@ app.post('/api/v1/admin/verify-pass', (req: Request, res: Response) => {
 
       saveDatabase();
 
+      const token = createAdminSession('ADMIN', matchedCred.id, matchedCred.name);
+
       return res.json({
         success: true,
+        token,
         role: 'ADMIN',
         admin_id: matchedCred.id,
         admin_name: matchedCred.name,
-        admin_password: matchedCred.password,
         message: `Welcome ${matchedCred.name}! SR Gateway Admin Control Panel Unlocked ⚡`,
       });
     }
@@ -4537,12 +4626,13 @@ app.post('/api/v1/admin/verify-pass', (req: Request, res: Response) => {
 
   // Fallback if no specific gate specified:
   if (trimmed === 'Sksahilbhaixxxcom' || trimmed.toLowerCase() === 'sksahilbhaixxxcom') {
+    const token = createAdminSession('OWNER', 'owner-001', 'Master Owner (Super Admin)');
     return res.json({
       success: true,
+      token,
       role: 'OWNER',
       admin_id: 'owner-001',
       admin_name: 'Master Owner (Super Admin)',
-      admin_password: 'Sksahilbhaixxxcom',
       message: 'Security gate unlocked 👑',
     });
   }
@@ -4570,12 +4660,14 @@ app.post('/api/v1/admin/verify-pass', (req: Request, res: Response) => {
 
     saveDatabase();
 
+    const token = createAdminSession('ADMIN', matchedCred.id, matchedCred.name);
+
     return res.json({
       success: true,
+      token,
       role: 'ADMIN',
       admin_id: matchedCred.id,
       admin_name: matchedCred.name,
-      admin_password: matchedCred.password,
       message: `Welcome ${matchedCred.name}! SR Gateway Admin Control Panel Unlocked ⚡`,
     });
   }
@@ -4587,7 +4679,7 @@ app.post('/api/v1/admin/verify-pass', (req: Request, res: Response) => {
 });
 
 // Admin Audit Logs Endpoints
-app.get('/api/v1/admin/audit-logs', (req: Request, res: Response) => {
+app.get('/api/v1/admin/audit-logs', requireAdminAuth, (req: Request, res: Response) => {
   res.json({
     status: 'success',
     code: 200,
@@ -4596,7 +4688,7 @@ app.get('/api/v1/admin/audit-logs', (req: Request, res: Response) => {
   });
 });
 
-app.post('/api/v1/admin/audit-logs', (req: Request, res: Response) => {
+app.post('/api/v1/admin/audit-logs', requireAdminAuth, (req: Request, res: Response) => {
   const { admin_id, admin_name, admin_password, action, target_user_id, target_user_name, amount, previous_balance, new_balance, reason } = req.body || {};
   const newLog = {
     id: `AUD-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
@@ -4655,8 +4747,8 @@ const handleResetAllBalances = (req: Request, res: Response) => {
   });
 };
 
-app.post('/api/v1/admin/reset-balances', handleResetAllBalances);
-app.post('/api/v1/admin/reset-all-balances', handleResetAllBalances);
+app.post('/api/v1/admin/reset-balances', requireOwnerAuth, handleResetAllBalances);
+app.post('/api/v1/admin/reset-all-balances', requireOwnerAuth, handleResetAllBalances);
 
 // Admin Wipe All Registered Users Data
 const handleWipeAllUsers = (req: Request, res: Response) => {
@@ -4842,9 +4934,9 @@ const handleAdminCreateUser = (req: Request, res: Response) => {
   });
 };
 
-app.post('/api/v1/admin/create-user', handleAdminCreateUser);
-app.post('/api/v1/admin/wipe-users', handleWipeAllUsers);
-app.post('/api/v1/admin/wipe-all-users', handleWipeAllUsers);
+app.post('/api/v1/admin/create-user', requireAdminAuth, handleAdminCreateUser);
+app.post('/api/v1/admin/wipe-users', requireOwnerAuth, handleWipeAllUsers);
+app.post('/api/v1/admin/wipe-all-users', requireOwnerAuth, handleWipeAllUsers);
 
 // Dedicated endpoint: Link Telegram Chat ID / Username to user account & strictly unbind from other accounts
 app.post('/api/v1/auth/telegram-link', (req: Request, res: Response) => {
@@ -4953,8 +5045,12 @@ app.post('/api/v1/user/update-chat-id', (req: Request, res: Response) => {
   });
 });
 
-// Sync state endpoint for frontend synchronization
+// Sync state endpoint for frontend synchronization (Secure, role-aware)
 app.get('/api/v1/sync-state', (req: Request, res: Response) => {
+  const adminSession = getAdminSessionFromReq(req);
+  const isOwner = adminSession?.role === 'OWNER';
+  const isAdmin = isOwner || adminSession?.role === 'ADMIN';
+
   const profileMap = new Map<string, any>();
   Object.values(users).forEach((u: any) => {
     if (u && (u.id || u.user_custom_id)) {
@@ -4966,24 +5062,64 @@ app.get('/api/v1/sync-state', (req: Request, res: Response) => {
   res.json({
     status: 'success',
     code: 200,
-    settings: appSettings,
-    profiles: dedupedProfiles,
+    settings: isAdmin ? appSettings : getSanitizedSettingsForRole('USER'),
+    profiles: isAdmin ? dedupedProfiles : getSanitizedProfilesForPublic(dedupedProfiles),
     wallets,
     deposits: depositRequests,
     withdrawals: withdrawalRequests,
     transactions,
-    apiKeys,
-    auditLogs: auditLogs.slice(0, 200),
-    subAdminCredentials,
+    apiKeys: isAdmin ? apiKeys : [],
+    auditLogs: isAdmin ? auditLogs.slice(0, 200) : [],
+    subAdminCredentials: isOwner ? subAdminCredentials : [],
   });
 });
 
 app.post('/api/v1/sync-state', (req: Request, res: Response) => {
-  const { profiles, wallets: incomingWallets, settings: incomingSettings, deposits, withdrawals, transactions: incomingTxns, apiKeys: incomingKeys, isAdmin } = req.body || {};
+  const adminSession = getAdminSessionFromReq(req);
+  const isOwner = adminSession?.role === 'OWNER';
+  const isAdmin = isOwner || adminSession?.role === 'ADMIN';
 
-  // Strictly enforce that only admin actions can update global appSettings to prevent accidental reset by regular user state
+  const { profiles, wallets: incomingWallets, settings: incomingSettings, deposits, withdrawals, transactions: incomingTxns, apiKeys: incomingKeys } = req.body || {};
+
+  // Strictly enforce that only admin actions with valid server admin session can update global appSettings
   if (isAdmin && incomingSettings && typeof incomingSettings === 'object') {
-    appSettings = { ...appSettings, ...incomingSettings };
+    const clientSecurityCode = ((req.headers['x-security-code'] as string) || req.body?.security_code || '').trim();
+    const requiredCode = isOwner ? OWNER_SECURITY_CODE : SUBADMIN_SECURITY_CODE;
+    
+    // Only update appSettings if security code matches
+    if (clientSecurityCode === requiredCode) {
+      if (!isOwner) {
+        // Sub-admins cannot alter sensitive gateway keys
+        const sensitiveFields = [
+          'admin_upi_id', 'admin_qr_url', 'admin_bank_name', 'admin_bank_account_name',
+          'admin_bank_account_no', 'admin_bank_ifsc', 'deposit_charge_percent',
+          'withdraw_charge_percent', 'minimum_deposit', 'minimum_withdraw',
+          'maximum_withdraw', 'otp_telegram_bot_token', 'smtp_pass', 'smtp_user',
+          'smtp_host', 'smtp_port', 'smtp_from_name', 'smtp_from_email',
+          'signup_bonus_enabled', 'signup_bonus_amount', 'welcome_bonus_min_txn',
+          'welcome_bonus_expiry_hours', 'maintenance_mode_enabled',
+          'maintenance_mode_title', 'maintenance_mode_message',
+          'maintenance_channel_url', 'maintenance_estimated_time'
+        ];
+        for (const k of sensitiveFields) {
+          if (incomingSettings[k] !== undefined) {
+            incomingSettings[k] = (appSettings as any)[k];
+          }
+        }
+      }
+
+      const {
+        otp_telegram_bot_token: _botTok,
+        smtp_pass: _smtpP,
+        smtp_user: _smtpU,
+        smtp_host: _smtpH,
+        smtp_from_email: _smtpFE,
+        security_code: _secCode,
+        ...safeIncomingSettings
+      } = incomingSettings;
+
+      appSettings = { ...appSettings, ...safeIncomingSettings };
+    }
   }
 
   if (Array.isArray(profiles)) {
@@ -5087,7 +5223,7 @@ app.post('/api/v1/sync-state', (req: Request, res: Response) => {
 });
 
 // Sync users from client state
-app.post('/api/v1/admin/sync-users', (req: Request, res: Response) => {
+app.post('/api/v1/admin/sync-users', requireAdminAuth, (req: Request, res: Response) => {
   const { profiles, wallets: incomingWallets } = req.body || {};
   if (Array.isArray(profiles)) {
     for (const p of profiles) {
@@ -5112,7 +5248,7 @@ app.post('/api/v1/admin/sync-users', (req: Request, res: Response) => {
 });
 
 // Admin: Set User Daily Request Limit
-app.post('/api/v1/admin/user/set-limit', (req: Request, res: Response) => {
+app.post('/api/v1/admin/user/set-limit', requireAdminAuth, (req: Request, res: Response) => {
   const { user_id, limit, admin_key } = req.body || {};
   const targetId = (user_id || '').toString().trim();
   const newLimit = parseInt(limit, 10);
@@ -5153,7 +5289,7 @@ app.post('/api/v1/admin/user/set-limit', (req: Request, res: Response) => {
 });
 
 // Admin: Reset User Daily Request Count
-app.post('/api/v1/admin/user/reset-count', (req: Request, res: Response) => {
+app.post('/api/v1/admin/user/reset-count', requireAdminAuth, (req: Request, res: Response) => {
   const { user_id } = req.body || {};
   const targetId = (user_id || '').toString().trim();
 
@@ -5194,7 +5330,7 @@ app.post('/api/v1/admin/user/reset-count', (req: Request, res: Response) => {
 });
 
 // Admin: Export Full Database (JSON Backup & Migration Payload)
-app.get('/api/v1/admin/export-database', (req: Request, res: Response) => {
+app.get('/api/v1/admin/export-database', requireOwnerAuth, (req: Request, res: Response) => {
   try {
     const uniqueUserMap = new Map<string, any>();
     for (const u of Object.values(users)) {
@@ -5225,7 +5361,7 @@ app.get('/api/v1/admin/export-database', (req: Request, res: Response) => {
 });
 
 // Admin: Import Full Database (JSON Restore & Migration Sync)
-app.post('/api/v1/admin/import-database', (req: Request, res: Response) => {
+app.post('/api/v1/admin/import-database', requireOwnerAuth, (req: Request, res: Response) => {
   try {
     const data = req.body;
     if (!data || typeof data !== 'object') {
@@ -5310,7 +5446,7 @@ app.post('/api/v1/admin/import-database', (req: Request, res: Response) => {
 });
 
 // Admin: Update User Credentials (Password, RPIN, Telegram Chat ID, Mobile, Email)
-app.post('/api/v1/admin/user/update-credentials', (req: Request, res: Response) => {
+app.post('/api/v1/admin/user/update-credentials', requireAdminAuth, (req: Request, res: Response) => {
   const { user_id, password, rpin, telegram_chat_id, telegram_id, mobile, email, full_name, status } = req.body || {};
   const targetId = (user_id || '').toString().trim();
 
@@ -5365,7 +5501,7 @@ app.post('/api/v1/admin/user/update-credentials', (req: Request, res: Response) 
 });
 
 // Admin: Toggle User Account Status (Suspend / Unsuspend)
-app.post('/api/v1/admin/user/toggle-status', (req: Request, res: Response) => {
+app.post('/api/v1/admin/user/toggle-status', requireAdminAuth, (req: Request, res: Response) => {
   const { user_id, status, reason, admin_name = 'Administrator', admin_password = '', admin_id = 'admin-001' } = req.body || {};
   const targetId = (user_id || '').toString().trim();
   const targetStatus = (status || '').toString().toUpperCase();
@@ -5424,7 +5560,7 @@ app.post('/api/v1/admin/user/toggle-status', (req: Request, res: Response) => {
 });
 
 // Admin: Adjust User Wallet Balance (Atomic Credit or Debit with Multi-key Mirroring)
-app.post('/api/v1/admin/user/adjust-balance', (req: Request, res: Response) => {
+app.post('/api/v1/admin/user/adjust-balance', requireAdminAuth, (req: Request, res: Response) => {
   const { user_id, amount, type, reason, admin_id = 'admin-001', admin_name = 'Administrator', admin_password = '' } = req.body || {};
   const targetId = (user_id || '').toString().trim();
   const numAmount = parseFloat(amount);
@@ -6793,11 +6929,8 @@ app.post('/api/v1/telegram-bot/simulate-command', async (req: Request, res: Resp
 });
 
 
-// Forward to secure handleUpdateAdminSettings
-app.put('/api/v1/admin/settings', handleUpdateAdminSettings);
-
 // Admin Email Alert Testing Endpoint
-app.post('/api/v1/admin/test-email', async (req: Request, res: Response) => {
+app.post('/api/v1/admin/test-email', requireAdminAuth, async (req: Request, res: Response) => {
   const {
     to = 'sk190rihan@gmail.com',
     test_type = 'LOGIN_ALERT',
@@ -6915,7 +7048,7 @@ app.post('/api/v1/email/send-alert', async (req: Request, res: Response) => {
 });
 
 // Email Audit Logs
-app.get('/api/v1/admin/email-logs', (req: Request, res: Response) => {
+app.get('/api/v1/admin/email-logs', requireAdminAuth, (req: Request, res: Response) => {
   res.json({
     status: 'success',
     code: 200,
@@ -6924,7 +7057,7 @@ app.get('/api/v1/admin/email-logs', (req: Request, res: Response) => {
   });
 });
 
-app.delete('/api/v1/admin/email-logs', (req: Request, res: Response) => {
+app.delete('/api/v1/admin/email-logs', requireAdminAuth, (req: Request, res: Response) => {
   emailLogs = [];
   res.json({
     status: 'success',
@@ -6933,7 +7066,7 @@ app.delete('/api/v1/admin/email-logs', (req: Request, res: Response) => {
   });
 });
 
-app.post('/api/v1/admin/approve-deposit', async (req: Request, res: Response) => {
+app.post('/api/v1/admin/approve-deposit', requireAdminAuth, async (req: Request, res: Response) => {
   const { deposit_id, admin_name = 'Administrator', admin_password = '', admin_id = 'admin-001' } = req.body;
   const dep = depositRequests.find((d) => d.id === deposit_id);
 
@@ -7060,7 +7193,7 @@ app.post('/api/v1/admin/approve-deposit', async (req: Request, res: Response) =>
   res.json({ status: 'success', code: 200, message: 'Deposit approved & user balance updated', deposit: dep, wallet });
 });
 
-app.post('/api/v1/admin/reject-deposit', async (req: Request, res: Response) => {
+app.post('/api/v1/admin/reject-deposit', requireAdminAuth, async (req: Request, res: Response) => {
   const { deposit_id, reason = 'Invalid UTR', admin_name = 'Administrator', admin_password = '', admin_id = 'admin-001' } = req.body;
   const dep = depositRequests.find((d) => d.id === deposit_id);
 
@@ -7098,7 +7231,7 @@ app.post('/api/v1/admin/reject-deposit', async (req: Request, res: Response) => 
   res.json({ status: 'success', code: 200, message: 'Deposit request rejected', deposit: dep });
 });
 
-app.post('/api/v1/admin/approve-withdraw', async (req: Request, res: Response) => {
+app.post('/api/v1/admin/approve-withdraw', requireAdminAuth, async (req: Request, res: Response) => {
   const { withdraw_id, admin_name = 'Administrator', admin_password = '', admin_id = 'admin-001' } = req.body;
   const wd = withdrawalRequests.find((w) => w.id === withdraw_id);
 
@@ -7212,7 +7345,7 @@ app.post('/api/v1/admin/approve-withdraw', async (req: Request, res: Response) =
   res.json({ status: 'success', code: 200, message: 'Withdrawal marked as paid & confirmed', withdrawal: wd, wallet });
 });
 
-app.post('/api/v1/admin/reject-withdraw', async (req: Request, res: Response) => {
+app.post('/api/v1/admin/reject-withdraw', requireAdminAuth, async (req: Request, res: Response) => {
   const { withdraw_id, reason = 'Declined by Admin', admin_name = 'Administrator', admin_password = '', admin_id = 'admin-001' } = req.body;
   const wd = withdrawalRequests.find((w) => w.id === withdraw_id);
 
@@ -7276,7 +7409,7 @@ app.post('/api/v1/admin/reject-withdraw', async (req: Request, res: Response) =>
   res.json({ status: 'success', code: 200, message: 'Withdrawal request rejected and balance restored', withdrawal: wd, wallet });
 });
 
-app.post('/api/v1/admin/credit-debit', (req: Request, res: Response) => {
+app.post('/api/v1/admin/credit-debit', requireAdminAuth, (req: Request, res: Response) => {
   const { target_user_id, amount, type, reason } = req.body;
   const numAmt = parseFloat(amount);
 
@@ -7348,7 +7481,7 @@ app.post('/api/v1/admin/credit-debit', (req: Request, res: Response) => {
 });
 
 // Admin Action: Update User Daily HTTPS Request Limit
-app.post('/api/v1/admin/update-user-quota', (req: Request, res: Response) => {
+app.post('/api/v1/admin/update-user-quota', requireAdminAuth, (req: Request, res: Response) => {
   const { user_id, user_custom_id, daily_limit } = req.body;
   const newLimit = Math.max(1, parseInt(daily_limit, 10) || 10);
 
@@ -7385,7 +7518,7 @@ app.post('/api/v1/admin/update-user-quota', (req: Request, res: Response) => {
 });
 
 // Admin Action: Reset User Today's HTTPS Request Counter to 0 (Instant Unlock)
-app.post('/api/v1/admin/reset-user-quota-count', (req: Request, res: Response) => {
+app.post('/api/v1/admin/reset-user-quota-count', requireAdminAuth, (req: Request, res: Response) => {
   const { user_id, user_custom_id } = req.body;
 
   const targetUser = users[user_id] || users[user_custom_id] || Object.values(users).find(
@@ -7471,7 +7604,7 @@ app.get('/api/v1/user/quota', (req: Request, res: Response) => {
 });
 
 // Admin Action: Reset All Users' Balances to ₹0.00
-app.post('/api/v1/admin/reset-all-balances', (req: Request, res: Response) => {
+app.post('/api/v1/admin/reset-all-balances', requireOwnerAuth, (req: Request, res: Response) => {
   let resetCount = 0;
   let totalResetAmount = 0;
 
@@ -7515,7 +7648,7 @@ app.post('/api/v1/admin/reset-all-balances', (req: Request, res: Response) => {
 });
 
 // Admin Action: Factory Wipe All Registered Users Data
-app.post('/api/v1/admin/wipe-all-users', (req: Request, res: Response) => {
+app.post('/api/v1/admin/wipe-all-users', requireOwnerAuth, (req: Request, res: Response) => {
   const previousUserCount = Object.keys(users).length;
 
   // Preserve Master Admin Account Only
@@ -7586,7 +7719,7 @@ app.post('/api/v1/admin/wipe-all-users', (req: Request, res: Response) => {
 });
 
 // Admin Telegram Bot Live Diagnostics & Polling Control
-app.get('/api/v1/admin/bot-health', async (req: Request, res: Response) => {
+app.get('/api/v1/admin/bot-health', requireAdminAuth, async (req: Request, res: Response) => {
   const token = getTelegramBotToken();
   if (!isRealTelegramToken(token)) {
     return res.json({

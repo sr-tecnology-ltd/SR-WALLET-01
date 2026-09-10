@@ -176,6 +176,25 @@ const safeLocalStorageSet = (key: string, value: string) => {
   }
 };
 
+export const getAdminAuthHeaders = (extraHeaders?: Record<string, string>): Record<string, string> => {
+  const token = typeof window !== 'undefined' ? (sessionStorage.getItem('sr_admin_token') || sessionStorage.getItem('sr_owner_token') || '') : '';
+  const adminPass = typeof window !== 'undefined' ? (sessionStorage.getItem('sr_admin_pass') || sessionStorage.getItem('sr_owner_pass') || sessionStorage.getItem('sr_subadmin_pass') || 'Sksahilbhaixxxcom') : 'Sksahilbhaixxxcom';
+  const adminRole = typeof window !== 'undefined' ? (sessionStorage.getItem('sr_admin_role') || sessionStorage.getItem('sr_owner_role') || sessionStorage.getItem('sr_subadmin_role') || 'ADMIN') : 'ADMIN';
+  const adminId = typeof window !== 'undefined' ? (sessionStorage.getItem('sr_admin_id') || sessionStorage.getItem('sr_owner_id') || sessionStorage.getItem('sr_subadmin_id') || 'admin-001') : 'admin-001';
+  const adminName = typeof window !== 'undefined' ? (sessionStorage.getItem('sr_admin_name') || sessionStorage.getItem('sr_owner_name') || sessionStorage.getItem('sr_subadmin_name') || 'Administrator') : 'Administrator';
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(extraHeaders || {}),
+  };
+  if (token) headers['x-admin-token'] = token;
+  if (adminPass) headers['x-admin-key'] = adminPass;
+  if (adminRole) headers['x-user-role'] = adminRole;
+  if (adminId) headers['x-admin-id'] = adminId;
+  if (adminName) headers['x-admin-name'] = adminName;
+  return headers;
+};
+
 export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Load state from localStorage or initialize
   const [profiles, setProfiles] = useState<UserProfile[]>(() => {
@@ -322,7 +341,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Non-blocking sync to backend
     fetch('/api/v1/sync-state', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAdminAuthHeaders(),
       body: JSON.stringify({
         profiles,
         wallets,
@@ -356,7 +375,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (isSyncingRef.current) return;
     isSyncingRef.current = true;
     try {
-      const res = await fetch('/api/v1/sync-state');
+      const res = await fetch('/api/v1/sync-state', {
+        headers: getAdminAuthHeaders(),
+      });
       if (!res.ok) return;
       const data = await res.json();
       if (data.status === 'success') {
@@ -730,16 +751,13 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // Push to backend settings API and sync-state immediately
       fetch('/api/v1/admin/settings', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-role': activeRole,
-        },
+        headers: getAdminAuthHeaders({ 'x-user-role': activeRole }),
         body: JSON.stringify({ ...merged, operator_role: activeRole }),
       }).catch(() => null);
 
       fetch('/api/v1/sync-state', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify({ settings: merged, isAdmin: true }),
       }).catch(() => null);
 
@@ -785,7 +803,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Non-blocking sync to server audit logs
     fetch('/api/v1/admin/audit-logs', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAdminAuthHeaders(),
       body: JSON.stringify(newLog),
     }).catch(() => {});
   };
@@ -1036,7 +1054,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const res = await fetch('/api/v1/admin/approve-deposit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify({
           deposit_id: depositId,
           admin_id: adminId,
@@ -1152,7 +1170,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       await fetch('/api/v1/admin/reject-deposit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify({
           deposit_id: depositId,
           reason,
@@ -1395,7 +1413,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const res = await fetch('/api/v1/admin/approve-withdraw', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify({
           withdraw_id: withdrawalId,
           payment_reference: paymentReference,
@@ -1504,7 +1522,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const res = await fetch('/api/v1/admin/reject-withdraw', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify({
           withdraw_id: withdrawalId,
           reason,
@@ -1998,7 +2016,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const res = await fetch('/api/v1/admin/user/adjust-balance', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify({
           user_id: resolvedId,
           amount,
@@ -2108,7 +2126,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const res = await fetch('/api/v1/admin/user/adjust-balance', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify({
           user_id: resolvedId,
           amount,
@@ -2178,7 +2196,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Sync with backend API
     fetch('/api/v1/admin/update-user-quota', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAdminAuthHeaders(),
       body: JSON.stringify({
         user_id: targetUser.id,
         user_custom_id: targetUser.user_custom_id,
@@ -2214,7 +2232,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Sync with backend API
     fetch('/api/v1/admin/reset-user-quota-count', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAdminAuthHeaders(),
       body: JSON.stringify({
         user_id: targetUser.id,
         user_custom_id: targetUser.user_custom_id,
@@ -2652,7 +2670,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       const res = await fetch('/api/v1/admin/create-user', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify({
           full_name: data.fullName,
           mobile: cleanMobile,
@@ -2747,7 +2765,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // Post to backend persistent database
       const res = await fetch('/api/v1/admin/user/update-credentials', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify({
           user_id: targetUser.user_custom_id || targetUser.id,
           ...data,
@@ -2774,7 +2792,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // 1. Send to server backend to replace disk file /data/srgateway_database.json and sync in-memory state
       const res = await fetch('/api/v1/admin/import-database', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify(jsonPayload),
       });
 
@@ -3457,7 +3475,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       await fetch('/api/v1/admin/reset-all-balances', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
       });
     } catch (e) {
       console.warn('Backend reset-all-balances call failed:', e);
@@ -3511,7 +3529,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       await fetch('/api/v1/admin/wipe-all-users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAdminAuthHeaders(),
       });
     } catch (e) {
       console.warn('Backend wipe-all-users call failed:', e);
@@ -3536,10 +3554,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const res = await fetch('/api/v1/owner/admins', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-role': activeRole,
-        },
+        headers: getAdminAuthHeaders({ 'x-user-role': activeRole }),
         body: JSON.stringify({ ...data, operator_role: activeRole }),
       });
       const result = await res.json();
@@ -3573,10 +3588,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const res = await fetch(`/api/v1/owner/admins/${id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-role': activeRole,
-        },
+        headers: getAdminAuthHeaders({ 'x-user-role': activeRole }),
         body: JSON.stringify({ ...data, operator_role: activeRole }),
       });
       const result = await res.json();
@@ -3599,10 +3611,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const res = await fetch(`/api/v1/owner/admins/${id}`, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-role': activeRole,
-        },
+        headers: getAdminAuthHeaders({ 'x-user-role': activeRole }),
       });
       const result = await res.json();
       if (res.ok) {
@@ -3623,7 +3632,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const ownerFetchAdmins = async (): Promise<UserProfile[]> => {
     try {
       const res = await fetch('/api/v1/owner/admins', {
-        headers: { 'x-user-role': activeRole },
+        headers: getAdminAuthHeaders({ 'x-user-role': activeRole }),
       });
       const result = await res.json();
       if (res.ok && Array.isArray(result.admins)) {
@@ -3638,7 +3647,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const ownerFetchAdminPasswords = async (): Promise<SubAdminCredential[]> => {
     try {
       const res = await fetch('/api/v1/owner/admin-passwords', {
-        headers: { 'x-user-role': activeRole },
+        headers: getAdminAuthHeaders({ 'x-user-role': activeRole }),
       });
       const result = await res.json();
       if (res.ok && Array.isArray(result.credentials)) {
@@ -3655,7 +3664,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const res = await fetch('/api/v1/owner/admin-passwords', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-user-role': activeRole },
+        headers: getAdminAuthHeaders({ 'x-user-role': activeRole }),
         body: JSON.stringify(data),
       });
       const result = await res.json();
@@ -3674,7 +3683,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const res = await fetch(`/api/v1/owner/admin-passwords/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'x-user-role': activeRole },
+        headers: getAdminAuthHeaders({ 'x-user-role': activeRole }),
         body: JSON.stringify(data),
       });
       const result = await res.json();
@@ -3693,7 +3702,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const res = await fetch(`/api/v1/owner/admin-passwords/${id}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json', 'x-user-role': activeRole },
+        headers: getAdminAuthHeaders({ 'x-user-role': activeRole }),
       });
       const result = await res.json();
       if (res.ok) {
@@ -3716,12 +3725,16 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
       const result = await res.json();
       if (res.ok && result.success) {
+        if (result.token) {
+          sessionStorage.setItem('sr_admin_token', result.token);
+        }
         if (result.role === 'OWNER') {
           sessionStorage.setItem('sr_owner_authed', 'true');
           sessionStorage.setItem('sr_owner_role', 'MASTER_OWNER');
           sessionStorage.setItem('sr_owner_id', result.admin_id || 'owner-001');
           sessionStorage.setItem('sr_owner_name', result.admin_name || 'Master Administrator');
           sessionStorage.setItem('sr_owner_pass', result.admin_password || password);
+          if (result.token) sessionStorage.setItem('sr_owner_token', result.token);
         } else {
           sessionStorage.setItem('sr_subadmin_authed', 'true');
           sessionStorage.setItem('sr_subadmin_role', result.role || 'ADMIN');
@@ -3738,12 +3751,13 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           success: true,
           message: result.message,
           role: result.role,
+          token: result.token,
           admin_id: result.admin_id,
           admin_name: result.admin_name,
           admin_password: result.admin_password,
         };
       }
-      return { success: false, message: result.message || '⚠️ Invalid password. Access Denied!' };
+      return { success: false, message: result.message || '⚠️ Galat password hai! Access Denied.' };
     } catch (e: any) {
       return { success: false, message: '⚠️ Network error verifying password' };
     }
